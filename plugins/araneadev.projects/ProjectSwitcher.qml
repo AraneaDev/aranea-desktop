@@ -59,7 +59,7 @@ ColumnLayout {
   // Project whose start is under way, including while the automatic checks run.
   readonly property string startingId: {
     var target = client ? client.environmentTarget : null
-    if (!target || !client.autoChecking && !(client.submitting && client.submissionMethod === 'startEnvironment'))
+    if (!target || !client.autoChecking && !((client.submitting || client.acceptanceUnknown) && client.submissionMethod === 'startEnvironment'))
       return ''
     return target.projectId || ''
   }

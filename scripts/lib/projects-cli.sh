@@ -404,10 +404,11 @@ projects_cli_main() {
     projects_cli_require omarchy-shell timeout
     projects_cli_ipc shell summon araneadev.projects '{"mode":"switcher"}' >/dev/null || projects_cli_fail OWNER_UNAVAILABLE 'The quick switcher could not be opened.' 'Activate Aranea and retry.'
     local switch_readback
-    if switch_readback=$(projects_cli_ipc aranea.projects.capture captureSnapshot) && jq -e '.opened==true and .mode=="switcher"' <<<"$switch_readback" >/dev/null 2>&1; then
+    switch_readback=$(projects_cli_ipc aranea.projects.capture captureSnapshot) || projects_cli_fail OWNER_UNAVAILABLE 'The quick switcher could not be confirmed.' 'Activate Aranea and retry.'
+    if jq -e '.opened==true and .mode=="switcher"' <<<"$switch_readback" >/dev/null 2>&1; then
       projects_cli_finish observed '' 'Quick switcher opened.' '{}'
     fi
-    projects_cli_finish partial SWITCHER_BLOCKED 'Projects has unsaved changes; the full window stays open.' '{"recovery":"Save or discard the changes in Projects, then retry."}' 1
+    projects_cli_finish partial SWITCHER_BLOCKED 'Projects is busy with setup or unsaved changes; the full window stays open.' '{"recovery":"Finish or discard the setup or changes in Projects, then retry."}' 1
   fi
   projects_cli_require flock realpath
   case "$command" in register | ignore | relocate | open | discover) projects_cli_require git ;;

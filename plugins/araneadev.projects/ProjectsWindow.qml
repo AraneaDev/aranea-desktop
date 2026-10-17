@@ -69,6 +69,8 @@ PanelWindow {
   }
 
   visible: surfaceMotion.present
+  onVisibleChanged: if (!visible)
+    panel.root.closeFinished()
   // The compact switcher spans the screen so a click outside its card can close it.
   anchors.left: root.mode === 'switcher'
   anchors.right: root.mode === 'switcher'

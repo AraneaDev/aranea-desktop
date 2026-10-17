@@ -47,6 +47,7 @@ case "$1 $2" in
   'shell summon') [[ "$CLI_MODE" != noswitch || "${3:-}" != araneadev.projects || "${4:-}" != *switcher* ]] || exit 1; echo ok ;;
   'shell toggle') echo 'toggle is not allowed' >&2; exit 1 ;;
   'aranea.projects.capture captureSnapshot')
+    [[ "$CLI_MODE" != snapfail ]] || exit 1
     if [[ "$CLI_MODE" == details ]]; then
       jq -cn --arg id "$CLI_PROJECT" '{opened:true,projectId:$id,ui:null}'
     elif [[ "$CLI_MODE" == blocked ]]; then echo '{"opened":true,"mode":"","section":"projects","ui":null}'
@@ -137,7 +138,10 @@ jq -se '[.[] | select(.[0:3]==["shell","summon","araneadev.projects"])] | length
 jq -se 'any(.[]; .[1]=="toggle") | not' "$CLI_CALLS" >/dev/null
 # A window that keeps its full layout is reported as partial, never as opened.
 CLI_MODE=blocked run_cli 1 projects switch
-jq -se 'last as $l | $l.status=="partial" and $l.code=="SWITCHER_BLOCKED" and $l.message=="Projects has unsaved changes; the full window stays open."' "$events" >/dev/null
+jq -se 'last as $l | $l.status=="partial" and $l.code=="SWITCHER_BLOCKED" and $l.message=="Projects is busy with setup or unsaved changes; the full window stays open."' "$events" >/dev/null
+# A failed read-back means the owner is unreachable, not that changes are unsaved.
+CLI_MODE=snapfail run_cli 1 projects switch
+jq -se 'last.code=="OWNER_UNAVAILABLE"' "$events" >/dev/null
 CLI_MODE=noswitch run_cli 1 projects switch
 jq -se 'last.code=="OWNER_UNAVAILABLE"' "$events" >/dev/null
 run_cli 2 projects switch extra

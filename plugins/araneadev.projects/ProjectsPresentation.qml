@@ -637,8 +637,15 @@ Item {
   function close() {
     inspectionDestination = null
     clearDismissalIntent()
-    mode = ''
     opened = false
+    // Without a window there is no fade-out to protect.
+    if (!view)
+      mode = ''
+  }
+  // The window has finished closing and is gone: the next open starts from the full layout.
+  function closeFinished() {
+    if (!opened)
+      mode = ''
   }
   Component.onCompleted: {
     if (!windowEnabled)

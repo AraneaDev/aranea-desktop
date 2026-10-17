@@ -578,7 +578,25 @@ ShellRoot {
       keys.keyClick(Qt.Key_Escape)
       t.check(!entry.opened, 'Escape closes even while display-only')
       entry.captureActive = false
-      t.equal(entry.mode, '', 'closing resets the mode')
+      closeCase()
+    })
+  }
+  // Closing keeps the compact card while the window fades out; the mode resets once it is gone.
+  function closeCase() {
+    t.check(!entry.opened, 'closed')
+    host.openSwitcher()
+    t.step(60, function () {
+      entry.close()
+      t.equal(entry.mode, 'switcher', 'the mode is kept during the close')
+      t.check(t.findChild(surface, 'projectSwitcherCard').width <= 560, 'the card stays compact while closing')
+      entry.closeFinished()
+      t.equal(entry.mode, '', 'the mode resets once the window is gone')
+      host.openSwitcher()
+      entry.close()
+      entry.open('{}')
+      t.equal(entry.mode, '', 'an open without a mode gives the full layout')
+      entry.close()
+      entry.closeFinished()
       lateRowsCase()
     })
   }
@@ -592,7 +610,7 @@ ShellRoot {
         t.check(entry.projectClient.acceptanceUnknown, 'the start is unconfirmed')
         t.equal(t.findChild(surface, 'projectSwitcherAction:p-ret').text, 'Busy right now', 'another row reads Busy right now')
         t.equal(t.findChild(surface, 'projectSwitcherAction:p-bare').text, 'Busy right now', 'and so does the setup row')
-        t.equal(t.findChild(surface, 'projectSwitcherAction:p-start').text, 'Start · VS Code', 'the unconfirmed row keeps its own label')
+        t.equal(t.findChild(surface, 'projectSwitcherAction:p-start').text, 'Starting…', 'the unconfirmed row reads Starting')
         host.note()
         emptyCase()
       })
