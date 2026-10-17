@@ -42,7 +42,7 @@ if /usr/bin/jq -e 'type=="object" and has("kind")' <<<"$request" >/dev/null; the
      elif .terminalId=="alacritty" then ["alacritty","--class",$token,"--working-directory",$cwd,"--command"]
      elif .terminalId=="foot" then ["foot","--app-id",$token,"--working-directory",$cwd]
      else ["ghostty","--class="+$token,"--gtk-single-instance=false","--working-directory="+$cwd,"-e"] end) as $base |
-    {argv:($base + ["git","-c","core.pager=less","-c","pager.diff=less","-C",$cwd,"diff","--no-ext-diff","--no-textconv",$range]),cwd:$cwd}' <<<"$request")
+    {argv:($base + ["git","-c","core.pager=less","-c","pager.diff=less","-c","core.fsmonitor=false","-C",$cwd,"diff","--no-ext-diff","--no-textconv",$range]),cwd:$cwd}' <<<"$request")
 fi
 [[ "$project_diff" == true ]] || /usr/bin/jq -e '
   type=="object" and ((keys)==["argv","cwd"]) and ((.cwd|type)=="string") and (.cwd|startswith("/")) and (.cwd|test("[\\x00-\\x1f\\x7f]")|not) and
@@ -96,7 +96,7 @@ project_executable=$(resolve_tool "${argv[0]}") || fail TOOL_MISSING 'Choose an 
 argv[0]=$project_executable
 if [[ "$project_diff" == true ]]; then
   project_git=$(resolve_tool git) || fail TOOL_MISSING 'Install Git outside the checkout.'
-  argv[-11]=$project_git
+  argv[-13]=$project_git
 fi
 if [[ ${argv[-3]} == nvim && ${argv[-2]} == -- ]]; then
   project_nvim=$(resolve_tool nvim) || fail TOOL_MISSING 'Choose installed Neovim outside the checkout.'

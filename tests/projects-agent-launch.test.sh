@@ -222,8 +222,8 @@ for terminal in kitty alacritty foot ghostty; do
     [[ ! -f "$ARANEA_TEST_SANDBOX/cwd" ]] || break
     sleep .02
   done
-  tail_actual=$(jq -Rsc 'split("\n")[:-1][-11:]' "$ARANEA_TEST_SANDBOX/argv")
-  tail_expected=$(jq -cn --arg g "$tool_bin/git" --arg cwd "$checkout" --arg r "$merge_base...HEAD" '[$g,"-c","core.pager=less","-c","pager.diff=less","-C",$cwd,"diff","--no-ext-diff","--no-textconv",$r]')
+  tail_actual=$(jq -Rsc 'split("\n")[:-1][-13:]' "$ARANEA_TEST_SANDBOX/argv")
+  tail_expected=$(jq -cn --arg g "$tool_bin/git" --arg cwd "$checkout" --arg r "$merge_base...HEAD" '[$g,"-c","core.pager=less","-c","pager.diff=less","-c","core.fsmonitor=false","-C",$cwd,"diff","--no-ext-diff","--no-textconv",$r]')
   [[ "$tail_actual" == "$tail_expected" ]] || {
     echo "Expected diff tail $tail_expected for $terminal, got: $tail_actual"
     exit 1
@@ -318,6 +318,32 @@ sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || tru
 sleep 1
 [[ ! -f "$ARANEA_TEST_SANDBOX/pager-ran" ]] || {
   echo "pager.diff ran from repository config"
+  exit 1
+}
+accepted=$((accepted + 1))
+# A repository core.fsmonitor hook never runs, even with a changed working tree (pty, real argv).
+printf '#!/bin/sh\n: > "%s/fsmonitor-ran"\nprintf "\\0"\n' "$ARANEA_TEST_SANDBOX" >"$ARANEA_TEST_SANDBOX/fsmonitor.sh"
+chmod +x "$ARANEA_TEST_SANDBOX/fsmonitor.sh"
+git -C "$repo" config --unset pager.diff
+git -C "$repo" config core.fsmonitor "$ARANEA_TEST_SANDBOX/fsmonitor.sh"
+echo three >"$repo/f"
+rm -f "$ARANEA_TEST_SANDBOX/fsmonitor-ran"
+# Control: a plain status of the same repository does run the planted hook.
+git -C "$repo" status >/dev/null 2>&1 || true
+[[ -f "$ARANEA_TEST_SANDBOX/fsmonitor-ran" ]] || {
+  echo "Control failed: core.fsmonitor should run for a status"
+  exit 1
+}
+rm -f "$ARANEA_TEST_SANDBOX/fsmonitor-ran"
+jq -cn --arg p "$repo" '{projects:[{id:"p",checkouts:[{id:"c",path:$p,primary:false}]}]}' >"$ARANEA_TEST_SANDBOX/home/.local/state/aranea/projects.json"
+result=$(diff_request "$repo" "$base" kitty | PATH="$real_bin" "$launcher") || {
+  echo "Expected fsmonitor diff acceptance, got: $result"
+  exit 1
+}
+sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || true"
+sleep 2
+[[ ! -f "$ARANEA_TEST_SANDBOX/fsmonitor-ran" ]] || {
+  echo "core.fsmonitor ran from repository config"
   exit 1
 }
 accepted=$((accepted + 1))
