@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.31.2](https://github.com/AraneaDev/aranea-desktop/compare/v2.31.1...v2.31.2) (2026-10-17)
+
+
+### Fixes
+
+* **screenshots:** close open panels before a Projects capture ([#177](https://github.com/AraneaDev/aranea-desktop/issues/177)) ([e082122](https://github.com/AraneaDev/aranea-desktop/commit/e082122c5bea7d1d8bc456428f51e3e6ed92af12))
+
 ## [2.31.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.31.0...v2.31.1) (2026-10-17)
 
 
