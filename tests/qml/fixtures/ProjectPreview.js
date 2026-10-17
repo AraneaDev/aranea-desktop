@@ -400,9 +400,18 @@ function sample(id, mode, count) {
               ahead: 3,
               behind: 0,
               commits: [
-                { sha: "89abcdef0123456789abcdef0123456789abcdef", subject: "Keep focus in the sidebar after a refresh" },
-                { sha: "4567890123abcdef4567890123abcdef45678901", subject: "Add keyboard shortcuts to the project list" },
-                { sha: "bcdef0123456789abcdef0123456789abcdef012", subject: "Group navigation links by section" }
+                {
+                  sha: "89abcdef0123456789abcdef0123456789abcdef",
+                  subject: "Keep focus in the sidebar after a refresh"
+                },
+                {
+                  sha: "4567890123abcdef4567890123abcdef45678901",
+                  subject: "Add keyboard shortcuts to the project list"
+                },
+                {
+                  sha: "bcdef0123456789abcdef0123456789abcdef012",
+                  subject: "Group navigation links by section"
+                }
               ],
               files: [
                 { path: "src/navigation/Sidebar.js", added: 64, removed: 12 },
@@ -417,27 +426,26 @@ function sample(id, mode, count) {
           }
         }
       : {},
-    projectActions:
-      reviewFixture
-        ? {
-            snapshot: {
-              revision: 1,
-              definitions: [
-                {
-                  id: "a-tests",
-                  projectId: project.id,
-                  revision: 1,
-                  name: "Run tests",
-                  kind: "command",
-                  argv: ["npm", "test"],
-                  cwdRelative: "."
-                }
-              ],
-              runs: [],
-              requests: []
-            }
+    projectActions: reviewFixture
+      ? {
+          snapshot: {
+            revision: 1,
+            definitions: [
+              {
+                id: "a-tests",
+                projectId: project.id,
+                revision: 1,
+                name: "Run tests",
+                kind: "command",
+                argv: ["npm", "test"],
+                cwdRelative: "."
+              }
+            ],
+            runs: [],
+            requests: []
           }
-        : mode === "activity"
+        }
+      : mode === "activity"
         ? {
             snapshot: {
               revision: 1,
@@ -469,30 +477,29 @@ function sample(id, mode, count) {
             }
           }
         : {},
-    activitySnapshot:
-      reviewFixture
-        ? {
-            tasks: [
-              {
-                taskId: "t-navigation",
-                provider: "codex",
-                description: "Polish project navigation",
-                reportedState: "ready-for-review",
-                freshness: "connected",
-                nativeSessionEligible: true,
-                lastReceivedAt: reviewTime,
-                verification: { status: "reported-pass" },
-                association: {
-                  status: "registered",
-                  projectId: project.id,
-                  checkoutId: "c-review",
-                  cwd: project.checkouts[1].path
-                }
+    activitySnapshot: reviewFixture
+      ? {
+          tasks: [
+            {
+              taskId: "t-navigation",
+              provider: "codex",
+              description: "Polish project navigation",
+              reportedState: "ready-for-review",
+              freshness: "connected",
+              nativeSessionEligible: true,
+              lastReceivedAt: reviewTime,
+              verification: { status: "reported-pass" },
+              association: {
+                status: "registered",
+                projectId: project.id,
+                checkoutId: "c-review",
+                cwd: project.checkouts[1].path
               }
-            ],
-            operations: []
-          }
-        : mode === "activity"
+            }
+          ],
+          operations: []
+        }
+      : mode === "activity"
         ? {
             tasks: [
               {

@@ -736,9 +736,8 @@ Result fields, carried as the final CLI event's `data`:
   `{projectId,checkoutId,branch,base,mergeBase,head,ahead,behind,commits,files,uncommitted,truncated}`.
   Only task checkouts can be reviewed. The base is chosen as for `task new`
   (`refs/remotes/<remote>/HEAD`, then `<remote>/main`, `<remote>/master`, then
-  local `main`, `master`). `commits` is `[{sha,subject}]`, newest first, at most
-  50. `files` is `[{path,added,removed}]` from `git diff --numstat
-  <mergeBase>...HEAD`, at most 200; binary files report `added` and `removed`
+  local `main`, `master`). `commits` is `[{sha,subject}]`, newest first, at most 50. `files` is `[{path,added,removed}]` from `git diff --numstat
+<mergeBase>...HEAD`, at most 200; binary files report `added` and `removed`
   as `null`. `uncommitted` is `{dirty,untracked}`. `truncated` is true when
   either list was cut.
 - `review mark`: `{projectId,checkoutId,head,taskFinishedAt}`. It saves the
