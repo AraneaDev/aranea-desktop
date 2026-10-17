@@ -105,10 +105,10 @@ Item {
   Connections {
     target: queue.client
     ignoreUnknownSignals: true
-    // A failed list or details read leaves the batch running.
+    // A failed list read leaves the batch running (details reads never set error).
     function onErrorChanged() {
       var error = queue.client.error
-      if (!queue.pending || !error || ['snapshot', 'snapshotPage', 'task'].indexOf(queue.client.errorMethod) >= 0)
+      if (!queue.pending || !error || ['snapshot', 'snapshotPage'].indexOf(queue.client.errorMethod) >= 0)
         return
       queue.fail(error)
     }

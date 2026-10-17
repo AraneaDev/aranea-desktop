@@ -111,6 +111,7 @@ ShellRoot {
         }
       }), '')
       t.equal(client.taskDetails.result, 'full', 'details task kept')
+      detailsBesideWork()
       mismatchedPage({
         token: 'other-read',
         total: 2
@@ -121,6 +122,34 @@ ShellRoot {
       }, 'page with another total')
       finishCapture()
     })
+  }
+  // A details read is read-only: its failure leaves a dismissal being observed
+  // alone, and a submission started meanwhile does not drop its answer.
+  function detailsBesideWork() {
+    client.dismiss('d')
+    var index = calls.length - 1
+    calls[index].done(0, '{"ok":true,"operationId":"dismiss-d","ownerId":"o"}', '')
+    t.check(client.pending && calls[index + 1].argv[2] === 'operation', 'dismissal observed')
+    client.readTask('a')
+    calls[calls.length - 1].done(1, '', 'Socket Error QLocalSocket::PeerClosedError')
+    t.check(client.pending, 'failed details read keeps the dismissal pending')
+    t.equal(client.error, null, 'failed details read sets no shared error')
+    t.check(client.available, 'failed details read does not mark the owner unavailable')
+    calls[index + 1].done(0, '{"id":"dismiss-d","ownerId":"o","state":"completed","outcome":"observed"}', '')
+    t.check(!client.pending, 'dismissal completes')
+    client.readTask('b')
+    var details = calls.length - 1
+    client.dismiss('e')
+    calls[details].done(0, JSON.stringify({
+      ok: true,
+      task: {
+        taskId: 'b',
+        result: 'full b'
+      }
+    }), '')
+    t.equal(client.taskDetails.result, 'full b', 'details answer kept although a submission started')
+    calls[calls.length - 1].done(0, '{"ok":true,"operationId":"dismiss-e","ownerId":"o"}', '')
+    calls[calls.length - 1].done(0, '{"id":"dismiss-e","ownerId":"o","state":"completed","outcome":"observed"}', '')
   }
   // A page that does not belong to the read in progress abandons that read
   // and keeps the last snapshot.

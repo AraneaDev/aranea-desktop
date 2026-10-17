@@ -173,15 +173,27 @@ Item {
     })
     return true
   }
-  // Read one task in full for the details view; failures keep the last one.
+  // Read one task in full for the details view. This read is read-only and
+  // runs beside any submission: it never touches pending, error, available or
+  // the submission generations, and only a later details read supersedes it.
+  // Failures keep the last details.
   function readTask(taskId: string): bool {
     if (captureActive || !Logic.validId(taskId))
       return false
     var read = ++detailGeneration
-    invoke('task', [taskId], function (response) {
-      if (read === client.detailGeneration && response.ok && response.task && response.task.taskId === taskId)
+    var complete = function (code, output) {
+      if (client.captureActive || read !== client.detailGeneration || code !== 0)
+        return
+      var response = null
+      try {
+        response = JSON.parse(output)
+      } catch (e) {}
+      if (response && response.ok && response.task && response.task.taskId === taskId)
         client.taskDetails = response.task
-    })
+    }
+    try {
+      runner([ipcPath, 'aranea.activity', 'task', taskId], complete)
+    } catch (e) {}
     return true
   }
   // A deliberate new user action starts a new submission; transport ambiguity never retries.

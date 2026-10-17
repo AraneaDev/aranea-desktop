@@ -211,6 +211,9 @@ ShellRoot {
       client.refresh()
       calls[calls.length - 1].done(0, '', 'Socket Error QLocalSocket::PeerClosedError')
       t.check(queue.pending, 'failed list read does not cancel the batch')
+      client.readTask('claude:details')
+      calls[calls.length - 1].done(1, '', 'Socket Error QLocalSocket::PeerClosedError')
+      t.check(queue.pending && client.pending, 'failed details read does not cancel the batch')
       accept(index, 'large-' + index)
       complete(calls.length - 1, 'large-' + index)
       t.waitFor(function () {
