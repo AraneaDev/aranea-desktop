@@ -221,7 +221,16 @@ ShellRoot {
             t.equal(t.findChild(header, 'projectRetrySeed').text, 'Check again', 'a failed probe offers Check again')
             t.equal(t.findChild(header, 'projectBlockedReason').text, '', 'no install hint after a failed probe')
             var problem = t.findChild(surface, 'projectsPageProblem')
-            t.check(!!problem && problem.problem && problem.problem.body === "Couldn't check which tools are installed.", 'the page problem keeps the plain message')
+            t.check(!!problem, 'page problem block exists')
+            t.equal(problem.problem, null, 'a seed failure shows in the header only, not the page box')
+            t.check(!t.findChild(surface, 'projectsPageNote').visible, 'nor as a plain page note')
+            // Any other registry error still uses the page box.
+            entry.projectController.errorObject = {
+              code: 'REGISTRY_CONFLICT',
+              message: 'The registry changed since the supplied revision.'
+            }
+            t.check(!!problem.problem && problem.problem.kind === 'changed', 'other registry errors still show the page box')
+            entry.projectController.errorObject = null
             fallback()
           })
         })
