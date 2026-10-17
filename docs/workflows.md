@@ -140,13 +140,14 @@ check action (a saved command named like "test" or "check"; it reads "not run"
 until you run it, and also when a run was stopped or could not be confirmed).
 **Run checks** runs that action. **Open diff** opens your terminal with `git
 diff` against where the branch started; it turns off external diff tools,
-text conversion and the repository's pager setting. **Push branch** pushes the
+text conversion and any pager the repository configures (including a
+per-command `pager.diff`), so repository settings cannot run commands. **Push branch** pushes the
 branch and sets its upstream (never forced). While the agent is still working
 the checkout shows **Agent working**, or **Agent needs input** when it is
 waiting for you.
 
-Choose **Mark reviewed** when you are done; the card comes back if the agent
-commits again or finishes another task. Removing the task checkout ends the
+Choose **Mark reviewed** when you are done; the card comes back when the agent
+finishes another task, or when you open that checkout and it has new commits. Removing the task checkout ends the
 review too. Reviews only appear for task checkouts, not your main checkout.
 In the quick switcher, a project with work to review shows `Review · <branch>`,
 and **Enter** opens that checkout's Overview without launching anything.

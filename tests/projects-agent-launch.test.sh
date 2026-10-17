@@ -222,8 +222,8 @@ for terminal in kitty alacritty foot ghostty; do
     [[ ! -f "$ARANEA_TEST_SANDBOX/cwd" ]] || break
     sleep .02
   done
-  tail_actual=$(jq -Rsc 'split("\n")[:-1][-9:]' "$ARANEA_TEST_SANDBOX/argv")
-  tail_expected=$(jq -cn --arg g "$tool_bin/git" --arg cwd "$checkout" --arg r "$merge_base...HEAD" '[$g,"-c","core.pager=less","-C",$cwd,"diff","--no-ext-diff","--no-textconv",$r]')
+  tail_actual=$(jq -Rsc 'split("\n")[:-1][-11:]' "$ARANEA_TEST_SANDBOX/argv")
+  tail_expected=$(jq -cn --arg g "$tool_bin/git" --arg cwd "$checkout" --arg r "$merge_base...HEAD" '[$g,"-c","core.pager=less","-c","pager.diff=less","-C",$cwd,"diff","--no-ext-diff","--no-textconv",$r]')
   [[ "$tail_actual" == "$tail_expected" ]] || {
     echo "Expected diff tail $tail_expected for $terminal, got: $tail_actual"
     exit 1
@@ -244,6 +244,7 @@ refuse_raw() {
 refuse_raw "$(diff_request "$checkout" 'HEAD;id')" INVALID_LAUNCH
 refuse_raw "$(diff_request "$checkout" "${merge_base^^}")" INVALID_LAUNCH
 refuse_raw "$(diff_request "$checkout" "${merge_base}0")" INVALID_LAUNCH
+refuse_raw "$(diff_request "$checkout" "$merge_base"$'\n')" INVALID_LAUNCH
 refuse_raw "$(diff_request "$checkout" "$merge_base" xterm)" INVALID_LAUNCH
 refuse_raw "$(diff_request "$ARANEA_TEST_SANDBOX/other")" CHECKOUT_INVALID
 refuse_raw "$(diff_request "$checkout/nested")" CHECKOUT_INVALID
@@ -290,6 +291,32 @@ sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || tru
 sleep 1
 [[ ! -f "$ARANEA_TEST_SANDBOX/external-ran" ]] || {
   echo "diff.external ran from repository config"
+  exit 1
+}
+accepted=$((accepted + 1))
+# A repository pager.diff outranks core.pager: run the launcher's argv under a real pty so git pages.
+git -C "$repo" config pager.diff "/usr/bin/touch $ARANEA_TEST_SANDBOX/pager-ran; /usr/bin/cat"
+cat >"$real_bin/kitty" <<'APP'
+#!/bin/bash
+shift 4
+exec /usr/bin/script -qefc "$(printf '%q ' "$@")" /dev/null
+APP
+rm -f "$ARANEA_TEST_SANDBOX/pager-ran"
+# Control: the previous argv (core.pager only) does execute the planted pager under a pty.
+/usr/bin/script -qefc "$(printf '%q ' git -c core.pager=less -C "$repo" diff --no-ext-diff --no-textconv "$base...HEAD")" /dev/null </dev/null >/dev/null 2>&1 || true
+[[ -f "$ARANEA_TEST_SANDBOX/pager-ran" ]] || {
+  echo "Control failed: pager.diff should run under a pty with only core.pager set"
+  exit 1
+}
+rm -f "$ARANEA_TEST_SANDBOX/pager-ran"
+result=$(diff_request "$repo" "$base" kitty | PATH="$real_bin" "$launcher") || {
+  echo "Expected pty diff acceptance, got: $result"
+  exit 1
+}
+sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || true"
+sleep 1
+[[ ! -f "$ARANEA_TEST_SANDBOX/pager-ran" ]] || {
+  echo "pager.diff ran from repository config"
   exit 1
 }
 accepted=$((accepted + 1))
