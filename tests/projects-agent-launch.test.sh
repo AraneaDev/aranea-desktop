@@ -201,4 +201,195 @@ for provider in claude codex; do
   mv "$checkout/nested/$provider" "$tool_bin/$provider"
   launch_path="$tool_bin"
 done
+# Open diff: the saved terminal runs `git -C <registered checkout> diff <mergeBase>...HEAD`, nothing else.
+cp "$tool_bin/kitty" "$tool_bin/git"
+mkdir -p "$ARANEA_TEST_SANDBOX/home/.local/state/aranea" "$ARANEA_TEST_SANDBOX/other"
+jq -cn --arg p "$checkout" '{projects:[{id:"p",checkouts:[{id:"c",path:$p,primary:false}]}]}' >"$ARANEA_TEST_SANDBOX/home/.local/state/aranea/projects.json"
+merge_base=0123456789abcdef0123456789abcdef01234567
+# Open diff request for a folder, merge base and terminal; defaults are valid.
+diff_request() {
+  jq -cn --arg cwd "${1:-$checkout}" --arg mb "${2:-$merge_base}" --arg t "${3:-kitty}" '{kind:"diff",cwd:$cwd,mergeBase:$mb,terminalId:$t}'
+}
+for terminal in kitty alacritty foot ghostty; do
+  rm -f "$ARANEA_TEST_SANDBOX/argv" "$ARANEA_TEST_SANDBOX/cwd"
+  result=$(diff_request "$checkout" "$merge_base" "$terminal" | PATH="$launch_path" "$launcher") || {
+    echo "Expected diff acceptance for $terminal, got: $result"
+    exit 1
+  }
+  jq -e '.ok and .status=="accepted"' <<<"$result" >/dev/null
+  sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || true"
+  for ((i = 0; i < 50; i++)); do
+    [[ ! -f "$ARANEA_TEST_SANDBOX/cwd" ]] || break
+    sleep .02
+  done
+  tail_actual=$(jq -Rsc 'split("\n")[:-1][-13:]' "$ARANEA_TEST_SANDBOX/argv")
+  tail_expected=$(jq -cn --arg g "$tool_bin/git" --arg cwd "$checkout" --arg r "$merge_base...HEAD" '[$g,"-c","core.pager=less","-c","pager.diff=less","-c","core.fsmonitor=false","-C",$cwd,"diff","--no-ext-diff","--no-textconv",$r]')
+  [[ "$tail_actual" == "$tail_expected" ]] || {
+    echo "Expected diff tail $tail_expected for $terminal, got: $tail_actual"
+    exit 1
+  }
+  accepted=$((accepted + 1))
+done
+# Refuse a raw launcher request with the given code and no terminal started.
+refuse_raw() {
+  local request=$1 code=$2 rc=0 out
+  rm -f "$ARANEA_TEST_SANDBOX/argv"
+  out=$(PATH="$launch_path" "$launcher" <<<"$request") || rc=$?
+  [[ $rc != 0 ]] && jq -e --arg code "$code" '.ok==false and .code==$code' <<<"$out" >/dev/null && [[ ! -f "$ARANEA_TEST_SANDBOX/argv" ]] || {
+    echo "Expected $code without launch for $request, got: $out"
+    exit 1
+  }
+  refused=$((refused + 1))
+}
+refuse_raw "$(diff_request "$checkout" 'HEAD;id')" INVALID_LAUNCH
+refuse_raw "$(diff_request "$checkout" "${merge_base^^}")" INVALID_LAUNCH
+refuse_raw "$(diff_request "$checkout" "${merge_base}0")" INVALID_LAUNCH
+refuse_raw "$(diff_request "$checkout" "$merge_base"$'\n')" INVALID_LAUNCH
+refuse_raw "$(diff_request "$checkout" "$merge_base" xterm)" INVALID_LAUNCH
+refuse_raw "$(diff_request "$ARANEA_TEST_SANDBOX/other")" CHECKOUT_INVALID
+refuse_raw "$(diff_request "$checkout/nested")" CHECKOUT_INVALID
+# A symlink to a registered checkout resolves there but is not the registered path itself.
+rm -rf "$ARANEA_TEST_SANDBOX/diff-alias"
+ln -s "$checkout" "$ARANEA_TEST_SANDBOX/diff-alias"
+refuse_raw "$(diff_request "$ARANEA_TEST_SANDBOX/diff-alias")" CHECKOUT_INVALID
+rm -f "$ARANEA_TEST_SANDBOX/diff-alias"
+refuse_raw "$(diff_request | jq -c '.extra="x"')" INVALID_LAUNCH
+refuse_raw "$(diff_request | jq -c '.argv=["kitty","x","y"]')" INVALID_LAUNCH
+refuse_raw "$(diff_request | jq -c 'del(.terminalId)')" INVALID_LAUNCH
+# Repository config never runs: a diff.external marker script is not executed by the real git.
+real_bin="$ARANEA_TEST_SANDBOX/realbin"
+mkdir -p "$real_bin"
+ln -s /bin/bash "$real_bin/bash"
+ln -s "$(command -v git)" "$real_bin/git"
+ln -s /usr/bin/less "$real_bin/less"
+cat >"$real_bin/kitty" <<'APP'
+#!/bin/bash
+shift 4
+exec "$@"
+APP
+chmod +x "$real_bin/kitty"
+repo="$ARANEA_TEST_SANDBOX/repo"
+mkdir -p "$repo"
+git_env=(GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t)
+env "${git_env[@]}" git -C "$repo" init -q
+echo one >"$repo/f"
+env "${git_env[@]}" git -C "$repo" add f
+env "${git_env[@]}" git -C "$repo" commit -q -m one
+echo two >"$repo/f"
+env "${git_env[@]}" git -C "$repo" commit -q -am two
+base=$(git -C "$repo" rev-parse HEAD~1)
+printf '#!/bin/sh\n: > "%s/external-ran"\n' "$ARANEA_TEST_SANDBOX" >"$ARANEA_TEST_SANDBOX/external.sh"
+chmod +x "$ARANEA_TEST_SANDBOX/external.sh"
+git -C "$repo" config diff.external "$ARANEA_TEST_SANDBOX/external.sh"
+# Control: without the guard flags the same config does run the marker script.
+git -C "$repo" --no-pager diff "$base...HEAD" >/dev/null 2>&1 || true
+[[ -f "$ARANEA_TEST_SANDBOX/external-ran" ]] || {
+  echo "Control failed: the marker script should run without --no-ext-diff"
+  exit 1
+}
+rm -f "$ARANEA_TEST_SANDBOX/external-ran"
+jq -cn --arg p "$repo" '{projects:[{id:"p",checkouts:[{id:"c",path:$p,primary:false}]}]}' >"$ARANEA_TEST_SANDBOX/home/.local/state/aranea/projects.json"
+result=$(diff_request "$repo" "$base" kitty | PATH="$real_bin" "$launcher") || {
+  echo "Expected real diff acceptance, got: $result"
+  exit 1
+}
+sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || true"
+sleep 1
+[[ ! -f "$ARANEA_TEST_SANDBOX/external-ran" ]] || {
+  echo "diff.external ran from repository config"
+  exit 1
+}
+accepted=$((accepted + 1))
+# A repository pager.diff outranks core.pager: run the launcher's argv under a real pty so git pages.
+git -C "$repo" config pager.diff "/usr/bin/touch $ARANEA_TEST_SANDBOX/pager-ran; /usr/bin/cat"
+cat >"$real_bin/kitty" <<'APP'
+#!/bin/bash
+shift 4
+exec /usr/bin/script -qefc "$(printf '%q ' "$@")" /dev/null
+APP
+rm -f "$ARANEA_TEST_SANDBOX/pager-ran"
+# Control: the previous argv (core.pager only) does execute the planted pager under a pty.
+/usr/bin/script -qefc "$(printf '%q ' git -c core.pager=less -C "$repo" diff --no-ext-diff --no-textconv "$base...HEAD")" /dev/null </dev/null >/dev/null 2>&1 || true
+[[ -f "$ARANEA_TEST_SANDBOX/pager-ran" ]] || {
+  echo "Control failed: pager.diff should run under a pty with only core.pager set"
+  exit 1
+}
+rm -f "$ARANEA_TEST_SANDBOX/pager-ran"
+result=$(diff_request "$repo" "$base" kitty | PATH="$real_bin" "$launcher") || {
+  echo "Expected pty diff acceptance, got: $result"
+  exit 1
+}
+sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || true"
+sleep 1
+[[ ! -f "$ARANEA_TEST_SANDBOX/pager-ran" ]] || {
+  echo "pager.diff ran from repository config"
+  exit 1
+}
+accepted=$((accepted + 1))
+# A repository core.fsmonitor hook never runs, even with a changed working tree (pty, real argv).
+printf '#!/bin/sh\n: > "%s/fsmonitor-ran"\nprintf "\\0"\n' "$ARANEA_TEST_SANDBOX" >"$ARANEA_TEST_SANDBOX/fsmonitor.sh"
+chmod +x "$ARANEA_TEST_SANDBOX/fsmonitor.sh"
+git -C "$repo" config --unset pager.diff
+git -C "$repo" config core.fsmonitor "$ARANEA_TEST_SANDBOX/fsmonitor.sh"
+echo three >"$repo/f"
+rm -f "$ARANEA_TEST_SANDBOX/fsmonitor-ran"
+# Control: a plain status of the same repository does run the planted hook.
+git -C "$repo" status >/dev/null 2>&1 || true
+[[ -f "$ARANEA_TEST_SANDBOX/fsmonitor-ran" ]] || {
+  echo "Control failed: core.fsmonitor should run for a status"
+  exit 1
+}
+rm -f "$ARANEA_TEST_SANDBOX/fsmonitor-ran"
+jq -cn --arg p "$repo" '{projects:[{id:"p",checkouts:[{id:"c",path:$p,primary:false}]}]}' >"$ARANEA_TEST_SANDBOX/home/.local/state/aranea/projects.json"
+result=$(diff_request "$repo" "$base" kitty | PATH="$real_bin" "$launcher") || {
+  echo "Expected fsmonitor diff acceptance, got: $result"
+  exit 1
+}
+sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || true"
+sleep 2
+[[ ! -f "$ARANEA_TEST_SANDBOX/fsmonitor-ran" ]] || {
+  echo "core.fsmonitor ran from repository config"
+  exit 1
+}
+accepted=$((accepted + 1))
+# A partial clone must not fetch a missing blob during Open diff: a planted uploadpack would run.
+pc_remote="$ARANEA_TEST_SANDBOX/pc-remote.git"
+git init -q --bare -b main "$pc_remote"
+git -C "$pc_remote" config uploadpack.allowFilter true
+git -C "$pc_remote" config uploadpack.allowAnySHA1InWant true
+git clone -q "$pc_remote" "$ARANEA_TEST_SANDBOX/pc-seed" 2>/dev/null
+echo old >"$ARANEA_TEST_SANDBOX/pc-seed/f"
+env "${git_env[@]}" git -C "$ARANEA_TEST_SANDBOX/pc-seed" add f
+env "${git_env[@]}" git -C "$ARANEA_TEST_SANDBOX/pc-seed" commit -q -m old
+git -C "$ARANEA_TEST_SANDBOX/pc-seed" push -q origin HEAD:main
+pc="$ARANEA_TEST_SANDBOX/pc"
+pc_linked="$ARANEA_TEST_SANDBOX/pc-linked"
+git clone -q --no-checkout --filter=blob:none "file://$pc_remote" "$pc" 2>/dev/null
+git -C "$pc" worktree add -q --no-checkout -b feat "$pc_linked"
+pc_blob=$(echo new | git -C "$pc_linked" hash-object -w --stdin)
+git -C "$pc_linked" read-tree HEAD
+git -C "$pc_linked" update-index --cacheinfo "100644,$pc_blob,f"
+env "${git_env[@]}" git -C "$pc_linked" commit -q -m new
+pc_base=$(git -C "$pc_linked" rev-parse HEAD~1)
+git -C "$pc" config remote.origin.uploadpack "/usr/bin/touch $ARANEA_TEST_SANDBOX/lazy-ran; git-upload-pack"
+jq -cn --arg p "$pc_linked" '{projects:[{id:"p",checkouts:[{id:"c",path:$p,primary:false}]}]}' >"$ARANEA_TEST_SANDBOX/home/.local/state/aranea/projects.json"
+rm -f "$ARANEA_TEST_SANDBOX/lazy-ran"
+result=$(diff_request "$pc_linked" "$pc_base" kitty | PATH="$real_bin" "$launcher") || {
+  echo "Expected partial clone diff acceptance, got: $result"
+  exit 1
+}
+sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || true"
+sleep 2
+[[ ! -f "$ARANEA_TEST_SANDBOX/lazy-ran" ]] || {
+  echo "a lazy fetch ran the repository uploadpack command"
+  exit 1
+}
+# Control: the same diff without the guard does fetch the blob and run the planted command.
+/usr/bin/script -qefc "$(printf '%q ' git -C "$pc_linked" diff --no-ext-diff --no-textconv "$pc_base...HEAD")" /dev/null </dev/null >/dev/null 2>&1 || true
+[[ -f "$ARANEA_TEST_SANDBOX/lazy-ran" ]] || {
+  echo "Control failed: the planted uploadpack should run on a lazy fetch"
+  exit 1
+}
+accepted=$((accepted + 1))
+echo "PASS Open diff: four terminals accepted, malformed mergeBase, unregistered path, unknown terminal and extra fields refused"
 echo "PASS $accepted accepted launches, $refused refusals: all terminal/provider shapes, basename-sensitive shims, editor/resume shapes and canonical safe PATH"

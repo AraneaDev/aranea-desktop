@@ -153,3 +153,63 @@ test("labels have no banned word or em dash", () => {
     for (const word of problems.BANNED) assert.ok(!text.includes(word), word)
   }
 })
+
+const taskOn = (checkoutId, at, state, projectId) => ({
+  taskId: "t-" + checkoutId + at,
+  reportedState: state || "ready-for-review",
+  lastReceivedAt: at,
+  association: { status: "registered", projectId: projectId || "p-b", checkoutId }
+})
+const withTaskCheckouts = () => {
+  const list = projects()
+  list[1].checkouts = [
+    { id: "c-b", path: "/w/bee", branch: "dev", primary: true },
+    { id: "c-x", path: "/w/bee-x", branch: "feat/x", primary: false },
+    { id: "c-y", path: "/w/bee-y", branch: "feat/y", primary: false }
+  ]
+  return list
+}
+const rowsWith = (list, runtime, tasks, reviews) =>
+  plain(s.switcherRows(list, nav, "", runtime, tools, {}, tasks, reviews))
+
+test("a ready task checkout gives the review action and chip", () => {
+  const r = rowsWith(withTaskCheckouts(), { environments: [env()] }, [taskOn("c-x", 100)], {})
+  const bee = r.find((x) => x.id === "p-b")
+  assert.deepEqual(bee.action, {
+    kind: "review",
+    label: "Review · feat/x",
+    target: { projectId: "p-b", checkoutId: "c-x" }
+  })
+  assert.equal(bee.review, true)
+  assert.equal(r.find((x) => x.id === "p-a").review, false)
+  assert.equal(r.find((x) => x.id === "p-a").action.kind, "start")
+})
+
+test("the newest finished task picks the review checkout", () => {
+  const r = rowsWith(
+    withTaskCheckouts(),
+    {},
+    [taskOn("c-x", 100), taskOn("c-y", 300), taskOn("c-x", 200, "working")],
+    {}
+  )
+  assert.equal(r.find((x) => x.id === "p-b").action.target.checkoutId, "c-y")
+  const r2 = rowsWith(withTaskCheckouts(), {}, [taskOn("c-x", 400), taskOn("c-y", 300)], {})
+  assert.equal(r2.find((x) => x.id === "p-b").action.target.checkoutId, "c-x")
+})
+
+test("working, reviewed and unrelated tasks give no review", () => {
+  const list = withTaskCheckouts()
+  let r = rowsWith(list, {}, [taskOn("c-x", 100, "working")], {})
+  assert.equal(r.find((x) => x.id === "p-b").review, false)
+  list[1].checkouts[1].review = { reviewedHead: "a".repeat(40), reviewedTaskAt: 100 }
+  r = rowsWith(list, {}, [taskOn("c-x", 100)], { "c-x": { head: "a".repeat(40) } })
+  assert.equal(r.find((x) => x.id === "p-b").review, false)
+  r = rowsWith(withTaskCheckouts(), {}, [taskOn("c-x", 100, "ready-for-review", "p-a")], {})
+  assert.equal(r.find((x) => x.id === "p-b").review, false)
+})
+
+test("without tasks nothing changes", () => {
+  const r = rows({ environments: [env()] })
+  assert.ok(r.every((x) => x.review === false))
+  assert.equal(r[1].action.kind, "return")
+})

@@ -15,6 +15,7 @@ import "ProjectActionRecords.js" as Records
 import "ProjectActionSuggestions.js" as Suggestions
 import "ProjectProfiles.js" as Profiles
 import "ProjectProblems.js" as Problems
+import "ProjectReview.js" as Review
 import "ProjectsLogic.js" as Logic
 
 Item {
@@ -110,6 +111,21 @@ Item {
   function redetectOverview() {
     if (overviewWantsSuggestions)
       root.actionClient.detect(false)
+  }
+  Connections {
+    target: panel.root.projectController
+    function onMutationFailed(action, args, message) {
+      if (action === 'review-mark')
+        panel.reviewActionError = {
+          projectId: args.projectId,
+          checkoutId: args.checkoutId,
+          error: {
+            code: 'REGISTRY_WRITE_FAILED',
+            message: message,
+            recovery: ''
+          }
+        }
+    }
   }
   Connections {
     target: panel.root.actionClient
@@ -350,6 +366,8 @@ Item {
   }
   // Enter on a switcher row: select its project first, then use the ordinary start or return path.
   function switcherGo(row) {
+    if (row && row.action.kind === 'review')
+      return switcherReview(row)
     if (root.inert || !root.opened || !row || switcher.busy || !switcherSelect(row.id))
       return false
     if (row.action.kind === 'return')
@@ -357,6 +375,24 @@ Item {
     if (row.action.kind === 'start')
       return root.startProfile(row.action.target.profileId, row.action.target.profileRevision, false)
     return false
+  }
+  // Enter on a review row: open Projects on that task checkout's Overview; nothing launches.
+  function switcherReview(row) {
+    if (root.inert || !root.opened || !row || switcher.busy || !switcherSelect(row.id))
+      return false
+    var target = row.action.target
+    root.mode = ''
+    section = 'overview'
+    var project = (root.projectController.state.projects || []).find(function (p) {
+      return p.id === row.id
+    })
+    if (project && project.lastCheckoutId !== target.checkoutId)
+      root.projectController.request('select-checkout', {
+        projectId: target.projectId,
+        checkoutId: target.checkoutId
+      })
+    Qt.callLater(focusKeys)
+    return true
   }
   // The explicit Start after a failed return uses the row's remembered profile.
   function switcherStart(row) {
@@ -632,6 +668,106 @@ Item {
       return c.id === project.lastCheckoutId
     }) || null : null
   }
+  // Last push or review-mark failure as {projectId, checkoutId, error}; shown only for that pair.
+  property var reviewActionError: null
+  // Review card model for the selected task checkout; state 'none' shows nothing.
+  readonly property var reviewModel: {
+    var project = projectsPage.selectedProject, checkout = selectedCheckout
+    if (!project || !checkout || checkout.primary)
+      return {
+        state: 'none'
+      }
+    var snapshot = root.activityClient.snapshot || {}
+    var tasks = Review.tasksFor(snapshot.tasks || [], project.id, checkout.id)
+    var entry = root.reviewClient.reviews[checkout.id] || {}
+    var mine = entry.projectId === project.id
+    var data = mine && entry.data && entry.data.projectId === project.id ? entry.data : null
+    var state = Review.reviewState(checkout, tasks, data)
+    if (state !== 'ready')
+      return {
+        state: state
+      }
+    var definition = Review.checksAction(selectedDefinitions, project.id)
+    var runs = definition ? Records.runs(root.actionClient.snapshot, project.id, checkout.id).filter(function (r) {
+      return r.actionId === definition.id
+    }) : []
+    var client = root.actionClient
+    var running = root.gitCommands.pending
+    var stored = reviewActionError
+    var storedMine = !!stored && stored.projectId === project.id && stored.checkoutId === checkout.id
+    var terminal = (project.tools || {}).terminalId || (root.projectController.tools.defaults || {}).terminalId || ''
+    var finished = Review.latestFinished(tasks)
+    return {
+      state: state,
+      branch: checkout.branch || '',
+      data: data,
+      taskSummary: finished ? finished.result || finished.description || '' : '',
+      // lastReceivedAt is in seconds; the card reads milliseconds.
+      taskFinishedAt: finished && typeof finished.lastReceivedAt === 'number' ? finished.lastReceivedAt * 1000 : null,
+      readError: !!(mine && entry.error),
+      agentReport: Review.agentReportLabel(Review.latestFinished(tasks)),
+      checksText: definition ? Review.checksLabel(runs[0] || null) : 'no check action saved',
+      hasChecks: !!definition,
+      canRunChecks: !!definition && !client.pending && !client.submissionUncertain && client.availability.execution === true && !Records.activeRun(client.snapshot, project.id, checkout.id, definition.id),
+      canOpenDiff: !!data && !!data.mergeBase && !!terminal && !root.reviewClient.diffPending,
+      pushPending: !!running && running.operation === 'push' && running.projectId === project.id && running.checkoutId === checkout.id,
+      pushBlocked: !!running,
+      markPending: root.projectController.pending,
+      error: (storedMine ? stored.error : null) || (mine ? entry.error : null) || root.reviewClient.diffError || null
+    }
+  }
+  // Agent tasks, for review markers.
+  readonly property var markerTasks: (root.activityClient.snapshot || {}).tasks || []
+  // Review helper data by checkout id, only where it belongs to the checkout's project.
+  readonly property var markerReviews: {
+    var out = {}
+    var all = root.reviewClient.reviews || {}
+    Object.keys(all).forEach(function (id) {
+      var entry = all[id]
+      if (entry && entry.data && entry.data.projectId === entry.projectId)
+        out[id] = entry.data
+    })
+    return out
+  }
+  // Run the project's check action in the selected checkout; one press, one run.
+  function runReviewChecks() {
+    var project = projectsPage.selectedProject, checkout = selectedCheckout
+    if (root.inert || !project || !checkout || !reviewModel.canRunChecks)
+      return
+    var definition = Review.checksAction(selectedDefinitions, project.id)
+    if (definition)
+      root.actionClient.start(definition.id, definition.revision)
+  }
+  // Open the saved terminal on the diff against the merge base.
+  function openReviewDiff() {
+    var project = projectsPage.selectedProject, checkout = selectedCheckout
+    if (root.inert || !project || !checkout || !reviewModel.canOpenDiff)
+      return
+    var terminal = (project.tools || {}).terminalId || (root.projectController.tools.defaults || {}).terminalId || ''
+    root.reviewClient.openDiff(checkout.path, reviewModel.data.mergeBase, terminal)
+  }
+  // Push the task branch; the helper never forces and never pushes another branch.
+  function pushReviewBranch() {
+    if (reviewModel.state !== 'ready')
+      return
+    if (runGit('push'))
+      reviewActionError = null
+  }
+  // Record that this head and this task time were reviewed.
+  function markReviewed() {
+    var project = projectsPage.selectedProject, checkout = selectedCheckout
+    if (root.inert || !project || !checkout || !reviewModel.data || reviewModel.markPending || reviewModel.readError)
+      return
+    var tasks = Review.tasksFor((root.activityClient.snapshot || {}).tasks || [], project.id, checkout.id)
+    var latest = Review.latestFinished(tasks)
+    reviewActionError = null
+    root.projectController.request('review-mark', {
+      projectId: project.id,
+      checkoutId: checkout.id,
+      head: reviewModel.data.head,
+      taskFinishedAt: latest && typeof latest.lastReceivedAt === 'number' ? latest.lastReceivedAt : null
+    })
+  }
   // Start one Git command for the selected pair; false means nothing started.
   function runGit(operation, extra) {
     var project = projectsPage.selectedProject, checkoutId = root.gitClient.checkoutId
@@ -718,6 +854,14 @@ Item {
           }
         else if (stored && stored.projectId === projectId && stored.checkoutId === checkoutId)
           panel.gitCommandError = null
+        if (project && project.id === projectId && panel.root.gitClient.checkoutId === checkoutId)
+          panel.root.gitClient.refresh()
+      } else if (operation === 'push') {
+        panel.reviewActionError = response.ok ? null : {
+          projectId: projectId,
+          checkoutId: checkoutId,
+          error: response.error
+        }
         if (project && project.id === projectId && panel.root.gitClient.checkoutId === checkoutId)
           panel.root.gitClient.refresh()
       } else if (operation === 'task-create') {
@@ -874,6 +1018,8 @@ Item {
       runtime: panel.root.projectClient.snapshot
       tools: panel.root.projectController.tools
       gitCache: panel.root.gitClient.cache
+      tasks: panel.markerTasks
+      reviews: panel.markerReviews
       client: panel.root.projectClient
       launching: !!panel.root.inspectionLaunchIntent
       displayOnly: panel.root.inert
@@ -963,6 +1109,8 @@ Item {
               projects: panel.root.projectController.state.projects || []
               gitCache: panel.root.gitClient.cache
               navigation: panel.root.projectController.state.navigation || {}
+              tasks: panel.markerTasks
+              reviews: panel.markerReviews
               bindings: panel.root.projectClient.snapshot.bindings || []
               selectedId: projectsPage.selectedProject ? projectsPage.selectedProject.id : panel.root.projectId
               navigationEnabled: !panel.navigationBlocked && !panel.root.inert
@@ -1392,6 +1540,16 @@ Item {
                   gitCommandError: panel.selectedGitCommandError
                   gitCommandOperation: panel.selectedGitCommandOperation
                   gitCommandBusy: !!panel.root.gitCommands.pending
+                  review: panel.reviewModel
+                  onReviewRunChecksRequested: panel.runReviewChecks()
+                  onReviewOpenDiffRequested: panel.openReviewDiff()
+                  onReviewPushRequested: panel.pushReviewBranch()
+                  onReviewMarkRequested: panel.markReviewed()
+                  onReviewRemoveRequested: {
+                    var project = projectsPage.selectedProject
+                    if (project && panel.selectedCheckout)
+                      panel.requestTaskRemove(project.id, panel.selectedCheckout.id)
+                  }
                   onRefreshRequested: panel.refreshOverview()
                   onFetchRequested: panel.runGit('fetch')
                   onPullRequested: panel.runGit('pull')

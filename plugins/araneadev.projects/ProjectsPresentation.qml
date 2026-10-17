@@ -246,6 +246,19 @@ Item {
     id: gitCommands
     captureActive: root.inert
   }
+  // Reads of how task checkouts differ from their base, and the Open diff launch.
+  property alias reviewClient: reviewClient
+  ProjectReviewClient {
+    id: reviewClient
+    active: root.opened
+    timed: root.opened && !!root.view && root.view.section === 'overview'
+    captureActive: root.inert
+    projectId: gitClient.projectId
+    checkoutId: gitClient.checkoutId
+    tasks: (activityClient.snapshot || {}).tasks || []
+    projects: (projectController.state || {}).projects || []
+    commands: gitCommands
+  }
   // One action observer shared by Overview and full Actions, including receipts.
   property alias actionClient: actionClient
   ProjectActionsClient {
@@ -429,6 +442,7 @@ Item {
       },
       actions: actionSnapshot(),
       gitCache: gitClient.cache,
+      reviews: reviewClient.reviews,
       activity: {
         snapshot: activityClient.snapshot,
         available: activityClient.available,
@@ -460,6 +474,7 @@ Item {
     var f = payload.fixture
     restoreActions(f.projectActions || {})
     gitClient.cache = f.projectGitCache || {}
+    reviewClient.reviews = f.projectReviews || {}
     activityClient.snapshot = f.activitySnapshot || {
       tasks: [],
       operations: []
@@ -502,6 +517,7 @@ Item {
       return 'invalid'
     var saved = JSON.parse(payloadJson), focus = captureSaved.focus, p = saved.projects
     gitClient.cache = saved.gitCache || {}
+    reviewClient.reviews = saved.reviews || {}
     activityClient.snapshot = saved.activity.snapshot
     activityClient.available = saved.activity.available
     activityClient.error = saved.activity.error

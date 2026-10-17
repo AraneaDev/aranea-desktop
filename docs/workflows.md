@@ -129,6 +129,29 @@ change is still running, Aranea asks you to wait a moment and try again.
 **Remove** takes the line out again. Aranea never changes your other bindings.
 From a terminal, `aranea projects switch` opens the switcher.
 
+## Review agent work
+
+When an agent you connected finishes in a task checkout, the project shows
+**Ready for review** at the top of that checkout's Overview, and the project
+gets a **Review** marker in the sidebar and the quick switcher. The card lists
+the commits and changed files since the branch started, any uncommitted
+changes, what the agent reported about its checks, and the result of your own
+check action (a saved command named like "test" or "check"; it reads "not run"
+until you run it, and also when a run was stopped or could not be confirmed).
+**Run checks** runs that action. **Open diff** opens your terminal with `git
+diff` against where the branch started; it turns off external diff tools,
+text conversion, the repository's pager and on-demand fetches, so settings in
+the repository can't make it run other programs. **Push branch** pushes the
+branch and sets its upstream (never forced). While the agent is still working
+the checkout shows **Agent working**, or **Agent needs input** when it is
+waiting for you.
+
+Choose **Mark reviewed** when you are done; the card comes back when the agent
+finishes another task, or when you open that checkout and it has new commits. Removing the task checkout ends the
+review too. Reviews only appear for task checkouts, not your main checkout.
+In the quick switcher, a project with work to review shows `Review · <branch>`,
+and **Enter** opens that checkout's Overview without launching anything.
+
 ## When something goes wrong
 
 Projects explains problems in plain words with at most two actions. **Starting…**

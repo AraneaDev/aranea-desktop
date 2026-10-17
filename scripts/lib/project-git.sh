@@ -69,7 +69,7 @@ project_git_classify() {
   if grep -qiE 'terminal prompts disabled|could not read (username|password)|authentication failed|permission denied \(|host key verification failed' "$git_tmp/err"; then
     project_git_fail AUTH_REQUIRED 'Git needs credentials for this remote.' 'Run git fetch once in a terminal to sign in.'
   fi
-  first=$(grep -m1 -E '^(fatal|error): ' "$git_tmp/err" | cut -c1-300 || true)
+  first=$(grep -m1 -E '^ ! \[|^(fatal|error): ' "$git_tmp/err" | cut -c1-300 || true)
   project_git_fail GIT_ERROR "${first:-Git failed.}" 'Inspect this checkout in a terminal, then refresh.'
 }
 
@@ -137,7 +137,9 @@ project_git_lock() {
   mkdir -p -- "$dir" || project_git_fail GIT_ERROR 'Cannot create the Git lock directory.' 'Check state-directory permissions and retry.'
   key=$(printf '%s' "$common" | sha256sum | cut -c1-32)
   exec {project_git_lock_fd}>"$dir/$key.lock"
-  flock -w 75 "$project_git_lock_fd" || project_git_fail GIT_BUSY 'Another Git operation on this repository is still running.' 'Wait for it to finish, then retry.'
+  local seconds=${ARANEA_GIT_LOCK_SECONDS:-75}
+  [[ $seconds =~ ^[0-9]{1,3}$ ]] && ((10#$seconds >= 1)) || seconds=75
+  flock -w "$((10#$seconds))" "$project_git_lock_fd" || project_git_fail GIT_BUSY 'Another Git operation on this repository is still running.' 'Wait for it to finish, then retry.'
 }
 
 # Call the registry store; prints the new state or returns 1.
@@ -153,20 +155,10 @@ project_git_primary_path() {
   jq -r --arg p "$project" '.projects[]|select(.id == $p)|.checkouts[]|select(.primary)|.path' "$git_tmp/registry"
 }
 
-# Create a branch and worktree from the default branch, then register and select it.
-project_git_task_create() {
-  local primary_path folder remote base='' candidate state new_id status=0
-  if [[ -z $branch || $branch == -* || $branch == *'@{'* ]] || ! projects_registry_git check-ref-format --branch "$branch" >/dev/null 2>&1; then
-    project_git_fail INVALID_BRANCH 'That is not a valid branch name.' 'Use letters, numbers, - _ . and /, without spaces or ~ ^ : ? * [ \.'
-  fi
-  ! project_git_read -C "$path" show-ref --verify --quiet "refs/heads/$branch" ||
-    project_git_fail BRANCH_EXISTS "A branch named $branch already exists." 'Choose another branch name.'
-  primary_path=$(project_git_primary_path)
-  folder="$(dirname -- "$primary_path")/$(basename -- "$primary_path")-worktrees/${branch//\//-}"
-  [[ ! -e $folder && ! -L $folder ]] || project_git_fail PATH_EXISTS "A folder already exists at $folder." 'Choose another branch name or move that folder.'
-  remote=$(project_git_remote)
+# Print the default branch to start from: the remote's, else local main/master; nothing when none.
+project_git_default_base() {
+  local remote=$1 base='' candidate
   if [[ -n $remote ]]; then
-    project_git_fetch_remote "$remote"
     base=$(project_git_read -C "$path" symbolic-ref --quiet --short "refs/remotes/$remote/HEAD" 2>/dev/null || true)
     for candidate in main master; do
       [[ -z $base ]] || break
@@ -178,6 +170,23 @@ project_git_task_create() {
       ! project_git_read -C "$path" rev-parse --verify --quiet "refs/heads/$candidate" >/dev/null || base=$candidate
     done
   fi
+  printf '%s' "$base"
+}
+
+# Create a branch and worktree from the default branch, then register and select it.
+project_git_task_create() {
+  local primary_path folder remote base state new_id status=0
+  if [[ -z $branch || $branch == -* || $branch == *'@{'* ]] || ! projects_registry_git check-ref-format --branch "$branch" >/dev/null 2>&1; then
+    project_git_fail INVALID_BRANCH 'That is not a valid branch name.' 'Use letters, numbers, - _ . and /, without spaces or ~ ^ : ? * [ \.'
+  fi
+  ! project_git_read -C "$path" show-ref --verify --quiet "refs/heads/$branch" ||
+    project_git_fail BRANCH_EXISTS "A branch named $branch already exists." 'Choose another branch name.'
+  primary_path=$(project_git_primary_path)
+  folder="$(dirname -- "$primary_path")/$(basename -- "$primary_path")-worktrees/${branch//\//-}"
+  [[ ! -e $folder && ! -L $folder ]] || project_git_fail PATH_EXISTS "A folder already exists at $folder." 'Choose another branch name or move that folder.'
+  remote=$(project_git_remote)
+  [[ -z $remote ]] || project_git_fetch_remote "$remote"
+  base=$(project_git_default_base "$remote")
   [[ -n $base ]] || project_git_fail NO_DEFAULT_BRANCH 'Cannot find the default branch to start from.' 'Create a main or master branch, or run git remote set-head origin --auto.'
   project_git_alive
   mkdir -p -- "$(dirname -- "$folder")" || project_git_fail GIT_ERROR "Cannot create $(dirname -- "$folder")." 'Check folder permissions and retry.'
@@ -338,6 +347,68 @@ project_git_remove_missing() {
   project_git_ok "$(jq -c '{projectId,checkoutId,path,branch,removed:true}' <<<"$facts")"
 }
 
+# Report a task checkout's commits and files against where its branch started; reads only.
+project_git_review() {
+  local remote base base_sha merge_base='' head current excludes record ahead behind dirty=false untracked=false
+  # Reads here never fetch a missing object, so repository transport settings cannot run.
+  local -x ARANEA_GIT_NO_LAZY_FETCH=1
+  [[ $primary != true ]] || project_git_fail PRIMARY_CHECKOUT 'The main checkout has nothing to review.' 'Choose a task checkout.'
+  remote=$(project_git_remote)
+  base=$(project_git_default_base "$remote")
+  [[ -n $base ]] || project_git_fail NO_DEFAULT_BRANCH 'Cannot find the default branch to review against.' 'Create a main or master branch, or run git remote set-head origin --auto.'
+  # Without the repository lock a fetch can land mid-read, so every value derives from these two SHAs.
+  head=$(project_git_read -C "$path" rev-parse --verify HEAD 2>/dev/null || true)
+  base_sha=$(project_git_read -C "$path" rev-parse --verify "$base^{commit}" 2>/dev/null || true)
+  [[ $base_sha =~ ^[0-9a-f]{40}$ ]] && merge_base=$(project_git_read -C "$path" merge-base "$base_sha" "$head" 2>/dev/null || true)
+  [[ $merge_base =~ ^[0-9a-f]{40}$ && $head =~ ^[0-9a-f]{40}$ ]] || project_git_fail GIT_ERROR 'Git could not find where this branch started.' 'Inspect this checkout in a terminal, then refresh.'
+  current=$(project_git_read -C "$path" symbolic-ref --quiet HEAD 2>/dev/null || true)
+  current=${current#refs/heads/}
+  if ! { ahead=$(project_git_read -C "$path" rev-list --count "$merge_base..$head" 2>/dev/null) &&
+    behind=$(project_git_read -C "$path" rev-list --count "$head..$base_sha" 2>/dev/null) &&
+    project_git_read -C "$path" log --format=%H%x00%s -z -n 51 "$merge_base..$head" >"$git_tmp/review-log" 2>/dev/null &&
+    project_git_read -C "$path" diff --numstat -z "$merge_base...$head" >"$git_tmp/review-files" 2>/dev/null; }; then
+    project_git_fail GIT_ERROR 'Git could not read this branch.' 'Inspect this checkout in a terminal, then refresh.'
+  fi
+  excludes=$(project_git_user_excludes)
+  project_git_read ${excludes:+-c "core.excludesFile=$excludes"} -C "$path" status --porcelain=v1 -z --untracked-files=normal >"$git_tmp/status" 2>/dev/null ||
+    project_git_fail GIT_ERROR 'Git could not read this branch.' 'Inspect this checkout in a terminal, then refresh.'
+  while IFS= read -r -d '' record; do
+    [[ -n $record ]] || continue
+    if [[ $record == '?? '* ]]; then untracked=true; else dirty=true; fi
+  done <"$git_tmp/status"
+  project_git_ok "$(jq -cn --arg p "$project" --arg c "$checkout" --arg b "$current" --arg base "$base" --arg mb "$merge_base" --arg h "$head" --argjson ahead "$ahead" --argjson behind "$behind" --argjson d "$dirty" --argjson u "$untracked" --rawfile log "$git_tmp/review-log" --rawfile files "$git_tmp/review-files" '
+    def pairs: if length < 2 then empty else {sha: .[0], subject: .[1]}, (.[2:] | pairs) end;
+    def numstat: if length == 0 then empty else
+      (.[0] | capture("^(?<a>[^\t]*)\t(?<r>[^\t]*)\t(?<p>.*)$"; "s")) as $m
+      | (if $m.p == "" then .[2] else $m.p end) as $path
+      | {path: $path, added: ($m.a | tonumber? // null), removed: ($m.r | tonumber? // null)},
+        (.[(if $m.p == "" then 3 else 1 end):] | numstat) end;
+    ($log | rtrimstr("\u0000") | if . == "" then [] else split("\u0000") end | [pairs]) as $commits
+    | ($files | rtrimstr("\u0000") | if . == "" then [] else split("\u0000") end | [numstat]) as $changed
+    | {projectId: $p, checkoutId: $c, branch: (if $b == "" then null else $b end), base: $base, mergeBase: $mb, head: $h,
+       ahead: $ahead, behind: $behind, commits: $commits[:50], files: $changed[:200],
+       uncommitted: {dirty: $d, untracked: $u}, truncated: (($commits | length) > 50 or ($changed | length) > 200)}')"
+}
+
+# Push the current branch to its remote with an upstream; never forces, never pushes other branches.
+project_git_push() {
+  local current remote status=0
+  current=$(project_git_read -C "$path" symbolic-ref --quiet HEAD 2>/dev/null || true)
+  current=${current#refs/heads/}
+  [[ -n $current ]] || project_git_fail NO_BRANCH 'This checkout is not on a branch.' 'Switch to a branch in a terminal, then retry.'
+  remote=$(project_git_remote)
+  [[ -n $remote ]] || project_git_fail NO_REMOTE 'This repository has no remote to push to.' 'Add a remote in a terminal, then retry.'
+  project_git_alive
+  project_git_user "$project_git_network_seconds" -C "$path" push --set-upstream --no-follow-tags --recurse-submodules=no -- "$remote" "refs/heads/$current:refs/heads/$current" || status=$?
+  if ((status != 0)); then
+    if ((status != 124 && status != 137)) && grep -qE '^ ! \[rejected\].*\((fetch first|non-fast-forward)\)' "$git_tmp/err"; then
+      project_git_fail PUSH_REJECTED 'The remote has newer commits; fetch and update first.' 'Pull or merge in a terminal, then push again.'
+    fi
+    project_git_classify "$status"
+  fi
+  project_git_ok "$(jq -cn --arg p "$project" --arg c "$checkout" --arg r "$remote" --arg b "$current" '{projectId:$p,checkoutId:$c,remote:$r,branch:$b,upstream:($r + "/" + $b),pushed:true}')"
+}
+
 # Parse arguments, prove the checkout, lock the repository and dispatch.
 project_git_main() {
   local operation=${1:-} project='' checkout='' branch='' check=false confirm=false json=false dependency
@@ -347,7 +418,7 @@ project_git_main() {
   for dependency in jq git timeout flock mktemp sha256sum realpath; do
     command -v "$dependency" >/dev/null || project_git_fail DEPENDENCY_MISSING "Install $dependency to run Git operations." 'Install the missing dependency and retry.'
   done
-  case "$operation" in fetch | pull | task-create | task-remove) shift ;; *) project_git_fail INVALID_REQUEST 'Unsupported Git operation.' 'Use fetch, pull, task-create or task-remove.' ;; esac
+  case "$operation" in fetch | pull | task-create | task-remove | review | push) shift ;; *) project_git_fail INVALID_REQUEST 'Unsupported Git operation.' 'Use fetch, pull, task-create, task-remove, review or push.' ;; esac
   while (($#)); do
     case "$1" in
       --project | --checkout | --branch)
@@ -383,11 +454,14 @@ project_git_main() {
     cat "$git_tmp/proof"
     exit 1
   fi
-  project_git_lock
+  # Review only reads, with optional locks off, so it never queues behind a fetch or push.
+  [[ $operation == review ]] || project_git_lock
   case "$operation" in
     fetch) project_git_fetch ;;
     pull) project_git_pull ;;
     task-create) project_git_task_create ;;
     task-remove) project_git_task_remove ;;
+    review) project_git_review ;;
+    push) project_git_push ;;
   esac
 }

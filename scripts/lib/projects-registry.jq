@@ -12,9 +12,15 @@ def roles: type == "array" and length > 0 and all(.[]; . == "editor" or . == "te
   and (. as $r | ["editor","terminal","agent"] | map(select(. as $x | $r | index($x))) == $r);
 def distinct: length == (unique|length);
 def fields($required; $optional): type == "object" and ((keys - ($required + $optional))|length == 0) and ($required - keys|length == 0);
+def review_mark:
+  fields(["reviewedHead","reviewedTaskAt","reviewedAt"];[])
+  and (.reviewedHead|type == "string" and test("^[0-9a-f]{40}$") and length == 40)
+  and (.reviewedTaskAt == null or (.reviewedTaskAt|integer and . >= 0))
+  and (.reviewedAt|integer and . > 0);
 def checkout:
-  fields(["id","path","branch","primary"];[]) and (.id|opaque("c")) and (.path|path)
-  and (.branch == null or (.branch|text)) and (.primary|type == "boolean");
+  fields(["id","path","branch","primary"];["review"]) and (.id|opaque("c")) and (.path|path)
+  and (.branch == null or (.branch|text)) and (.primary|type == "boolean")
+  and ((has("review")|not) or (.review|review_mark));
 def tools:
   fields(["editorId","terminalId","agentId"];[]) and (.editorId|editor) and (.terminalId|terminal) and (.agentId|agent);
 def profile_draft:
@@ -104,6 +110,8 @@ def request_valid:
     elif $action == "relocate" then fields(["projectId","checkoutId","path"];[]) and (.projectId|text) and (.checkoutId|text) and (.path|text)
     elif $action == "select-checkout" then fields(["projectId","checkoutId"];[]) and (.projectId|text) and (.checkoutId|text)
     elif $action == "checkout-remove" then fields(["projectId","checkoutId"];[]) and (.projectId|text) and (.checkoutId|text)
+    elif $action == "review-mark" then fields(["projectId","checkoutId","head","taskFinishedAt"];[]) and (.projectId|text) and (.checkoutId|text)
+      and (.head|type == "string" and test("^[0-9a-f]{40}$") and length == 40) and (.taskFinishedAt == null or (.taskFinishedAt|integer and . >= 0))
     elif $action == "associate" then fields(["projectId","checkoutId","mode","workspaceId","separate"];["placedAt"]) and (.projectId|text) and (.checkoutId|text)
       and ((has("placedAt")|not) or (.placedAt|integer and . >= 0))
       and (.mode|mode) and (.workspaceId == null or (.workspaceId|integer and . > 0)) and (.separate|type == "boolean")
@@ -193,6 +201,11 @@ def mutate($r):
         | .associations |= map(select(.checkoutId != $a.checkoutId))
         | .environments |= map(select(.checkoutId != $a.checkoutId))
         | if .lastCheckoutId == $a.checkoutId then .lastCheckoutId = ([.checkouts[]|select(.primary)|.id][0] // .checkouts[0].id) else . end
+      else . end)
+  elif $r.action == "review-mark" then require_checkout($a.projectId;$a.checkoutId)
+    | if any(.projects[]|select(.id == $a.projectId)|.checkouts[];.id == $a.checkoutId and .primary) then error("PRIMARY_CHECKOUT") else . end
+    | .projects |= map(if .id == $a.projectId then
+        .checkouts |= map(if .id == $a.checkoutId then .review = {reviewedHead:$a.head,reviewedTaskAt:$a.taskFinishedAt,reviewedAt:$a.reviewedAt} else . end)
       else . end)
   elif $r.action == "associate" then require_checkout($a.projectId;$a.checkoutId) | .projects |= map(if .id == $a.projectId then
     .associations = ([.associations[]|select(if $a.separate then (.separate|not) or .checkoutId != $a.checkoutId else .separate end)]
