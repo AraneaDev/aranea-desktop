@@ -348,6 +348,8 @@ project_git_remove_missing() {
 # Report a task checkout's commits and files against where its branch started; reads only.
 project_git_review() {
   local remote base merge_base head current excludes record ahead behind dirty=false untracked=false
+  # Reads here never fetch a missing object, so repository transport settings cannot run.
+  local -x ARANEA_GIT_NO_LAZY_FETCH=1
   [[ $primary != true ]] || project_git_fail PRIMARY_CHECKOUT 'The main checkout has nothing to review.' 'Choose a task checkout.'
   remote=$(project_git_remote)
   base=$(project_git_default_base "$remote")

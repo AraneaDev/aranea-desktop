@@ -256,6 +256,7 @@ real_bin="$ARANEA_TEST_SANDBOX/realbin"
 mkdir -p "$real_bin"
 ln -s /bin/bash "$real_bin/bash"
 ln -s "$(command -v git)" "$real_bin/git"
+ln -s /usr/bin/less "$real_bin/less"
 cat >"$real_bin/kitty" <<'APP'
 #!/bin/bash
 shift 4
@@ -317,6 +318,45 @@ sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || tru
 sleep 1
 [[ ! -f "$ARANEA_TEST_SANDBOX/pager-ran" ]] || {
   echo "pager.diff ran from repository config"
+  exit 1
+}
+accepted=$((accepted + 1))
+# A partial clone must not fetch a missing blob during Open diff: a planted uploadpack would run.
+pc_remote="$ARANEA_TEST_SANDBOX/pc-remote.git"
+git init -q --bare -b main "$pc_remote"
+git -C "$pc_remote" config uploadpack.allowFilter true
+git -C "$pc_remote" config uploadpack.allowAnySHA1InWant true
+git clone -q "$pc_remote" "$ARANEA_TEST_SANDBOX/pc-seed" 2>/dev/null
+echo old >"$ARANEA_TEST_SANDBOX/pc-seed/f"
+env "${git_env[@]}" git -C "$ARANEA_TEST_SANDBOX/pc-seed" add f
+env "${git_env[@]}" git -C "$ARANEA_TEST_SANDBOX/pc-seed" commit -q -m old
+git -C "$ARANEA_TEST_SANDBOX/pc-seed" push -q origin HEAD:main
+pc="$ARANEA_TEST_SANDBOX/pc"
+pc_linked="$ARANEA_TEST_SANDBOX/pc-linked"
+git clone -q --no-checkout --filter=blob:none "file://$pc_remote" "$pc" 2>/dev/null
+git -C "$pc" worktree add -q --no-checkout -b feat "$pc_linked"
+pc_blob=$(echo new | git -C "$pc_linked" hash-object -w --stdin)
+git -C "$pc_linked" read-tree HEAD
+git -C "$pc_linked" update-index --cacheinfo "100644,$pc_blob,f"
+env "${git_env[@]}" git -C "$pc_linked" commit -q -m new
+pc_base=$(git -C "$pc_linked" rev-parse HEAD~1)
+git -C "$pc" config remote.origin.uploadpack "/usr/bin/touch $ARANEA_TEST_SANDBOX/lazy-ran; git-upload-pack"
+jq -cn --arg p "$pc_linked" '{projects:[{id:"p",checkouts:[{id:"c",path:$p,primary:false}]}]}' >"$ARANEA_TEST_SANDBOX/home/.local/state/aranea/projects.json"
+rm -f "$ARANEA_TEST_SANDBOX/lazy-ran"
+result=$(diff_request "$pc_linked" "$pc_base" kitty | PATH="$real_bin" "$launcher") || {
+  echo "Expected partial clone diff acceptance, got: $result"
+  exit 1
+}
+sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || true"
+sleep 2
+[[ ! -f "$ARANEA_TEST_SANDBOX/lazy-ran" ]] || {
+  echo "a lazy fetch ran the repository uploadpack command"
+  exit 1
+}
+# Control: the same diff without the guard does fetch the blob and run the planted command.
+/usr/bin/script -qefc "$(printf '%q ' git -C "$pc_linked" diff --no-ext-diff --no-textconv "$pc_base...HEAD")" /dev/null </dev/null >/dev/null 2>&1 || true
+[[ -f "$ARANEA_TEST_SANDBOX/lazy-ran" ]] || {
+  echo "Control failed: the planted uploadpack should run on a lazy fetch"
   exit 1
 }
 accepted=$((accepted + 1))

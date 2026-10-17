@@ -28,6 +28,8 @@ projects_registry_git() (
   local git_context
   for git_context in "${!GIT_@}"; do unset "$git_context"; done
   export GIT_OPTIONAL_LOCKS=0 GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+  # Local reads opt out of on-demand object fetches; network operations never set this.
+  [[ -z ${ARANEA_GIT_NO_LAZY_FETCH:-} ]] || export GIT_NO_LAZY_FETCH=1
   git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"
 )
 

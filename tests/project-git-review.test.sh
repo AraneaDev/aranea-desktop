@@ -203,7 +203,45 @@ tag_named_like_branch() {
   jq -e '.ok and .data.branch == "foo" and .data.upstream == "origin/foo"' "$result" >/dev/null
 }
 
-cases=(review_reports_changes review_refuses_primary review_no_default_branch review_caps review_hostile_names_inert rebased_branch_reviews_cleanly push_sets_upstream push_rejected push_detached push_auth_required push_never_forces push_hook_decline_is_not_rejected tag_named_like_branch)
+# Catch a review fetching a missing blob on demand: a planted uploadpack command must never run.
+review_never_lazy_fetches() {
+  rm -rf "$ARANEA_STATE_ROOT" "$ARANEA_TEST_SANDBOX/w"
+  mkdir -p "$ARANEA_TEST_SANDBOX/w"
+  local remote="$ARANEA_TEST_SANDBOX/w/remote.git" seed="$ARANEA_TEST_SANDBOX/w/seed" primary="$ARANEA_TEST_SANDBOX/w/pc" linked="$ARANEA_TEST_SANDBOX/w/pc-linked"
+  local marker="$ARANEA_TEST_SANDBOX/w/uploadpack-ran" blob base
+  git init -q --bare -b main "$remote"
+  git -C "$remote" config uploadpack.allowFilter true
+  git -C "$remote" config uploadpack.allowAnySHA1InWant true
+  git clone -q "$remote" "$seed" 2>/dev/null
+  commit_file "$seed" f 'old\n' 'add f'
+  git -C "$seed" push -q origin HEAD:main
+  git clone -q --no-checkout --filter=blob:none "file://$remote" "$primary" 2>/dev/null
+  git -C "$primary" worktree add -q --no-checkout -b feat "$linked"
+  blob=$(printf 'new\n' | git -C "$linked" hash-object -w --stdin)
+  git -C "$linked" read-tree HEAD
+  git -C "$linked" update-index --cacheinfo "100644,$blob,f"
+  git -C "$linked" -c user.name=T -c user.email=t@example.invalid commit -q -m 'change f'
+  base=$(git -C "$linked" rev-parse HEAD~1)
+  git -C "$primary" config remote.origin.uploadpack "/usr/bin/touch $marker; git-upload-pack"
+  jq -cn --arg a "$primary" --arg b "$linked" '{action:"register",args:{paths:[$a,$b]}}' | "$store" mutate >"$result"
+  project_id=$(jq -r '.state.projects[0].id' "$result")
+  task_id=$(jq -r '.state.projects[0].checkouts[]|select(.primary|not)|.id' "$result")
+  task_run review || true
+  [[ ! -f "$marker" ]] || {
+    echo "review ran the planted uploadpack"
+    return 1
+  }
+  # git refuses the missing blob; the helper reports that as a plain error, never a crash.
+  jq -e '.ok == false and .data == null and .error.code == "GIT_ERROR" and (.error.recovery|length > 0)' "$result" >/dev/null
+  # Control: without the guard the same read fetches the missing blob and runs the planted command.
+  git -C "$linked" diff --numstat "$base...HEAD" >/dev/null 2>&1 || true
+  [[ -f "$marker" ]] || {
+    echo "Control failed: the planted uploadpack should run on a lazy fetch"
+    return 1
+  }
+  rm -f "$marker"
+}
+cases=(review_reports_changes review_refuses_primary review_no_default_branch review_caps review_hostile_names_inert rebased_branch_reviews_cleanly review_never_lazy_fetches push_sets_upstream push_rejected push_detached push_auth_required push_never_forces push_hook_decline_is_not_rejected tag_named_like_branch)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e

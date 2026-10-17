@@ -140,8 +140,8 @@ check action (a saved command named like "test" or "check"; it reads "not run"
 until you run it, and also when a run was stopped or could not be confirmed).
 **Run checks** runs that action. **Open diff** opens your terminal with `git
 diff` against where the branch started; it turns off external diff tools,
-text conversion and any pager the repository configures (including a
-per-command `pager.diff`), so repository settings cannot run commands. **Push branch** pushes the
+text conversion, the repository's pager and on-demand fetches, so settings in
+the repository can't make it run other programs. **Push branch** pushes the
 branch and sets its upstream (never forced). While the agent is still working
 the checkout shows **Agent working**, or **Agent needs input** when it is
 waiting for you.
