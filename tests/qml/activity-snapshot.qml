@@ -190,6 +190,83 @@ ShellRoot {
     t.equal(client.snapshot.tasks[299].result, long, 'full result kept for details')
     t.equal(view.taskRows.length, 300, 'panel lists every task')
     t.equal(owner.ipcSnapshotPage('stale-token', 1).error.code, 'SNAPSHOT_EXPIRED', 'unknown page token refused')
+    boundedHeader()
+  }
+  // Many retained operations and a largest-size row still fit the first reply.
+  function boundedHeader() {
+    var wide = '€'.repeat(4096)
+    var blockers = [], diagnostics = [], ops = []
+    for (var b = 0; b < 32; b++)
+      blockers.push({
+        blockerId: 'b'.repeat(250) + b,
+        question: wide
+      })
+    for (var d = 0; d < 20; d++)
+      diagnostics.push({
+        summary: wide,
+        receivedAt: 900
+      })
+    var big = {
+      taskId: 'x'.repeat(256),
+      provider: 'claude',
+      providerSessionId: 's'.repeat(256),
+      producerEpoch: 'e'.repeat(256),
+      reportedState: 'needs-input',
+      description: wide,
+      result: wide,
+      question: wide,
+      blockers: blockers,
+      diagnostics: diagnostics,
+      verification: {
+        status: 'reported-fail',
+        summary: wide,
+        commands: Array(16).fill('c'.repeat(512))
+      },
+      association: {
+        status: 'unassigned',
+        projectId: null,
+        checkoutId: null,
+        cwd: '/' + 'p'.repeat(4000)
+      },
+      lastReceivedAt: 900,
+      source: 'report'
+    }
+    for (var i = 0; i < 100; i++)
+      ops.push({
+        id: 'op-' + i,
+        ownerId: owner.ownerId,
+        taskId: 'task-' + i,
+        action: 'reopen',
+        state: 'completed',
+        outcome: 'partial',
+        attempt: 1,
+        steps: [
+          {
+            role: 'terminal',
+            status: 'observed',
+            binding: {
+              address: '0x' + 'a'.repeat(300)
+            }
+          }
+        ],
+        error: {
+          code: 'SESSION_UNCONFIRMED',
+          message: 'm'.repeat(600),
+          recovery: 'r'.repeat(200)
+        },
+        task: big
+      })
+    owner.operations = ops
+    owner.storeState = {
+      schemaVersion: 1,
+      revision: 12,
+      tasks: [big],
+      sessions: []
+    }
+    var first = JSON.stringify(owner.ipcSnapshot())
+    t.check(bytes(first) < 64000, 'first reply with 100 retained operations and a largest row stays under 64 KB (' + bytes(first) + ')')
+    t.check(JSON.parse(first).operations.length > 0, 'recent operation outcomes still reach the panel')
+    owner.operations = []
     t.done()
   }
 }

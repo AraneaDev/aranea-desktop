@@ -326,8 +326,85 @@ function taskPage(rows, offset, budget) {
   return page
 }
 
+/** The fields Tasks views read from a retained operation (operationFor and
+ * operationView); steps keep only role, status and code.
+ * @param {ActivityData} op - owner operation
+ * @returns {ActivityData} compact copy
+ */
+function compactOperation(op) {
+  /** @type {ActivityData} */
+  var copy = {}
+  ;[
+    "id",
+    "ownerId",
+    "taskId",
+    "action",
+    "state",
+    "outcome",
+    "attempt",
+    "submissionPending",
+    "submissionUnconfirmed",
+    "result"
+  ].forEach(function (key) {
+    if (op[key] !== undefined) copy[key] = op[key]
+  })
+  if (Array.isArray(op.steps))
+    copy.steps = op.steps.map(function (/** @type {ActivityData} */ step) {
+      return {
+        role: step.role,
+        status: step.status,
+        code: step.code === undefined ? null : step.code
+      }
+    })
+  if (op.error && typeof op.error === "object")
+    copy.error = {
+      code: String(op.error.code || ""),
+      message: String(op.error.message || "").slice(0, 512),
+      recovery: String(op.error.recovery || "").slice(0, 512)
+    }
+  return copy
+}
+
+/** Operations for an IPC snapshot: open and protected ones always, then each
+ * task's latest completed outcome, newest first, while BUDGET bytes allow
+ * (open ones count against it but are never dropped).
+ * Completed set dismissals (no taskId) are left out; operation(id) has them.
+ * @param {Array<ActivityData>} operations - owner records, oldest first
+ * @param {number} budget - bytes for the serialized completed outcomes
+ * @returns {Array<ActivityData>} compact copies in their original order
+ */
+function ipcOperations(operations, budget) {
+  var list = operations || []
+  /** @type {{[id:string]:boolean}} */
+  var keep = {}
+  /** @type {{[taskId:string]:boolean}} */
+  var seen = {}
+  var used = 2
+  list.forEach(function (op) {
+    if (op.state !== "completed" || op.submissionPending || op.submissionUnconfirmed) {
+      keep[op.id] = true
+      used += utf8Length(JSON.stringify(compactOperation(op))) + 1
+    }
+  })
+  for (var i = list.length - 1; i >= 0; i--) {
+    var op = list[i]
+    if (keep[op.id] || typeof op.taskId !== "string" || seen[op.taskId]) continue
+    seen[op.taskId] = true
+    var size = utf8Length(JSON.stringify(compactOperation(op))) + 1
+    if (used + size > budget) break
+    keep[op.id] = true
+    used += size
+  }
+  return list
+    .filter(function (op) {
+      return keep[op.id]
+    })
+    .map(compactOperation)
+}
+
 if (typeof module !== "undefined")
   module.exports = {
+    ipcOperations,
     utf8Length,
     boundTask,
     taskPage,

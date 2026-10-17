@@ -114,9 +114,13 @@ Item {
   property int ipcSerial: 0
   // One IPC reply stays well under Quickshell's ~110 KB reply limit.
   property int ipcPageBytes: 60000
+  // Share of the first reply for retained operation outcomes.
+  property int ipcOperationBytes: 16000
   // First page of an IPC snapshot: owner fields plus as many bounded task rows
-  // as fit. Sessions stay in the owner (no client reads them) and operations
-  // drop their copied task. taskPage tells the client how to read the rest.
+  // as fit. Sessions stay in the owner (no client reads them). Operations are
+  // the open ones plus each task's latest outcome, compact and bounded
+  // (operation(id) still has the full record). taskPage tells the client how
+  // to read the rest.
   function ipcSnapshot(): var {
     var view = snapshot()
     var tasks = (view.tasks || []).map(Logic.boundTask)
@@ -129,12 +133,7 @@ Item {
     ]).slice(-4)
     var header = Object.assign({}, view, {
       tasks: [],
-      operations: (view.operations || []).map(function (op) {
-        var copy = Object.assign({}, op)
-        delete copy.task
-        delete copy.taskIds
-        return copy
-      }),
+      operations: Logic.ipcOperations(view.operations, ipcOperationBytes),
       taskPage: {
         token: token,
         total: tasks.length

@@ -207,3 +207,42 @@ test("task pages fill up to the byte budget and always make progress", () => {
   assert.equal(logic.taskPage(rows, 0, 10).length, 1, "one oversized row still advances")
   assert.equal(logic.taskPage(rows, 10, 3500).length, 0)
 })
+
+test("IPC operations keep open, protected and each task's latest outcome within a budget", () => {
+  assert.equal(typeof logic.ipcOperations, "function", "operation bounding exists")
+  const op = (id, taskId, extra = {}) => ({
+    id,
+    ownerId: "owner",
+    taskId,
+    action: "reopen",
+    state: "completed",
+    outcome: "partial",
+    attempt: 1,
+    steps: [{ role: "terminal", status: "observed", binding: { address: "0x" + "a".repeat(400) } }],
+    error: { code: "X", message: "m".repeat(2000), recovery: "r" },
+    task: { taskId, result: "x".repeat(4096) },
+    spec: { argv: ["x".repeat(500)] },
+    ...extra
+  })
+  const ops = []
+  for (let i = 0; i < 100; i++) ops.push(op("old-" + i, "t" + (i % 40)))
+  ops.push(op("open", "t1", { state: "observing", outcome: null }))
+  ops.push(op("protected", "t2", { submissionUnconfirmed: true }))
+  ops.push(op("set", undefined, { action: "dismiss-many", taskIds: ["a", "b"] }))
+  const kept = logic.ipcOperations(ops, 16000)
+  assert.ok(logic.utf8Length(JSON.stringify(kept)) <= 16000, "within budget")
+  const ids = kept.map((o) => o.id)
+  assert.ok(ids.includes("open") && ids.includes("protected"), "open and protected kept")
+  assert.ok(!ids.includes("set"), "completed set dismissal dropped")
+  assert.ok(ids.includes("old-99") && !ids.includes("old-59"), "only each task's latest outcome")
+  assert.ok(kept.every((o) => o.task === undefined && o.spec === undefined && !o.taskIds))
+  assert.equal(kept[0].steps[0].binding, undefined, "steps keep role and status")
+  assert.equal(kept[0].steps[0].status, "observed")
+  assert.ok(kept[0].error.message.length <= 513)
+  assert.deepEqual(
+    ids,
+    ops.map((o) => o.id).filter((id) => ids.includes(id)),
+    "original order kept"
+  )
+  assert.equal(logic.ipcOperations(ops, 300).length >= 1, true, "open work is never dropped")
+})

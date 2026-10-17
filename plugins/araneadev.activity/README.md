@@ -27,9 +27,11 @@ next rows of the same read, or `SNAPSHOT_EXPIRED` once the owner has dropped
 that read (it keeps the last four). Task rows keep what the Tasks views show:
 the first 4096 characters of each text and of the joined diagnostics and
 blocker questions. A row with long multibyte text everywhere is cut shorter to
-stay under 32 KB. IPC snapshots leave out sessions and the task copy kept in
-each operation. `ActivityClient.refresh()` reads every page before it replaces
-`snapshot`. A failed page keeps the last snapshot.
+stay under 32 KB. IPC snapshots leave out sessions. Their `operations` are
+the open and protected ones plus each task's latest outcome, cut to the fields
+the Tasks views read, in at most 16 KB; `operation(id)` returns a full record.
+`ActivityClient.refresh()` reads every page before it replaces `snapshot`. A
+failed page keeps the last snapshot.
 
 `ActivityClient` exposes `snapshot`, `available`, structured `error`, `pending`,
 `operationId`, `currentOperation`, `request(payload)`, `refresh()`,
