@@ -248,6 +248,11 @@ refuse_raw "$(diff_request "$checkout" "$merge_base"$'\n')" INVALID_LAUNCH
 refuse_raw "$(diff_request "$checkout" "$merge_base" xterm)" INVALID_LAUNCH
 refuse_raw "$(diff_request "$ARANEA_TEST_SANDBOX/other")" CHECKOUT_INVALID
 refuse_raw "$(diff_request "$checkout/nested")" CHECKOUT_INVALID
+# A symlink to a registered checkout resolves there but is not the registered path itself.
+rm -rf "$ARANEA_TEST_SANDBOX/diff-alias"
+ln -s "$checkout" "$ARANEA_TEST_SANDBOX/diff-alias"
+refuse_raw "$(diff_request "$ARANEA_TEST_SANDBOX/diff-alias")" CHECKOUT_INVALID
+rm -f "$ARANEA_TEST_SANDBOX/diff-alias"
 refuse_raw "$(diff_request | jq -c '.extra="x"')" INVALID_LAUNCH
 refuse_raw "$(diff_request | jq -c '.argv=["kitty","x","y"]')" INVALID_LAUNCH
 refuse_raw "$(diff_request | jq -c 'del(.terminalId)')" INVALID_LAUNCH

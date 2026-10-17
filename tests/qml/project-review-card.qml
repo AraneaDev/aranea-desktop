@@ -25,6 +25,8 @@ ShellRoot {
   property var launches: []
   // Runs the action client tried to start.
   property var actionCalls: []
+  // The same runs with their stdin and completion.
+  property var actionRequests: []
   // Review data the next answered read returns.
   property var reviewHead: host.head
   // Whether the fixture checkout has uncommitted changes.
@@ -298,6 +300,11 @@ ShellRoot {
     entry.activityClient.runner = function () {}
     entry.actionClient.runner = function (argv, input, done) {
       host.actionCalls.push(argv)
+      host.actionRequests.push({
+        argv: argv,
+        input: input,
+        done: done
+      })
     }
     entry.actionClient.snapshot = {
       definitions: [
@@ -371,6 +378,15 @@ ShellRoot {
     }).length, 1, 'Run checks starts one run')
     t.check(entry.actionClient.pending, 'the run is for the action client of this checkout')
     t.equal([entry.actionClient.projectId, entry.actionClient.checkoutId], ['p-a', 'c-l'], 'the run targets the selected pair')
+    host.actionRequests.filter(function (r) {
+      return r.argv[0] === '/usr/bin/cat'
+    })[0].done(0, '4f0c2b1e-8a57-4c3d-9d6e-1a2b3c4d5e6f\n', '')
+    var started = host.actionRequests.filter(function (r) {
+      return r.argv.length === 2 && r.argv[1] === 'start'
+    })
+    t.equal(started.length, 1, 'Run checks sends exactly one start request')
+    t.equal(started[0] ? JSON.parse(started[0].input).actionId : null, 'a-t', 'the start request names the saved check action')
+    t.equal(started[0] ? [JSON.parse(started[0].input).projectId, JSON.parse(started[0].input).checkoutId] : null, ['p-a', 'c-l'], 'the start request names the selected pair')
     entry.actionClient.pending = false
     diffFlow()
   }
@@ -689,7 +705,53 @@ ShellRoot {
       }
     }
     t.check(host.button('reviewMark').enabled, 'Mark reviewed returns with fresh data')
-    inertFlow()
+    switchFlow()
+  }
+  // A read still in flight for one project never shows on another project's checkout of the same id.
+  function switchFlow() {
+    var other = host.project()
+    other.id = 'p-b'
+    other.name = 'p-b'
+    var task = host.task('ready-for-review', 100)
+    var otherTask = host.task('ready-for-review', 100)
+    otherTask.id = 't2'
+    otherTask.taskId = 't2'
+    otherTask.association = {
+      status: 'registered',
+      projectId: 'p-b',
+      checkoutId: 'c-l'
+    }
+    host.setTasks([task, otherTask])
+    entry.projectController.state = {
+      revision: 9,
+      projects: [host.project(), other],
+      roots: [],
+      ignored: []
+    }
+    entry.reviewClient.reviews = {}
+    host.reviewCalls = []
+    entry.reviewClient.refreshSelected()
+    t.equal(host.reviewCalls.length, 1, 'a read for the first project is in flight')
+    t.equal(host.reviewCalls[0].argv.slice(1, 5), ['review', '--project', 'p-a', '--checkout'], 'the held read belongs to the first project')
+    entry.projectId = 'p-b'
+    t.waitFor(function () {
+      return surface.reviewModel.state === 'ready' && entry.selectedProject.id === 'p-b'
+    }, 3000, 'the second project is selected and ready', function () {
+      host.reviewCalls[0].answered = true
+      host.reviewCalls[0].done(0, JSON.stringify({
+        ok: true,
+        data: host.reviewData(),
+        error: null
+      }), '')
+      t.step(100, function () {
+        t.equal(entry.reviewClient.reviews['c-l'].projectId, 'p-a', 'the late result is stored for the project it was read for')
+        t.equal(surface.reviewModel.data, null, 'the late result shows nothing on the new project')
+        t.check(!surface.reviewModel.readError && !surface.reviewModel.error, 'the late result shows no failure on the new project')
+        t.check(!host.card().info, 'the card holds no data from the old project')
+        entry.projectId = 'p-a'
+        inertFlow()
+      })
+    })
   }
   // Capture mode disables every action and reads nothing.
   function inertFlow() {
