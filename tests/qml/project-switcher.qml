@@ -26,6 +26,8 @@ ShellRoot {
       terminals: [],
       agents: []
     })
+  // select-checkout requests the controller sent.
+  property var selects: []
   // Visible text of every switcher label seen in any state.
   property var seenTexts: []
   QmlTest {
@@ -183,6 +185,22 @@ ShellRoot {
         Qt.callLater(function () {
           done(0, JSON.stringify(host.tools), '')
         })
+      if (action === 'select-checkout') {
+        var args = JSON.parse(input).args
+        host.selects.push(args)
+        var next = JSON.parse(JSON.stringify(entry.projectController.state))
+        next.projects.forEach(function (p) {
+          if (p.id === args.projectId)
+            p.lastCheckoutId = args.checkoutId
+        })
+        next.revision++
+        Qt.callLater(function () {
+          done(0, JSON.stringify({
+            ok: true,
+            state: next
+          }), '')
+        })
+      }
       if (action === 'snapshot' || action === 'navigation-set' || action === 'profiles-seed')
         Qt.callLater(function () {
           done(0, JSON.stringify({
@@ -597,7 +615,67 @@ ShellRoot {
       t.equal(entry.mode, '', 'an open without a mode gives the full layout')
       entry.close()
       entry.closeFinished()
-      lateRowsCase()
+      reviewCase()
+    })
+  }
+  // Enter on a row with agent work to review opens that checkout's Overview and launches nothing.
+  function reviewCase() {
+    var withTask = host.project('p-start', 'Alpha', true)
+    withTask.checkouts[0].primary = true
+    withTask.checkouts.push({
+      id: 'x-p-start',
+      path: '/fixture/alpha-x',
+      branch: 'feat/x',
+      primary: false
+    })
+    host.show([withTask, host.project('p-ret', 'Beta', true), host.project('p-bare', 'Gamma', false)])
+    entry.activityClient.snapshot = {
+      tasks: [
+        {
+          id: 't1',
+          taskId: 't1',
+          reportedState: 'ready-for-review',
+          lastReceivedAt: 100,
+          verification: {
+            status: 'reported-pass'
+          },
+          association: {
+            status: 'registered',
+            projectId: 'p-start',
+            checkoutId: 'x-p-start'
+          }
+        }
+      ],
+      operations: []
+    }
+    host.selects = []
+    host.openSwitcher()
+    t.step(100, function () {
+      var row = t.findChild(surface, 'projectSwitcherRow:p-start')
+      t.equal(t.findChild(surface, 'projectSwitcherAction:p-start').text, 'Review · feat/x', 'the review label names the branch')
+      t.check(t.findChild(surface, 'projectSwitcherReviewChip:p-start').visible, 'the row shows the Review chip')
+      t.check(!t.findChild(surface, 'projectSwitcherReviewChip:p-ret').visible, 'other rows show no chip')
+      t.check(row.hasCursor, 'the review row holds the outline Enter acts on')
+      host.note()
+      keys.keyClick(Qt.Key_Return)
+      t.equal(entry.mode, '', 'Enter leaves the switcher for the full layout')
+      t.equal(entry.projectId, 'p-start', 'the project is selected')
+      t.equal(surface.section, 'overview', 'the Overview shows')
+      t.equal(host.method('startEnvironment').length + host.method('returnEnvironment').length, 0, 'nothing is launched')
+      t.waitFor(function () {
+        return host.selects.length === 1 && entry.selectedCheckoutId === 'x-p-start'
+      }, 3000, 'the review checkout is selected', function () {
+        t.equal(host.selects[0], {
+          projectId: 'p-start',
+          checkoutId: 'x-p-start'
+        }, 'select-checkout names the review checkout')
+        t.check(entry.opened, 'Projects stays open')
+        entry.activityClient.snapshot = {
+          tasks: [],
+          operations: []
+        }
+        lateRowsCase()
+      })
     })
   }
   // While an earlier start is unconfirmed, the other rows say they are busy.

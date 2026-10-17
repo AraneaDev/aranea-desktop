@@ -7,6 +7,7 @@ import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
 import "ProjectsNavigation.js" as Navigation
+import "ProjectReview.js" as Review
 
 ColumnLayout {
   id: sidebar
@@ -15,6 +16,10 @@ ColumnLayout {
   property var projects: []
   // Matching cached Git observations affect labels/search, never saved registrations.
   property var gitCache: ({})
+  // Agent tasks, for the Review chip.
+  property var tasks: []
+  // Review helper data by checkout id.
+  property var reviews: ({})
   // Observed workspace associations from the persistent project owner.
   property var bindings: []
   // Opaque selected project identity, independent of row ordering.
@@ -180,6 +185,13 @@ ColumnLayout {
     })[0]
     return binding && binding.workspaceId !== undefined ? ' · Workspace ' + binding.workspaceId : ''
   }
+  // Whether a project has a task checkout ready to review.
+  function hasReview(id) {
+    var project = projects.find(function (p) {
+      return p.id === id
+    })
+    return !!project && Review.projectHasReview(project, tasks, reviews)
+  }
   // Short path hints keep duplicate names distinguishable within compact rows.
   function folderLabel(row) {
     var path = row.path || ''
@@ -333,6 +345,14 @@ ColumnLayout {
               visible: sidebar.showCheckoutContext && (!!projectRow.modelData.path || !!projectRow.modelData.branch)
               text: (projectRow.modelData.branch || 'detached') + sidebar.workspaceLabel(projectRow.modelData.id)
               elide: Text.ElideRight
+              wrapMode: Text.NoWrap
+            }
+            Aranea.UiLabel {
+              objectName: 'projectReviewChip:' + projectRow.modelData.id
+              visible: sidebar.hasReview(projectRow.modelData.id)
+              text: 'Review'
+              font.bold: true
+              color: Aranea.DesignTokens.accent
               wrapMode: Text.NoWrap
             }
             Aranea.UiLabel {

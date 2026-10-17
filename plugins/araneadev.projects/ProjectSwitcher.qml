@@ -28,6 +28,10 @@ ColumnLayout {
   property bool launching: false
   // Plain problem shown in place of the list when the registry cannot be read.
   property var loadProblem: null
+  // Agent tasks, for the rows that have work to review.
+  property var tasks: []
+  // Review helper data by checkout id.
+  property var reviews: ({})
   // Registry, discovery, action or activity work is running: nothing may begin.
   property bool systemBusy: false
   // Inert capture hosts refuse every action.
@@ -41,7 +45,7 @@ ColumnLayout {
   // Return that found its windows gone, with the plain error to show.
   property var returnFailure: null
   // Rows in navigation order with their Enter action.
-  readonly property var rows: Switcher.switcherRows(projects, navigation, query, runtime, tools, gitCache)
+  readonly property var rows: Switcher.switcherRows(projects, navigation, query, runtime, tools, gitCache, tasks, reviews)
   // Enter target; falls back to the first row when the remembered one is filtered out.
   readonly property string cursorId: rows.some(function (row) {
     return row.id === switcher.highlightedId
@@ -142,7 +146,10 @@ ColumnLayout {
       return
     if (row.action.kind === 'setup')
       expand()
-    else if (!busy)
+    else if (row.action.kind === 'review') {
+      if (!systemBusy)
+        goRequested(row)
+    } else if (!busy)
       goRequested(row)
   }
   // Alt+Enter: open Projects on the row without launching.
@@ -157,6 +164,8 @@ ColumnLayout {
       return 'Starting…'
     if (row.id === returningId)
       return 'Returning…'
+    if (row.action.kind === 'review')
+      return systemBusy ? 'Busy right now' : row.action.label
     if (systemBusy || clientBusy && row.id !== busyOwnerId)
       return 'Busy right now'
     return row.action.label
@@ -260,7 +269,7 @@ ColumnLayout {
       Aranea.UiLabel {
         anchors.left: parent.left
         anchors.leftMargin: Style.space(12)
-        anchors.right: action.left
+        anchors.right: chip.visible ? chip.left : action.left
         anchors.rightMargin: Style.space(8)
         anchors.verticalCenter: parent.verticalCenter
         text: row.modelData.name + (row.modelData.branch ? ' · ' + row.modelData.branch : '')
@@ -268,6 +277,18 @@ ColumnLayout {
         font.bold: row.hasCursor
         wrapMode: Text.NoWrap
         elide: Text.ElideRight
+      }
+      Aranea.UiLabel {
+        id: chip
+        objectName: 'projectSwitcherReviewChip:' + row.modelData.id
+        anchors.right: action.left
+        anchors.rightMargin: Style.space(8)
+        anchors.verticalCenter: parent.verticalCenter
+        visible: row.modelData.review
+        text: 'Review'
+        font.bold: true
+        color: Aranea.DesignTokens.accent
+        wrapMode: Text.NoWrap
       }
       Aranea.UiLabel {
         id: action

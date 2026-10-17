@@ -366,6 +366,8 @@ Item {
   }
   // Enter on a switcher row: select its project first, then use the ordinary start or return path.
   function switcherGo(row) {
+    if (row && row.action.kind === 'review')
+      return switcherReview(row)
     if (root.inert || !root.opened || !row || switcher.busy || !switcherSelect(row.id))
       return false
     if (row.action.kind === 'return')
@@ -373,6 +375,24 @@ Item {
     if (row.action.kind === 'start')
       return root.startProfile(row.action.target.profileId, row.action.target.profileRevision, false)
     return false
+  }
+  // Enter on a review row: open Projects on that task checkout's Overview; nothing launches.
+  function switcherReview(row) {
+    if (root.inert || !root.opened || !row || !switcherSelect(row.id))
+      return false
+    var target = row.action.target
+    root.mode = ''
+    section = 'overview'
+    var project = (root.projectController.state.projects || []).find(function (p) {
+      return p.id === row.id
+    })
+    if (project && project.lastCheckoutId !== target.checkoutId)
+      root.projectController.request('select-checkout', {
+        projectId: target.projectId,
+        checkoutId: target.checkoutId
+      })
+    Qt.callLater(focusKeys)
+    return true
   }
   // The explicit Start after a failed return uses the row's remembered profile.
   function switcherStart(row) {
@@ -691,6 +711,19 @@ Item {
       error: (storedMine ? stored.error : null) || (mine ? entry.error : null) || root.reviewClient.diffError || null
     }
   }
+  // Agent tasks, for review markers.
+  readonly property var markerTasks: (root.activityClient.snapshot || {}).tasks || []
+  // Review helper data by checkout id, only where it belongs to the checkout's project.
+  readonly property var markerReviews: {
+    var out = {}
+    var all = root.reviewClient.reviews || {}
+    Object.keys(all).forEach(function (id) {
+      var entry = all[id]
+      if (entry && entry.data && entry.data.projectId === entry.projectId)
+        out[id] = entry.data
+    })
+    return out
+  }
   // Run the project's check action in the selected checkout; one press, one run.
   function runReviewChecks() {
     var project = projectsPage.selectedProject, checkout = selectedCheckout
@@ -980,6 +1013,8 @@ Item {
       runtime: panel.root.projectClient.snapshot
       tools: panel.root.projectController.tools
       gitCache: panel.root.gitClient.cache
+      tasks: panel.markerTasks
+      reviews: panel.markerReviews
       client: panel.root.projectClient
       launching: !!panel.root.inspectionLaunchIntent
       displayOnly: panel.root.inert
@@ -1069,6 +1104,8 @@ Item {
               projects: panel.root.projectController.state.projects || []
               gitCache: panel.root.gitClient.cache
               navigation: panel.root.projectController.state.navigation || {}
+              tasks: panel.markerTasks
+              reviews: panel.markerReviews
               bindings: panel.root.projectClient.snapshot.bindings || []
               selectedId: projectsPage.selectedProject ? projectsPage.selectedProject.id : panel.root.projectId
               navigationEnabled: !panel.navigationBlocked && !panel.root.inert
