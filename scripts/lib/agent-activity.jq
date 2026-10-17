@@ -86,8 +86,11 @@ def state_valid: fields(["schemaVersion","revision","sessions","tasks"];[]) and 
 def fresh($s): $s.connection.connected and $s.connection.bootId == $context.bootId and $context.monotonic >= $s.connection.monotonic and ($context.monotonic - $s.connection.monotonic) < 60 and $context.receivedAt >= $s.connection.receivedAt and ($context.receivedAt - $s.connection.receivedAt) < 60;
 def live($sessions): . as $t | $sessions[session_key] as $entry
   | .reportedState != "finished" and $entry != null and fresh($entry.session) and $entry.inactive[$t.taskId] == null;
+# Working with no report for 6 hours ended without one, even while heartbeats
+# keep its session connected (ActivityLogic.silentWork uses the same age).
+def stale_work: .reportedState == "working" and ($context.receivedAt - .lastReceivedAt) >= 21600;
 # Live work stays protected; completed review/failure without blockers may go.
-def dismissible($sessions): (live($sessions) and (((.reportedState|IN("ready-for-review","failed")) and (.blockers|length) == 0)|not))|not;
+def dismissible($sessions): (live($sessions) and (((.reportedState|IN("ready-for-review","failed")) and (.blockers|length) == 0)|not) and (stale_work|not))|not;
 def clock($connected): {receivedAt:$context.receivedAt,monotonic:$context.monotonic,bootId:$context.bootId,connected:$connected};
 def associate($a): [$projects.projects[] as $p | $p.checkouts[] | select(.path == $a.cwd) | {status:"registered",projectId:$p.id,checkoutId:.id,cwd:$a.cwd}] as $found
   | if ($a|has("projectId")) and (all($found[]; .projectId != $a.projectId or .checkoutId != $a.checkoutId) or ($found|length == 0)) then error("ASSOCIATION_MISMATCH")

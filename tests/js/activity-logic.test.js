@@ -52,6 +52,35 @@ test("boot, monotonic regression and retired turn invalidate freshness; terminal
       reportedState
     )
 })
+test("work superseded by a later prompt or silent for 6 hours has ended without a report", () => {
+  const retired = { ...session, nativeMetadata: { inactiveTaskIds: ["t"] } }
+  for (const reportedState of ["working", "needs-input"]) {
+    const ended = logic.project(
+      { tasks: [{ ...task, reportedState, lastReceivedAt: 1 }], sessions: [retired] },
+      2000,
+      registry
+    ).tasks[0]
+    assert.equal(ended.displayState, "ended", reportedState + " superseded by a later prompt")
+    assert.equal(ended.reportedState, reportedState, "reported state kept")
+  }
+  const hours = (h) => (1 + h * 3600) * 1000
+  // Heartbeats keep the session connected while the task itself stays silent.
+  const fresh = (h) => ({
+    ...session,
+    connection: { ...session.connection, receivedAt: 1 + h * 3600 }
+  })
+  const silent = (reportedState, h) =>
+    logic.project(
+      { tasks: [{ ...task, reportedState, lastReceivedAt: 1 }], sessions: [fresh(h)] },
+      hours(h),
+      registry
+    ).tasks[0].displayState
+  assert.equal(silent("working", 6), "ended", "working with no report for 6 hours")
+  assert.equal(silent("working", 5.9), "working", "recent work still working")
+  assert.equal(silent("needs-input", 6), "needs-input", "a question can wait for the user")
+  for (const reportedState of ["finished", "failed", "ready-for-review"])
+    assert.equal(silent(reportedState, 7), reportedState, "reported outcomes stay")
+})
 test("missing association and native proof never become focus or arbitrary resume commands", () => {
   assert.equal(typeof logic.resumeCommand, "function")
   assert.equal(logic.resumeCommand(task), "claude --resume '12345678-1234-1234-1234-123456789abc'")

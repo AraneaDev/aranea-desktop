@@ -86,7 +86,8 @@ function rows(snapshot, registry, now) {
     "ready-for-review": "Ready for review",
     failed: "Failed",
     finished: "Finished",
-    "connection-lost": "Connection lost"
+    "connection-lost": "Connection lost",
+    ended: "Ended without a report"
   }
   /** @type {{[key:string]:number}} */
   var priorities = {
@@ -95,7 +96,8 @@ function rows(snapshot, registry, now) {
     failed: 2,
     working: 3,
     "connection-lost": 4,
-    finished: 5
+    ended: 5,
+    finished: 6
   }
   /** @type {Array<TaskData>} */
   var projects = (registry || {}).projects || []
@@ -131,7 +133,7 @@ function rows(snapshot, registry, now) {
         if (canReopen) secondary = { kind: "reopen", label: "Reopen session" }
       } else if (state === "ready-for-review") {
         if (assigned) primary = { kind: "open-checkout", label: "Open checkout", local: false }
-      } else if (state === "connection-lost") {
+      } else if (state === "connection-lost" || state === "ended") {
         if (canReopen) primary = { kind: "reopen", label: "Reopen session", local: false }
       } else if (state === "working" || state === "needs-input") {
         if (canFocus)
@@ -169,7 +171,7 @@ function rows(snapshot, registry, now) {
         lastReceivedAt: report.lastReceivedAt,
         lastReportTime: report.lastReportTime,
         lastReportLabel: report.lastReportLabel,
-        priority: priorities[state] === undefined ? 6 : priorities[state],
+        priority: priorities[state] === undefined ? 7 : priorities[state],
         attention: attention,
         freshnessLabel:
           freshness === "connected"
@@ -218,6 +220,7 @@ function rows(snapshot, registry, now) {
         secondary: secondary,
         canDismiss:
           freshness === "connection-lost" ||
+          state === "ended" ||
           task.reportedState === "finished" ||
           (["ready-for-review", "failed"].indexOf(task.reportedState) >= 0 &&
             (task.blockers || []).length === 0),

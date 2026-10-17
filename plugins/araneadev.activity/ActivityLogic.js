@@ -56,7 +56,27 @@ function sessionFor(state, task) {
   )
 }
 
+/** Seconds without any report after which working is treated as ended (6 hours).
+ * The store's dismiss rule uses the same age (agent-activity.jq stale_work). */
+var silentWorkSeconds = 21600
+
+/** A working task with no report for silentWorkSeconds, while its session may
+ * still send heartbeats. A question (needs-input) can wait for the user.
+ * @param {ActivityData} task - retained task
+ * @param {number} wall - current wall clock in milliseconds
+ * @returns {boolean} the work ended without a report
+ */
+function silentWork(task, wall) {
+  return (
+    task.reportedState === "working" &&
+    typeof task.lastReceivedAt === "number" &&
+    wall - task.lastReceivedAt * 1000 >= silentWorkSeconds * 1000
+  )
+}
+
 /** Project reported lifecycle independently from connection and verification.
+ * displayState is "ended" for working or needs-input work a later prompt in its
+ * session superseded, and for working with no report for 6 hours.
  * Numeric now is wall milliseconds; clock objects additionally provide monotonic
  * milliseconds and bootId. Store projections remain authoritative for boot loss.
  * @param {ActivityData} state - last validated store snapshot
@@ -83,8 +103,9 @@ function project(state, now, registry) {
           lost ||
           clock.monotonic < c.monotonic * 1000 ||
           clock.monotonic - c.monotonic * 1000 >= 60000
-      if (s && ((s.nativeMetadata || {}).inactiveTaskIds || []).indexOf(task.taskId) >= 0)
-        lost = true
+      var superseded =
+        !!s && ((s.nativeMetadata || {}).inactiveTaskIds || []).indexOf(task.taskId) >= 0
+      if (superseded) lost = true
       var freshness = lost
         ? "connection-lost"
         : s.provenance && s.provenance.commandHash
@@ -105,6 +126,8 @@ function project(state, now, registry) {
       )
         association.status = "unavailable"
       var historical = ["finished", "failed", "ready-for-review"].indexOf(task.reportedState) >= 0
+      var displayState = !historical && lost ? "connection-lost" : task.reportedState
+      if (!historical && (superseded || silentWork(task, clock.wall))) displayState = "ended"
       return Object.assign({}, task, {
         // Presentation eligibility follows private exact-epoch evidence, not the
         // latest producer label. Runtime still independently proves every action.
@@ -117,7 +140,7 @@ function project(state, now, registry) {
         ),
         association: association,
         freshness: freshness,
-        displayState: !historical && lost ? "connection-lost" : task.reportedState,
+        displayState: displayState,
         verification: task.verification || { status: "unknown", summary: "", commands: [] },
         resumeCommand: resumeCommand(task),
         focusScope: "hosting-terminal",

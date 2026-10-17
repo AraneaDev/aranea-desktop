@@ -64,6 +64,34 @@ test("completed reviews and failures are clearable without clearing live work or
   for (const state of ["working", "needs-input"])
     assert.equal(logic.rows({ tasks: [task("live", state)] }, registry)[0].canDismiss, false)
 })
+test("ended work reads as ended without a report and can be cleared", () => {
+  const [row] = logic.rows(
+    { tasks: [task("ended", "working", { displayState: "ended", freshness: "connected" })] },
+    registry
+  )
+  assert.equal(row.stateLabel, "Ended without a report")
+  assert.equal(row.reportedLabel, "Working", "last reported state still shown")
+  assert.equal(row.canDismiss, true)
+  assert.equal(row.attention, false)
+  assert.notEqual(row.primary.kind, "focus", "no going to a session that ended")
+  assert.equal(
+    logic
+      .rows(
+        {
+          tasks: [
+            task("ended", "working", { displayState: "ended" }),
+            task("lost", "working", { displayState: "connection-lost" }),
+            task("live", "working")
+          ]
+        },
+        registry
+      )
+      .map((r) => r.key)
+      .join(","),
+    "live,lost,ended",
+    "ended work sorts after live and lost work"
+  )
+})
 test("all six states use human labels and attention comes first without verification inference", () => {
   assert.equal(typeof logic.rows, "function", "Tasks projection exists")
   const states = [

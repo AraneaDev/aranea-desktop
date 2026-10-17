@@ -287,6 +287,7 @@ and session guidance. Usage remains available separately.
 | Failed                        | Read diagnostics before deciding whether to resume.                   |
 | Finished                      | Read the result and check reported verification separately.           |
 | Connection lost / Unconfirmed | Check the terminal; this does not establish that the session stopped. |
+| Ended without a report        | A later prompt replaced it, or it sent nothing for 6 hours. Clear it. |
 
 **Details** shows the summary, exact checkout, report age, question or blockers,
 result, and any separately reported verification. Finished does not imply tests
