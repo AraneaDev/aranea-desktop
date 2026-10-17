@@ -85,7 +85,7 @@ if [[ "$1" == mutate ]]; then
   else
     prepare_status=$?
     [[ "$prepare_status" != 2 ]] || respond_error INVALID_PATH 'The resolved project path contains ASCII control characters.' 'Choose a folder whose canonical path contains no ASCII controls.'
-    [[ "$prepare_status" != 4 ]] || respond_error PROBE_FAILED 'Could not check which tools are installed.' 'Check again.'
+    [[ "$prepare_status" != 4 ]] || respond_error PROBE_FAILED "Couldn't check which tools are installed." 'Check again.'
     [[ "$prepare_status" != 3 ]] || respond_error CHECKOUT_CONFLICT 'Relocation would combine unrelated repository groups.' 'Choose a replacement checkout from the same group, or locate all moved checkouts.'
     respond_error CHECKOUT_INVALID 'The selected path is not an existing directory or checkout root.' 'Choose the exact existing project folder and retry.'
   fi

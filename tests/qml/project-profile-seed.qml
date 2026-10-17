@@ -210,18 +210,18 @@ ShellRoot {
             ok: false,
             error: {
               code: 'PROBE_FAILED',
-              message: 'Could not check which tools are installed.',
+              message: "Couldn't check which tools are installed.",
               recovery: 'Check again.'
             }
           }), '')
           t.waitFor(function () {
             return t.findChild(header, 'projectRetrySeed').visible
           }, 3000, 'retry offered again', function () {
-            t.equal(t.findChild(header, 'projectSeedError').text, 'Could not check which tools are installed.', 'a failed probe says so plainly')
+            t.equal(t.findChild(header, 'projectSeedError').text, "Couldn't check which tools are installed.", 'a failed probe says so plainly')
             t.equal(t.findChild(header, 'projectRetrySeed').text, 'Check again', 'a failed probe offers Check again')
             t.equal(t.findChild(header, 'projectBlockedReason').text, '', 'no install hint after a failed probe')
             var problem = t.findChild(surface, 'projectsPageProblem')
-            t.check(!!problem && problem.problem && problem.problem.body === 'Could not check which tools are installed.', 'the page problem keeps the plain message')
+            t.check(!!problem && problem.problem && problem.problem.body === "Couldn't check which tools are installed.", 'the page problem keeps the plain message')
             fallback()
           })
         })

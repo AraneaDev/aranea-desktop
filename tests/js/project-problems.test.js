@@ -257,11 +257,11 @@ test("a failed tool check keeps its plain backend message", () => {
   const problem = p.problem(
     {
       code: "PROBE_FAILED",
-      message: "Could not check which tools are installed.",
+      message: "Couldn't check which tools are installed.",
       recovery: "Check again."
     },
     { surface: "page", actions: ["refresh"] }
   )
-  assert.equal(problem.body, "Could not check which tools are installed.")
+  assert.equal(problem.body, "Couldn't check which tools are installed.")
   assert.deepEqual(plain(problem.actions.map((a) => a.id)), ["refresh"])
 })

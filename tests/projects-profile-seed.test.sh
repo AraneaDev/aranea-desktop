@@ -145,7 +145,7 @@ jq -cn --arg p "$p3" '{action:"profiles-seed",args:{projectId:$p}}' | PATH="$too
   echo 'FAIL: a failed probe must fail the seed' >&2
   exit 1
 }
-expect "$TMPDIR/out" '' '.ok==false and .error.code=="PROBE_FAILED" and .error.message=="Could not check which tools are installed." and .error.recovery=="Check again."' 'failed probe refuses the seed'
+expect "$TMPDIR/out" "Couldn't check which tools are installed." '.ok==false and .error.code=="PROBE_FAILED" and .error.message==$p and .error.recovery=="Check again."' 'failed probe refuses the seed'
 [[ $(cat "$ARANEA_STATE_ROOT/projects.json") == "$registry_before" ]] || {
   echo 'FAIL: a failed probe changed the registry' >&2
   exit 1
