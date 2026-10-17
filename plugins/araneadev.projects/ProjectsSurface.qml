@@ -618,8 +618,20 @@ Item {
         panel.requestSeed(project.id)
       })
   }
+  // Projects whose finished seed still left them with no profile (id → true).
+  property var seedsMadeNothing: ({})
+  // Record or clear one project's "seed made nothing" result.
+  function setSeedMadeNothing(projectId, empty) {
+    var next = Object.assign({}, seedsMadeNothing)
+    if (empty)
+      next[projectId] = true
+    else
+      delete next[projectId]
+    seedsMadeNothing = next
+  }
   // Forget a failed seed so the next request is allowed, then ask again.
   function retrySeed(projectId) {
+    setSeedMadeNothing(projectId, false)
     var next = Object.assign({}, seededProjects)
     delete next[projectId]
     seededProjects = next
@@ -633,6 +645,7 @@ Item {
       delete next[project.id]
       seededProjects = next
       setSeedFailure(project.id, null)
+      setSeedMadeNothing(project.id, false)
     }
     root.projectController.refresh()
   }
@@ -951,6 +964,15 @@ Item {
       projectsPage.registryMutationCompleted(action, args, state)
       if (action === 'profiles-seed' && args.projectId === panel.seedingProjectId)
         panel.seedingProjectId = ''
+      // Record what the seed made, not that it was asked for.
+      if (action === 'profiles-seed') {
+        var seeded = ((state || {}).projects || []).find(function (p) {
+          return p.id === args.projectId
+        })
+        panel.setSeedMadeNothing(args.projectId, !!seeded && !(seeded.profiles || []).length)
+      } else if (action === 'profile-save') {
+        panel.setSeedMadeNothing(args.projectId, false)
+      }
       panel.maybeSeedSelected()
     }
     function onMutationFailed(action, args) {
@@ -1203,7 +1225,7 @@ Item {
                   seeding: panel.seedingProjectId !== '' && !!projectsPage.selectedProject && panel.seedingProjectId === projectsPage.selectedProject.id
                   seedError: !panel.selectedSeedFailure ? '' : panel.seedProbeFailed ? 'Could not check which tools are installed.' : "Couldn't prepare a default profile."
                   seedRetryLabel: panel.seedProbeFailed ? 'Check again' : 'Retry'
-                  seedDone: !!projectsPage.selectedProject && !!panel.seededProjects[projectsPage.selectedProject.id] && panel.seedingProjectId !== projectsPage.selectedProject.id
+                  seedMadeNothing: !!projectsPage.selectedProject && !!panel.seedsMadeNothing[projectsPage.selectedProject.id]
                   onRefreshToolsRequested: panel.refreshTools()
                   onRetrySeedRequested: panel.retrySeed(projectsPage.selectedProject.id)
                   onManageProfilesRequested: panel.chooseSection('profiles')

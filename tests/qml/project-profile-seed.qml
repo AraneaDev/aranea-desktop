@@ -306,6 +306,41 @@ ShellRoot {
       })
     })
   }
+  // A seed that made a profile the user later removed gives no "could not be made" reason.
+  function removedAfterSeed() {
+    var header = t.findChild(surface, 'projectHeader')
+    entry.projectController.tools = host.codeOnly
+    host.show([host.project('p-rm', [])], 'p-rm', 11)
+    t.waitFor(function () {
+      return surface.seedingProjectId === 'p-rm'
+    }, 3000, 'removal project seeds', function () {
+      host.callbacks.shift()(0, JSON.stringify({
+        ok: true,
+        state: {
+          revision: 12,
+          projects: [host.project('p-rm', [host.editor('f-rm', 'VS Code', 'code')])],
+          roots: [],
+          ignored: []
+        }
+      }), '')
+      t.waitFor(function () {
+        return surface.seedingProjectId === '' && !!projectsPageProject('p-rm') && (projectsPageProject('p-rm').profiles || []).length === 1
+      }, 3000, 'seed made a profile', function () {
+        // The user removes every profile afterwards.
+        host.show([host.project('p-rm', [])], 'p-rm', 13)
+        t.step(60, function () {
+          t.equal(t.findChild(header, 'projectBlockedReason').text, '', 'no "could not be made" reason after removing a seeded profile')
+          t.done()
+        })
+      })
+    })
+  }
+  // The registry's current record of one project.
+  function projectsPageProject(id) {
+    return (entry.projectController.state.projects || []).find(function (p) {
+      return p.id === id
+    })
+  }
   // Refresh in the no-tools state seeds again once tools appear.
   function refreshReseeds() {
     var header = t.findChild(surface, 'projectHeader')
@@ -332,7 +367,16 @@ ShellRoot {
         t.waitFor(function () {
           return host.only('profiles-seed').length === before + 1
         }, 3000, 'Refresh seeds again', function () {
-          t.done()
+          host.callbacks.shift()(0, JSON.stringify({
+            ok: true,
+            state: {
+              revision: 10,
+              projects: [host.project('p-nt', [host.editor('f-nt', 'VS Code', 'code')])],
+              roots: [],
+              ignored: []
+            }
+          }), '')
+          removedAfterSeed()
         })
       })
     })

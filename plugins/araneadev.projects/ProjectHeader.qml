@@ -71,11 +71,11 @@ ColumnLayout {
   signal retrySeedRequested
   // Shown when the remembered profile is unusable and another one is used.
   readonly property string fallbackNote: project ? Profiles.fallbackNote(project, tools) : ''
-  // The default-profile seed for this project already finished this session.
-  property bool seedDone: false
+  // This project's finished seed left it with no profile.
+  property bool seedMadeNothing: false
   // Why nothing can start, when profiles exist; for a zero-profile project the no-tools hint,
   // or why a finished seed still left no profile.
-  readonly property string blockedReason: !project ? '' : (project.profiles || []).length ? Profiles.blockedReason(project, tools) : seeding || seedError ? '' : !Profiles.presets(tools).length ? 'Install a supported editor or terminal (VS Code, Neovim, Kitty, Alacritty, Foot or Ghostty), then Refresh.' : seedDone ? 'No default profile could be made. Add a profile to start.' : ''
+  readonly property string blockedReason: !project ? '' : (project.profiles || []).length ? Profiles.blockedReason(project, tools) : seeding || seedError ? '' : !Profiles.presets(tools).length ? 'Install a supported editor or terminal (VS Code, Neovim, Kitty, Alacritty, Foot or Ghostty), then Refresh.' : seedMadeNothing ? 'No default profile could be made. Add a profile to start.' : ''
   // Readable actual adapters, the seeding state or one actionable explanation.
   readonly property string profileSummary: profile ? Profiles.summary(profile, tools) : seeding ? 'Preparing a default profile…' : 'Choose a profile to start working.'
   // Explicit saved profile identity and revision for the current checkout.
