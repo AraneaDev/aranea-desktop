@@ -150,6 +150,22 @@ expect "$TMPDIR/out" "Couldn't check which tools are installed." '.ok==false and
   echo 'FAIL: a failed probe changed the registry' >&2
   exit 1
 }
+# The public CLI passes the failed tool check through unchanged.
+status=0
+PATH="$tools:$nobin" "$cli" projects profiles seed "$p3" --json >"$TMPDIR/cli" || status=$?
+[[ $status != 0 ]] || {
+  echo 'FAIL: the CLI must fail a seed whose tool check failed' >&2
+  exit 1
+}
+jq -es --arg m "Couldn't check which tools are installed." '.[-1].status=="failed" and .[-1].code=="PROBE_FAILED" and .[-1].message==$m and .[-1].data.recovery=="Check again."' "$TMPDIR/cli" >/dev/null || {
+  echo 'FAIL: the CLI hides PROBE_FAILED' >&2
+  cat "$TMPDIR/cli" >&2
+  exit 1
+}
+[[ $(cat "$ARANEA_STATE_ROOT/projects.json") == "$registry_before" ]] || {
+  echo 'FAIL: a failed probe through the CLI changed the registry' >&2
+  exit 1
+}
 
 # Backfill through the public CLI once tools exist.
 PATH="$tools:$minbin" "$cli" projects profiles seed "$p2" --json >"$TMPDIR/cli"
