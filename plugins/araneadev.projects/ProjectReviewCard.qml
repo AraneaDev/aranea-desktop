@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "ProjectOverview.js" as Overview
 import "ProjectProblems.js" as Problems
 import "ProjectReview.js" as Review
 
@@ -28,6 +29,10 @@ ProjectSectionCard {
   readonly property var shown: showAll ? commits : commits.slice(0, 5)
   // Plain commits and files line.
   readonly property string changesText: Review.changesLine(info)
+  // Changed files, first five unless Show all is on.
+  readonly property var files: info ? info.files || [] : []
+  // File rows currently listed.
+  readonly property var shownFiles: showAll ? files : files.slice(0, 5)
   // Run checks was pressed.
   signal runChecksRequested
   // Open diff was pressed.
@@ -44,6 +49,22 @@ ProjectSectionCard {
     text: 'Ready for review · ' + (card.review.branch || '')
     font.bold: true
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+  }
+  Aranea.UiLabel {
+    objectName: 'reviewTask'
+    Layout.fillWidth: true
+    visible: text !== ''
+    text: card.review.taskSummary || ''
+    elide: Text.ElideRight
+    maximumLineCount: 2
+    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+  }
+  Aranea.UiLabel {
+    objectName: 'reviewFinished'
+    Layout.fillWidth: true
+    visible: typeof card.review.taskFinishedAt === 'number'
+    text: typeof card.review.taskFinishedAt === 'number' ? 'Finished ' + Overview.ageLabel(card.review.taskFinishedAt, Date.now()) : ''
+    opacity: 0.7
   }
   Aranea.UiLabel {
     objectName: 'reviewSummary'
@@ -72,9 +93,22 @@ ProjectSectionCard {
       opacity: 0.85
     }
   }
+  Repeater {
+    model: card.shownFiles
+    Aranea.UiLabel {
+      id: file
+      required property var modelData
+      required property int index
+      objectName: 'reviewFile:' + index
+      Layout.fillWidth: true
+      text: file.modelData.path + '  ' + (typeof file.modelData.added === 'number' && typeof file.modelData.removed === 'number' ? '+' + file.modelData.added + ' -' + file.modelData.removed : 'binary')
+      elide: Text.ElideMiddle
+      opacity: 0.85
+    }
+  }
   Aranea.ActionButton {
     objectName: 'reviewShowAll'
-    visible: card.commits.length > 5
+    visible: card.commits.length > 5 || card.files.length > 5
     text: card.showAll ? 'Show fewer' : 'Show all'
     variant: 'quiet'
     pointerGate: card.pointerGate
@@ -135,7 +169,7 @@ ProjectSectionCard {
     Aranea.ActionButton {
       objectName: 'reviewMark'
       text: 'Mark reviewed'
-      enabled: !card.displayOnly && !!card.info && !card.review.markPending
+      enabled: !card.displayOnly && !!card.info && !card.review.markPending && !card.review.readError
       pointerGate: card.pointerGate
       onClicked: card.markRequested()
     }

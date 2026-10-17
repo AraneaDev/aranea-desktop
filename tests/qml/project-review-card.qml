@@ -33,6 +33,8 @@ ShellRoot {
   property var entryCounts: []
   // Commits the fixture review lists.
   property int commitCount: 2
+  // Adds five more changed files, the last one binary.
+  property bool manyFiles: false
   QmlTest {
     id: t
   }
@@ -98,8 +100,10 @@ ShellRoot {
     }
   }
   // An agent task on the task checkout.
-  function task(reportedState, at, verification) {
+  function task(reportedState, at, verification, result, description) {
     return {
+      result: result || '',
+      description: description || '',
       id: 't1',
       taskId: 't1',
       reportedState: reportedState,
@@ -123,7 +127,7 @@ ShellRoot {
   }
   // Helper data for the fixture checkout.
   function reviewData() {
-    return {
+    var data = {
       projectId: 'p-a',
       checkoutId: 'c-l',
       branch: 'feat/x',
@@ -161,6 +165,29 @@ ShellRoot {
       },
       truncated: false
     }
+    if (host.manyFiles)
+      data.files = data.files.concat([{
+        path: 'd.js',
+        added: 4,
+        removed: 0
+      }, {
+        path: 'e.js',
+        added: 5,
+        removed: 0
+      }, {
+        path: 'f.js',
+        added: 6,
+        removed: 0
+      }, {
+        path: 'g.js',
+        added: 7,
+        removed: 0
+      }, {
+        path: 'img.png',
+        added: null,
+        removed: null
+      }])
+    return data
   }
   // Answer every held review read with data or an error.
   function answerReviews(error) {
@@ -597,8 +624,66 @@ ShellRoot {
       t.check(t.findChild(host.card(), 'reviewUncommitted').visible, 'uncommitted changes are named')
       host.button('reviewShowAll').clicked()
       t.check(!!t.findChild(host.card(), 'reviewCommit:6'), 'Show all lists every subject')
-      inertFlow()
+      summaryFlow()
     })
+  }
+  // The agent's summary and finish time show under the title; seconds are read as seconds.
+  function summaryFlow() {
+    var finishedAt = Math.floor(Date.now() / 1000) - 7200
+    host.setTasks([host.task('ready-for-review', finishedAt, 'reported-pass', 'Added the parser', 'Write the parser')])
+    t.waitFor(function () {
+      return host.text('reviewTask') === 'Added the parser'
+    }, 3000, 'the result is the summary', function () {
+      t.equal(host.text('reviewFinished'), 'Finished 2h ago', 'the finish time reads as an age')
+      host.setTasks([host.task('ready-for-review', finishedAt, 'reported-pass', '', 'Write the parser')])
+      t.waitFor(function () {
+        return host.text('reviewTask') === 'Write the parser'
+      }, 3000, 'the description is the fallback', filesFlow)
+    })
+  }
+  // Show all also lists every changed file; fewer folded files show five, and a binary file says so.
+  function filesFlow() {
+    host.manyFiles = true
+    host.card().showAll = false
+    entry.reviewClient.refreshSelected()
+    host.answerReviews(null)
+    t.waitFor(function () {
+      return host.text('reviewChanges') === '7 commits · 8 files'
+    }, 3000, 'eight files are counted', function () {
+      t.equal(host.text('reviewFile:0'), 'a.js  +1 -0', 'a file row shows added and removed')
+      t.check(!!t.findChild(host.card(), 'reviewFile:4') && !t.findChild(host.card(), 'reviewFile:5'), 'five files show at first')
+      host.button('reviewShowAll').clicked()
+      t.equal(host.text('reviewFile:7'), 'img.png  binary', 'Show all lists every file, and a binary file says so')
+      staleMarkFlow()
+    })
+  }
+  // Mark reviewed needs fresh data: a failed re-read leaves it off.
+  function staleMarkFlow() {
+    host.manyFiles = false
+    var before = host.mutations.length
+    entry.reviewClient.reviews = {
+      'c-l': {
+        projectId: 'p-a',
+        data: host.reviewData(),
+        error: {
+          code: 'GIT_TIMEOUT',
+          message: 'Git took too long.',
+          recovery: ''
+        }
+      }
+    }
+    t.check(!host.button('reviewMark').enabled, 'Mark reviewed is off after a failed read')
+    surface.markReviewed()
+    t.equal(host.mutations.length, before, 'a failed read lets nothing be marked')
+    entry.reviewClient.reviews = {
+      'c-l': {
+        projectId: 'p-a',
+        data: host.reviewData(),
+        error: null
+      }
+    }
+    t.check(host.button('reviewMark').enabled, 'Mark reviewed returns with fresh data')
+    inertFlow()
   }
   // Capture mode disables every action and reads nothing.
   function inertFlow() {

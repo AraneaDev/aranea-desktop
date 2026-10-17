@@ -696,10 +696,15 @@ Item {
     var stored = reviewActionError
     var storedMine = !!stored && stored.projectId === project.id && stored.checkoutId === checkout.id
     var terminal = (project.tools || {}).terminalId || (root.projectController.tools.defaults || {}).terminalId || ''
+    var finished = Review.latestFinished(tasks)
     return {
       state: state,
       branch: checkout.branch || '',
       data: data,
+      taskSummary: finished ? finished.result || finished.description || '' : '',
+      // lastReceivedAt is in seconds; the card reads milliseconds.
+      taskFinishedAt: finished && typeof finished.lastReceivedAt === 'number' ? finished.lastReceivedAt * 1000 : null,
+      readError: !!(mine && entry.error),
       agentReport: Review.agentReportLabel(Review.latestFinished(tasks)),
       checksText: definition ? Review.checksLabel(runs[0] || null) : 'no check action saved',
       hasChecks: !!definition,
@@ -751,7 +756,7 @@ Item {
   // Record that this head and this task time were reviewed.
   function markReviewed() {
     var project = projectsPage.selectedProject, checkout = selectedCheckout
-    if (root.inert || !project || !checkout || !reviewModel.data || reviewModel.markPending)
+    if (root.inert || !project || !checkout || !reviewModel.data || reviewModel.markPending || reviewModel.readError)
       return
     var tasks = Review.tasksFor((root.activityClient.snapshot || {}).tasks || [], project.id, checkout.id)
     var latest = Review.latestFinished(tasks)
