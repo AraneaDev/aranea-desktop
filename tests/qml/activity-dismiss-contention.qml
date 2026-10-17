@@ -21,6 +21,10 @@ ShellRoot {
   QmlTest {
     id: t
   }
+  // Uses the real retry timers.
+  Activity.ActivityRuntime {
+    id: realTimers
+  }
   Activity.ActivityRuntime {
     id: runtime
     schedule: function (ms, fn) {
@@ -100,6 +104,31 @@ ShellRoot {
       }
     }
   }
+  // A capture that starts while a busy store waits for its retry ends the
+  // dismissal right away instead of leaving it until the owner's deadline.
+  function captureDuringBackoff() {
+    var answer = null, tries = 0
+    realTimers.processRunner = function (argv, input, done) {
+      tries++
+      done(1, JSON.stringify({
+        ok: false,
+        error: {
+          code: 'ACTIVITY_LOCK_FAILED',
+          message: 'Busy'
+        }
+      }), '')
+    }
+    realTimers.dismiss('busy-capture', function (response) {
+      answer = response
+    })
+    t.check(answer === null && tries === 1, 'busy store waits for a retry')
+    realTimers.captureActive = true
+    t.step(400, function () {
+      t.check(!!answer && !answer.ok && answer.error.code === 'INERT_MODE', 'capture answers the waiting dismissal')
+      t.equal(tries, 1, 'no mutation is tried during the capture')
+      t.done()
+    })
+  }
   Component.onCompleted: runtime.dismiss('old-task', function (response) {
     t.check(response.ok, 'explicit lock contention is retried to confirmed removal')
     t.equal(mutations, 2, 'only refused pre-mutation attempt is retried')
@@ -141,7 +170,7 @@ ShellRoot {
               missing: ['gone'],
               refused: ['live']
             }, 'store per-ID outcome kept after the confirmation read')
-            t.done()
+            captureDuringBackoff()
           })
         })
       })

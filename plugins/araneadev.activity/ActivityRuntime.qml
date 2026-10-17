@@ -127,15 +127,16 @@ Item {
   }
   // Waits before a busy store is tried again, in milliseconds; one entry per retry.
   readonly property var busyBackoff: [250, 500, 1000]
-  // Runs fn after ms; fixtures replace it to run retries without waiting.
+  // Runs fn after ms; fixtures replace it to run retries without waiting. fn
+  // always runs: during a capture its store call answers INERT_MODE, so the
+  // waiting caller is answered instead of left until the owner's deadline.
   property var schedule: function (ms, fn) {
     var timer = retryTimer.createObject(runtime, {
       interval: ms
     })
     timer.triggered.connect(function () {
       timer.destroy()
-      if (!runtime.captureActive)
-        fn()
+      fn()
     })
     timer.start()
   }
@@ -170,11 +171,24 @@ Item {
     function busy(response) {
       return response && !response.ok && response.transportUnconfirmed !== true && response.error && response.error.code === 'ACTIVITY_LOCK_FAILED'
     }
+    // Wait before the next try; a capture already on answers right away.
+    function later(attempt, fn) {
+      if (runtime.captureActive)
+        done({
+          ok: false,
+          error: {
+            code: 'INERT_MODE',
+            message: 'Inert activity fixture.'
+          }
+        })
+      else
+        runtime.schedule(runtime.busyBackoff[attempt], fn)
+    }
     // Read contention never replays the already acknowledged deletion.
     function verify(attempt, mutated) {
       readStore(function (response) {
         if (busy(response) && attempt < runtime.busyBackoff.length)
-          runtime.schedule(runtime.busyBackoff[attempt], function () {
+          later(attempt, function () {
             verify(attempt + 1, mutated)
           })
         else if (response && response.ok && mutated.result !== undefined)
@@ -189,7 +203,7 @@ Item {
     function remove(attempt) {
       json([scriptsPath + '/aranea-agent-store', 'mutate'], request, function (response) {
         if (busy(response) && attempt < runtime.busyBackoff.length)
-          runtime.schedule(runtime.busyBackoff[attempt], function () {
+          later(attempt, function () {
             remove(attempt + 1)
           })
         else if (!response.ok)
