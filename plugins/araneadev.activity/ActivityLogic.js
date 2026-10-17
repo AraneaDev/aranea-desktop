@@ -56,7 +56,27 @@ function sessionFor(state, task) {
   )
 }
 
+/** Seconds without any report after which working is treated as ended (6 hours).
+ * The store's dismiss rule uses the same age (agent-activity.jq stale_work). */
+var silentWorkSeconds = 21600
+
+/** A working task with no report for silentWorkSeconds, while its session may
+ * still send heartbeats. A question (needs-input) can wait for the user.
+ * @param {ActivityData} task - retained task
+ * @param {number} wall - current wall clock in milliseconds
+ * @returns {boolean} the work ended without a report
+ */
+function silentWork(task, wall) {
+  return (
+    task.reportedState === "working" &&
+    typeof task.lastReceivedAt === "number" &&
+    wall - task.lastReceivedAt * 1000 >= silentWorkSeconds * 1000
+  )
+}
+
 /** Project reported lifecycle independently from connection and verification.
+ * displayState is "ended" for working or needs-input work a later prompt in its
+ * session superseded, and for working with no report for 6 hours.
  * Numeric now is wall milliseconds; clock objects additionally provide monotonic
  * milliseconds and bootId. Store projections remain authoritative for boot loss.
  * @param {ActivityData} state - last validated store snapshot
@@ -83,8 +103,9 @@ function project(state, now, registry) {
           lost ||
           clock.monotonic < c.monotonic * 1000 ||
           clock.monotonic - c.monotonic * 1000 >= 60000
-      if (s && ((s.nativeMetadata || {}).inactiveTaskIds || []).indexOf(task.taskId) >= 0)
-        lost = true
+      var superseded =
+        !!s && ((s.nativeMetadata || {}).inactiveTaskIds || []).indexOf(task.taskId) >= 0
+      if (superseded) lost = true
       var freshness = lost
         ? "connection-lost"
         : s.provenance && s.provenance.commandHash
@@ -105,6 +126,8 @@ function project(state, now, registry) {
       )
         association.status = "unavailable"
       var historical = ["finished", "failed", "ready-for-review"].indexOf(task.reportedState) >= 0
+      var displayState = !historical && lost ? "connection-lost" : task.reportedState
+      if (!historical && (superseded || silentWork(task, clock.wall))) displayState = "ended"
       return Object.assign({}, task, {
         // Presentation eligibility follows private exact-epoch evidence, not the
         // latest producer label. Runtime still independently proves every action.
@@ -117,7 +140,7 @@ function project(state, now, registry) {
         ),
         association: association,
         freshness: freshness,
-        displayState: !historical && lost ? "connection-lost" : task.reportedState,
+        displayState: displayState,
         verification: task.verification || { status: "unknown", summary: "", commands: [] },
         resumeCommand: resumeCommand(task),
         focusScope: "hosting-terminal",
@@ -194,8 +217,271 @@ function notificationTransitions(previous, current, suppressed) {
       }
     })
 }
+/** Characters a panel shows of one text or one joined list (AgentTasksLogic.text). */
+var shownChars = 4096
+
+/** Largest single task row sent in an IPC snapshot page. */
+var maxTaskBytes = 32000
+
+/** UTF-8 size of a string, the unit the Quickshell IPC reply limit counts.
+ * @param {string} value - text
+ * @returns {number} bytes
+ */
+function utf8Length(value) {
+  var s = String(value),
+    n = 0
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charCodeAt(i)
+    if (c < 0x80) n += 1
+    else if (c < 0x800) n += 2
+    else if (c >= 0xd800 && c < 0xdc00 && i + 1 < s.length) {
+      n += 4
+      i++
+    } else n += 3
+  }
+  return n
+}
+
+/** At most LIMIT characters of VALUE; a cut ends with "…" (counted in LIMIT),
+ * so the Tasks views show that more text exists.
+ * @param {string} value - text
+ * @param {number} limit - characters kept, marker included
+ * @returns {string} bounded text
+ */
+function cut(value, limit) {
+  return value.length > limit ? value.slice(0, Math.max(0, limit - 1)) + "…" : value
+}
+
+/** Keep the first LIMIT characters of a list's joined text, one entry per line.
+ * @param {any} list - entries
+ * @param {string} field - text field of each entry
+ * @param {number} limit - joined characters kept
+ * @param {boolean} keepAll - keep every entry (with empty text past the limit)
+ * @returns {any} bounded copy, or the input when it is not a list
+ */
+function boundList(list, field, limit, keepAll) {
+  if (!Array.isArray(list)) return list
+  var room = limit
+  /** @type {Array<ActivityData>} */
+  var kept = []
+  /** @type {?ActivityData} */
+  var last = null
+  var lost = false
+  list.forEach(function (/** @type {ActivityData} */ entry) {
+    var text = typeof entry[field] === "string" ? entry[field] : ""
+    if (room <= 0 && text) lost = true
+    if (room <= 0 && !keepAll) return
+    var copy = Object.assign({}, entry)
+    if (typeof entry[field] === "string") {
+      copy[field] = room > 0 ? cut(text, room) : ""
+      room -= copy[field].length + 1
+      if (copy[field]) last = copy
+    }
+    kept.push(copy)
+  })
+  // Whole entries left out also leave the last shown text marked.
+  if (lost && last && !/…$/.test(last[field])) last[field] = last[field].slice(0, -1) + "…"
+  return kept
+}
+
+/** Bound one task row to what the Tasks views display, then to a byte size.
+ * Lists keep the first shown characters; a row that is still too large (long
+ * multibyte text everywhere) keeps shorter text. Identity fields never change.
+ * @param {ActivityData} task - projected task
+ * @returns {ActivityData} bounded copy
+ */
+function boundTask(task) {
+  var limits = [shownChars, 1024, 256]
+  /** @type {ActivityData} */
+  var copy = task
+  for (var i = 0; i < limits.length; i++) {
+    var limit = limits[i]
+    copy = Object.assign({}, task)
+    ;["description", "result", "question"].forEach(function (key) {
+      if (typeof task[key] === "string") copy[key] = cut(task[key], limit)
+    })
+    copy.diagnostics = boundList(task.diagnostics, "summary", limit, false)
+    copy.blockers = boundList(task.blockers, "question", limit, true)
+    if (task.verification && typeof task.verification === "object") {
+      copy.verification = Object.assign({}, task.verification)
+      if (typeof task.verification.summary === "string")
+        copy.verification.summary = cut(task.verification.summary, limit)
+      if (limit < shownChars && Array.isArray(task.verification.commands))
+        copy.verification.commands = boundList(
+          task.verification.commands.map(function (/** @type {any} */ c) {
+            return { c: String(c) }
+          }),
+          "c",
+          limit,
+          false
+        ).map(function (/** @type {ActivityData} */ c) {
+          return c.c
+        })
+    }
+    if (task.diagnostics === undefined) delete copy.diagnostics
+    if (task.blockers === undefined) delete copy.blockers
+    if (utf8Length(JSON.stringify(copy)) <= maxTaskBytes) return copy
+  }
+  return copy
+}
+
+/** Characters of description, result and question a list row carries. Lists
+ * show two elided lines; the details view reads the full task (task(id)). */
+var previewChars = 100
+
+/** A list row for an IPC snapshot page, kept small so the retention cap fits
+ * in a few pages: short description, result and question (a cut ends with
+ * "…"), blocker IDs without questions, verification status only, and no
+ * diagnostics. Empty text, empty lists, unknown verification and fields the
+ * client can derive (resumeCommand) or never reads are left out; expandPreview
+ * restores them. preview tells the details view to read the full task.
+ * @param {ActivityData} task - projected task
+ * @returns {ActivityData} preview copy
+ */
+function previewTask(task) {
+  var copy = Object.assign({}, task, { preview: true })
+  ;["focusScope", "ownership", "source", "resumeCommand", "diagnostics"].forEach(function (key) {
+    delete copy[key]
+  })
+  ;["description", "result", "question"].forEach(function (key) {
+    if (typeof task[key] !== "string" || !task[key]) delete copy[key]
+    else copy[key] = cut(task[key], previewChars + 1)
+  })
+  if (Array.isArray(task.blockers) && task.blockers.length)
+    copy.blockers = task.blockers.map(function (/** @type {ActivityData} */ b) {
+      return { blockerId: b.blockerId }
+    })
+  else delete copy.blockers
+  var status = task.verification && task.verification.status
+  if (status && status !== "unknown") copy.verification = { status: status }
+  else delete copy.verification
+  return copy
+}
+
+/** Client side of previewTask: the same fields every consumer expects, with
+ * empty defaults and the derived resume command.
+ * @param {ActivityData} row - preview row
+ * @returns {ActivityData} expanded copy (rows without preview unchanged)
+ */
+function expandPreview(row) {
+  if (!row || row.preview !== true) return row
+  var copy = Object.assign({ description: "", result: "", question: "", diagnostics: [] }, row)
+  copy.blockers = (row.blockers || []).map(function (/** @type {ActivityData} */ b) {
+    return { blockerId: b.blockerId, question: "" }
+  })
+  copy.verification = {
+    status: (row.verification && row.verification.status) || "unknown",
+    summary: "",
+    commands: []
+  }
+  copy.resumeCommand = resumeCommand(row)
+  return copy
+}
+
+/** Rows from OFFSET that fit in BUDGET bytes; at least one row while any remain.
+ * @param {Array<ActivityData>} rows - bounded task rows
+ * @param {number} offset - first row
+ * @param {number} budget - bytes for the serialized rows
+ * @returns {Array<ActivityData>} page
+ */
+function taskPage(rows, offset, budget) {
+  /** @type {Array<ActivityData>} */
+  var page = []
+  var used = 2
+  for (var i = offset; i < rows.length; i++) {
+    var size = utf8Length(JSON.stringify(rows[i])) + 1
+    if (page.length && used + size > budget) break
+    page.push(rows[i])
+    used += size
+  }
+  return page
+}
+
+/** The fields Tasks views read from a retained operation (operationFor and
+ * operationView); steps keep only role, status and code.
+ * @param {ActivityData} op - owner operation
+ * @returns {ActivityData} compact copy
+ */
+function compactOperation(op) {
+  /** @type {ActivityData} */
+  var copy = {}
+  ;[
+    "id",
+    "ownerId",
+    "taskId",
+    "action",
+    "state",
+    "outcome",
+    "attempt",
+    "submissionPending",
+    "submissionUnconfirmed",
+    "result"
+  ].forEach(function (key) {
+    if (op[key] !== undefined) copy[key] = op[key]
+  })
+  if (Array.isArray(op.steps))
+    copy.steps = op.steps.map(function (/** @type {ActivityData} */ step) {
+      return {
+        role: step.role,
+        status: step.status,
+        code: step.code === undefined ? null : step.code
+      }
+    })
+  if (op.error && typeof op.error === "object")
+    copy.error = {
+      code: String(op.error.code || ""),
+      message: String(op.error.message || "").slice(0, 512),
+      recovery: String(op.error.recovery || "").slice(0, 512)
+    }
+  return copy
+}
+
+/** Operations for an IPC snapshot: open and protected ones always, then each
+ * task's latest completed outcome, newest first, while BUDGET bytes allow
+ * (open ones count against it but are never dropped).
+ * Completed set dismissals (no taskId) are left out; operation(id) has them.
+ * @param {Array<ActivityData>} operations - owner records, oldest first
+ * @param {number} budget - bytes for the serialized completed outcomes
+ * @returns {Array<ActivityData>} compact copies in their original order
+ */
+function ipcOperations(operations, budget) {
+  var list = operations || []
+  /** @type {{[id:string]:boolean}} */
+  var keep = {}
+  /** @type {{[taskId:string]:boolean}} */
+  var seen = {}
+  var used = 2
+  list.forEach(function (op) {
+    if (op.state !== "completed" || op.submissionPending || op.submissionUnconfirmed) {
+      keep[op.id] = true
+      used += utf8Length(JSON.stringify(compactOperation(op))) + 1
+    }
+  })
+  for (var i = list.length - 1; i >= 0; i--) {
+    var op = list[i]
+    if (keep[op.id] || typeof op.taskId !== "string" || seen[op.taskId]) continue
+    seen[op.taskId] = true
+    var size = utf8Length(JSON.stringify(compactOperation(op))) + 1
+    if (used + size > budget) break
+    keep[op.id] = true
+    used += size
+  }
+  return list
+    .filter(function (op) {
+      return keep[op.id]
+    })
+    .map(compactOperation)
+}
+
 if (typeof module !== "undefined")
   module.exports = {
+    ipcOperations,
+    previewTask,
+    expandPreview,
+    utf8Length,
+    boundTask,
+    taskPage,
+    maxTaskBytes,
     validId,
     resumeCommand,
     sessionFor,

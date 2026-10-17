@@ -136,7 +136,15 @@ assert_views() {
   omarchy-shell fixture snapshot >"$TMPDIR/view"
   jq -e '.owner.tasks|length==3' "$TMPDIR/view" >/dev/null
   jq -e '.rows | any(.[];.providerLabel=="Codex" and .verificationLabel=="Verification reported passed" and .reportedLabel=="Ready for review") and any(.[];.providerLabel=="Claude Code" and .stateLabel=="Needs input" and .attention==true) and any(.[];.summary=="Headless retained result" and .primary.kind=="inspect-result")' "$TMPDIR/view" >/dev/null
-  jq -e '.owner.tasks==.client.tasks' "$TMPDIR/view" >/dev/null
+  # The client lists previews; identity, state, connection and checkout match the owner.
+  jq -e 'def same: map({taskId,provider,reportedState,displayState,freshness,association,lastReceivedAt,resumeCommand,verification:.verification.status,blockers:(.blockers|map(.blockerId))});
+    (.owner.tasks|same)==(.client.tasks|same) and all(.client.tasks[];.preview==true)' "$TMPDIR/view" >/dev/null
+  # Real IPC: a later page by token and integer offset, and one task in full.
+  omarchy-shell aranea.activity snapshot >"$TMPDIR/first"
+  omarchy-shell aranea.activity snapshotPage "$(jq -r .taskPage.token "$TMPDIR/first")" 1 >"$TMPDIR/page"
+  jq -e --slurpfile first "$TMPDIR/first" '.ok and .offset==1 and .total==($first[0].taskPage.total)' "$TMPDIR/page" >/dev/null
+  omarchy-shell aranea.activity task "$(jq -r '.owner.tasks[]|select(.provider=="codex")|.taskId' "$TMPDIR/view")" >"$TMPDIR/task"
+  jq -e '.ok and .task.result=="Codex result" and .task.verification.summary=="Fixture verification passed" and (.task|has("preview")|not)' "$TMPDIR/task" >/dev/null
 }
 start_owner
 owner_before=$(omarchy-shell aranea.activity snapshot | jq -r .ownerId)

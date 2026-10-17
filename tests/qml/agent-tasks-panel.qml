@@ -90,6 +90,15 @@ ShellRoot {
       }
       return true
     }
+    function dismissMany(ids) {
+      calls.push(['dismissMany', ids])
+      if (bulkMode) {
+        ownerId = 'bulk-owner'
+        operationId = 'dismiss-many-' + ids.join(',')
+        pending = true
+      }
+      return true
+    }
     function reconnect(id) {
       calls.push(['reconnect', id])
     }
@@ -498,17 +507,16 @@ ShellRoot {
     activity.currentOperation = null
     panel.captureActive = false
     tasks.requestClear(false)
-    t.equal(calls[calls.length - 1], ['dismiss', 'clear-done'], 'panel clear routes exact inactive identity through its activity client')
+    t.equal(calls[calls.length - 1], ['dismissMany', ['clear-done']], 'panel clear routes exact inactive identities through its activity client as one set')
     t.check(tasks.pending && tasks.clearing, 'real panel exposes bulk progress and disables actions')
     var beforeOther = calls.length
     panel.handleTaskAction('focus', 'keep-live')
     t.equal(calls.length, beforeOther, 'bulk clear prevents interleaved task actions')
     activity.pending = false
     activity.operationChanged({
-      id: 'dismiss-clear-done',
+      id: 'dismiss-many-clear-done',
       ownerId: 'bulk-owner',
-      taskId: 'clear-done',
-      action: 'dismiss',
+      action: 'dismiss-many',
       state: 'completed',
       outcome: 'observed'
     })

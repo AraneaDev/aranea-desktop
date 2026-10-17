@@ -7,8 +7,9 @@ connection receipts, retention, association and dismissal.
 
 ## IPC and clients
 
-`aranea.activity` exposes `snapshot()`, `request(json)`, `operation(id)`,
-`reobserve(id)` and `dismiss(taskId)`. Requests contain exactly `action` and
+`aranea.activity` exposes `snapshot()`, `snapshotPage(token, offset)`,
+`task(taskId)`, `request(json)`, `operation(id)`, `reobserve(id)`, `dismiss(taskId)` and
+`dismissMany(json)`. Requests contain exactly `action` and
 `taskId`; actions are `focus`, `reopen` and `open-checkout`. Acceptance returns
 `{ok,operationId,ownerId,error}`. Read an accepted ID to observe its outcome:
 `observed`, `partial` or `failed`. An owner restart returns `OPERATION_LOST`;
@@ -18,6 +19,27 @@ IPC snapshots retain task history and projected eligibility but omit private
 replay receipts, registration hashes, retired epochs, and callback correlation
 records. Those remain in the authoritative store; sending them to the panel can
 exceed the IPC transport's payload limit and leave its displayed count stale.
+
+Quickshell drops IPC replies above about 110 KB, so a snapshot is paged. Each
+reply stays under 60 KB. `snapshot()` returns the owner fields, the first task
+rows and `taskPage: {token, total}`. `snapshotPage(token, offset)` returns the
+next rows of the same read, or `SNAPSHOT_EXPIRED` once the owner has dropped
+that read (it keeps the last four). Task rows are short previews marked
+`preview: true`: the first 100 characters of the description, result and
+question (a cut ends with "…"), blocker IDs, the verification status and no
+diagnostics. So even the retention cap of 700 tasks loads in about ten
+replies. `task(taskId)` returns one task in full for the details view: the
+first 4096 characters of each text and of the joined diagnostics and blocker
+questions, cut shorter to stay under 32 KB when the text is long multibyte
+text everywhere. IPC snapshots leave out sessions. Their `operations` are
+the open and protected ones plus each task's latest outcome, cut to the fields
+the Tasks views read, in at most 16 KB; `operation(id)` returns a full record.
+`ActivityClient.refresh()` reads every page before it replaces `snapshot`, and
+fills preview rows back to the usual shape. A refresh asked for while pages are
+loading runs once after them instead of starting over. A failed page keeps the
+last snapshot. `readTask(taskId)` fills `taskDetails`; `AgentTasks` asks its
+host for it (`detailsNeeded`) when a preview row is opened, and again after
+each new report.
 
 `ActivityClient` exposes `snapshot`, `available`, structured `error`, `pending`,
 `operationId`, `currentOperation`, `request(payload)`, `refresh()`,
@@ -29,9 +51,16 @@ preparing, moving or focusing anything.
 
 Dismissal also accepts completed review/failure records in connected sessions
 when no unresolved blocker remains. Working tasks and live input requests stay
-protected. Explicit store-lock refusals retry up to three times before a
-mutation; once accepted, only the confirmation read may retry. Transport
-uncertainty never repeats a mutation.
+protected. Explicit store-lock refusals retry three times, after 250, 500 and
+1000 ms, before a mutation; once accepted, only the confirmation read may retry.
+Transport uncertainty never repeats a mutation.
+
+`dismissMany(json)` takes a JSON array of 1 to 700 unique task IDs and removes
+them in one store write (the store's `dismiss-many` action). IDs the store no
+longer has are skipped. Live tasks are kept, by the same rule as `dismiss`.
+The completed operation's `result` has the `removed`, `missing` and `refused`
+counts. Clear inactive in the Tasks panel sends its frozen IDs this way, split
+into sets of at most 16 KB, and reports any kept tasks after the last set.
 
 A launch submission outlives the observation deadline. `submissionPending`
 protects its operation from eviction and repeat submission; unrelated actions

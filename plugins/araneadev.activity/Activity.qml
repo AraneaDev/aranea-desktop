@@ -28,8 +28,16 @@ Item {
   }
   IpcHandler {
     target: 'aranea.activity'
+    // First page; read the rest with snapshotPage(taskPage.token, offset).
     function snapshot(): string {
-      return JSON.stringify(controller.snapshot())
+      return JSON.stringify(controller.ipcSnapshot())
+    }
+    function snapshotPage(token: string, offset: int): string {
+      return JSON.stringify(controller.ipcSnapshotPage(token, offset))
+    }
+    // One task in full; snapshot rows are previews.
+    function task(taskId: string): string {
+      return JSON.stringify(controller.ipcTask(taskId))
     }
     function request(json: string): string {
       return JSON.stringify(controller.requestJSON(json))
@@ -39,6 +47,14 @@ Item {
     }
     function dismiss(taskId: string): string {
       return JSON.stringify(controller.dismiss(taskId))
+    }
+    // JSON array of task IDs, removed in one store write.
+    function dismissMany(json: string): string {
+      var ids = null
+      try {
+        ids = JSON.parse(json)
+      } catch (e) {}
+      return JSON.stringify(controller.dismissMany(ids))
     }
     function reobserve(id: string): string {
       return JSON.stringify(controller.reobserve(id))

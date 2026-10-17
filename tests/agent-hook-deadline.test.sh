@@ -58,6 +58,25 @@ helper_pid=$(cat "$ARANEA_STATE_ROOT/pids")
 kill -0 "$helper_pid"
 [[ $(awk '{print $3}' "/proc/$helper_pid/stat") != Z ]]
 echo 'PASS successful worker receives native stdin and detached helper survives'
+# Worst case: the worker ignores TERM and exits on its own just before the
+# KILL, leaving a TERM-resistant child. The wrapper still ends by 1.9 s.
+cat >"$fixture/aranea-agent-hook-worker" <<'WORKER'
+#!/bin/bash
+trap '' TERM
+start=${EPOCHREALTIME//[!0-9]/}
+/bin/bash -c 'trap "" TERM; printf "%s\n" "$$" >>"$ARANEA_STATE_ROOT/pids"; exec /bin/sleep 30' &
+while ((${EPOCHREALTIME//[!0-9]/} - start < 1650000)); do :; done
+exit 1
+WORKER
+: >"$ARANEA_STATE_ROOT/pids"
+started=$(date +%s%N)
+/usr/bin/timeout 2 "$fixture/aranea-agent-hook" claude </dev/null >"$TMPDIR/out" 2>"$TMPDIR/err"
+elapsed_ms=$((($(date +%s%N) - started) / 1000000))
+((elapsed_ms < 1900)) || {
+  echo "FAIL wrapper took ${elapsed_ms} ms, over the 1.9 s bound"
+  exit 1
+}
+echo "PASS late worker exit still ends within 1.9 s (${elapsed_ms} ms)"
 # Failure and missing-worker exits must still leave the provider with no output.
 for mode in failed missing; do
   if [[ $mode == failed ]]; then
@@ -88,3 +107,26 @@ printf '{"session_id":"contended","hook_event_name":"SessionStart"}\n' | /usr/bi
 cmp "$TMPDIR/before" "$ARANEA_STATE_ROOT/agent-activity.json"
 wait "$locker"
 echo 'PASS real contended transaction returns within provider deadline without changing state'
+# A store cut off by the deadline still removes its own scratch files.
+slow="$TMPDIR/slow-scripts"
+cp -r "$repo_root/scripts" "$slow"
+# The mapper spins inside the store's own shell until the deadline signal.
+printf '%s\n' '#!/usr/bin/env bash' 'agent_hooks_prepare_request() { while :; do :; done; }' >"$slow/lib/agent-hooks.sh"
+rm -rf "$ARANEA_STATE_ROOT"
+mkdir -p "$ARANEA_STATE_ROOT"
+for _ in 1 2 3 4 5 6; do
+  printf '{"session_id":"slow","hook_event_name":"Stop","cwd":"/"}\n' | /usr/bin/timeout 2 "$slow/aranea-agent-hook" claude >"$TMPDIR/out" 2>"$TMPDIR/err"
+  [[ ! -s "$TMPDIR/out" && ! -s "$TMPDIR/err" ]]
+done
+leftovers=0
+for _ in {1..50}; do
+  leftovers=$(find "$ARANEA_STATE_ROOT" -mindepth 1 -maxdepth 1 \( -name '.activity.*' -o -name 'agent-activity.json.??????*' \) | wc -l)
+  ((leftovers == 0)) && break
+  sleep .02
+done
+((leftovers == 0)) || {
+  echo "FAIL store cut off by the deadline left $leftovers scratch files"
+  ls -a "$ARANEA_STATE_ROOT"
+  exit 1
+}
+echo 'PASS store cut off by the deadline removes its scratch files'

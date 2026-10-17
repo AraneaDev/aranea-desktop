@@ -108,6 +108,76 @@ Item {
       operations: operations
     })
   }
+  // Paged IPC reads, newest last; every page of one read comes from one view.
+  property var ipcViews: []
+  // Unique page tokens within this owner.
+  property int ipcSerial: 0
+  // One IPC reply stays well under Quickshell's ~110 KB reply limit.
+  property int ipcPageBytes: 60000
+  // Share of the first reply for retained operation outcomes.
+  property int ipcOperationBytes: 16000
+  // First page of an IPC snapshot: owner fields plus as many task rows as fit.
+  // Rows are short previews (Logic.previewTask), so even the retention cap
+  // takes only a few pages; ipcTask(id) returns one task in full. Sessions stay in the owner (no client reads them). Operations are
+  // the open ones plus each task's latest outcome, compact and bounded
+  // (operation(id) still has the full record). taskPage tells the client how
+  // to read the rest.
+  function ipcSnapshot(): var {
+    var view = snapshot()
+    var tasks = (view.tasks || []).map(Logic.previewTask)
+    var token = ownerId + '-snapshot-' + (++ipcSerial)
+    ipcViews = ipcViews.concat([
+      {
+        token: token,
+        tasks: tasks
+      }
+    ]).slice(-4)
+    var header = Object.assign({}, view, {
+      tasks: [],
+      operations: Logic.ipcOperations(view.operations, ipcOperationBytes),
+      taskPage: {
+        token: token,
+        total: tasks.length
+      }
+    })
+    delete header.sessions
+    var room = Math.max(8000, ipcPageBytes - Logic.utf8Length(JSON.stringify(header)))
+    header.tasks = Logic.taskPage(tasks, 0, room)
+    return header
+  }
+  // A later page of one IPC snapshot read, by its token and first row.
+  function ipcSnapshotPage(token: string, offset: int): var {
+    var cached = ipcViews.filter(function (view) {
+      return view.token === token
+    })[0]
+    if (!cached || offset < 0 || offset > cached.tasks.length)
+      return {
+        ok: false,
+        error: failure('SNAPSHOT_EXPIRED', 'Activity changed while it was being read. Refresh activity.')
+      }
+    return {
+      ok: true,
+      token: token,
+      offset: offset,
+      total: cached.tasks.length,
+      tasks: Logic.taskPage(cached.tasks, offset, ipcPageBytes - 512)
+    }
+  }
+  // One task in full for the details view, bounded to what details show.
+  function ipcTask(taskId: string): var {
+    var task = (snapshot().tasks || []).filter(function (row) {
+      return row.taskId === taskId
+    })[0]
+    if (!task)
+      return {
+        ok: false,
+        error: failure('TASK_NOT_FOUND', 'The task is no longer tracked.')
+      }
+    return {
+      ok: true,
+      task: Logic.boundTask(task)
+    }
+  }
   // New reads supersede old results but do not invalidate operation observers.
   function refresh(): bool {
     if (captureActive || !runtime)
@@ -290,7 +360,7 @@ Item {
   }
   // Accepted IDs are retained before asynchronous work starts.
   function request(payload: var): var {
-    if (payload && payload.action === 'dismiss')
+    if (payload && (payload.action === 'dismiss' || payload.action === 'dismiss-many'))
       return {
         ok: false,
         operationId: null,
@@ -303,6 +373,14 @@ Item {
     return enqueue({
       action: 'dismiss',
       taskId: taskId
+    })
+  }
+  // Clear inactive removes a whole set in one store write. IDs the store no
+  // longer has are skipped; live tasks stay. The result has the counts.
+  function dismissMany(taskIds: var): var {
+    return enqueue({
+      action: 'dismiss-many',
+      taskIds: taskIds
     })
   }
   // Internal actions share acceptance, retention and exactly one mutation transaction.
@@ -328,13 +406,15 @@ Item {
         error: failure('DEPENDENCY_MISSING', 'Activity is not available. Activate the activity plugin.')
       }
     invalidateSubmissions()
-    var task = payload && storeState.tasks.filter(function (row) {
+    var many = !!payload && payload.action === 'dismiss-many'
+    var task = payload && !many && storeState.tasks.filter(function (row) {
       return row.taskId === payload.taskId
-    })[0]
-    var result = Operations.request(operations, payload, ownerId + '-' + (++generation), ownerId, task ? (payload.action === 'dismiss' ? task.taskId : task.provider + ':' + task.providerSessionId) : '')
+    })[0] || null
+    var nextId = ownerId + '-' + (++generation)
+    var result = Operations.request(operations, payload, nextId, ownerId, many ? nextId : task ? (payload.action === 'dismiss' ? task.taskId : task.provider + ':' + task.providerSessionId) : '')
     if (!result.ok)
       return result
-    if (!task)
+    if (!task && !many)
       return {
         ok: false,
         operationId: null,
@@ -343,7 +423,7 @@ Item {
     if (!result.reused) {
       var op = Object.assign({}, result.operation, {
         task: task,
-        priorEpoch: task.producerEpoch,
+        priorEpoch: task ? task.producerEpoch : null,
         desktopId: runtime.sessionId,
         acceptedAt: clock(),
         attempt: 1
@@ -445,6 +525,39 @@ Item {
       deadline: clock() + operationTimeout,
       remaining: operationTimeout
     }))
+    if (op.action === 'dismiss-many') {
+      readGeneration++
+      runtime.dismissMany(op.taskIds, function (response) {
+        if (!current(id, attempt))
+          return
+        readGeneration++
+        var result = response && response.result
+        var confirmed = response && response.ok && response.state && result && Array.isArray(result.removed) && !response.state.tasks.some(function (task) {
+          return result.removed.indexOf(task.taskId) >= 0
+        })
+        if (!confirmed) {
+          finish(id, 'failed', response && response.error || failure('DISMISS_UNCONFIRMED', 'Store removal could not be confirmed.'), null)
+          return
+        }
+        storeState = response.state
+        readAt = clock()
+        elapsedSinceRead = 0
+        publish(Object.assign({}, operation(id), {
+          result: {
+            removed: result.removed.length,
+            missing: (result.missing || []).length,
+            refused: (result.refused || []).length
+          }
+        }))
+        finish(id, 'observed', null, [
+          {
+            role: 'dismiss',
+            status: 'observed'
+          }
+        ])
+      })
+      return
+    }
     if (op.action === 'dismiss') {
       readGeneration++
       runtime.dismiss(op.taskId, function (response) {

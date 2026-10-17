@@ -287,6 +287,12 @@ and session guidance. Usage remains available separately.
 | Failed                        | Read diagnostics before deciding whether to resume.                   |
 | Finished                      | Read the result and check reported verification separately.           |
 | Connection lost / Unconfirmed | Check the terminal; this does not establish that the session stopped. |
+| Ended without a report        | A later prompt replaced it, or it sent nothing for 6 hours. Clear it. |
+
+Working tasks are normally protected from clearing. After 6 hours with no
+report, a Working task can be cleared even while its session is still
+connected, so check that a long job is not still running before you clear it.
+Needs input is never cleared this way.
 
 **Details** shows the summary, exact checkout, report age, question or blockers,
 result, and any separately reported verification. Finished does not imply tests

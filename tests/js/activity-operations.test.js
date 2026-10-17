@@ -101,3 +101,32 @@ test("unresolved launch submission remains authoritative after observation timeo
     "two"
   )
 })
+
+test("a set dismissal takes exact unique IDs and is never merged with another set", () => {
+  const ok = ops.request([], { action: "dismiss-many", taskIds: ["a", "b"] }, "one", "owner", "one")
+  assert.equal(ok.ok, true)
+  assert.deepEqual(ok.operation.taskIds, ["a", "b"])
+  const other = ops.request(
+    [ok.operation],
+    { action: "dismiss-many", taskIds: ["c"] },
+    "two",
+    "owner",
+    "two"
+  )
+  assert.equal(other.operation.id, "two", "another set is its own operation")
+  const tooMany = Array.from({ length: 701 }, (_, i) => "t" + i)
+  for (const taskIds of [[], ["a", "a"], ["--help"], "a", tooMany])
+    assert.equal(
+      ops.request([], { action: "dismiss-many", taskIds }, "x", "owner", "x").ok,
+      false,
+      JSON.stringify(taskIds).slice(0, 40)
+    )
+  assert.equal(
+    ops.request([], { action: "dismiss-many", taskIds: ["a"], taskId: "a" }, "x", "owner", "x").ok,
+    false
+  )
+  assert.equal(
+    ops.request([], { action: "dismiss-many", taskId: "a" }, "x", "owner", "x").ok,
+    false
+  )
+})

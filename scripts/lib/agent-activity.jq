@@ -48,6 +48,7 @@ def request_valid: fields(["action","args"];["expectedRevision"]) and ((has("exp
     if $action == "register" then registration
     elif $action == "report" then event
     elif $action == "dismiss" then fields(["taskId"];[]) and (.taskId|id)
+    elif $action == "dismiss-many" then fields(["taskIds"];[]) and (.taskIds|type == "array" and length > 0 and length <= 700 and all(.[];id) and unique_values)
     elif $action == "prune" then fields([];[])
     elif $action == "native" then fields(["provider","payload","caller"];[]) and (.provider|provider) and (.payload|type == "object") and (.caller|provenance)
     else false end);
@@ -85,6 +86,11 @@ def state_valid: fields(["schemaVersion","revision","sessions","tasks"];[]) and 
 def fresh($s): $s.connection.connected and $s.connection.bootId == $context.bootId and $context.monotonic >= $s.connection.monotonic and ($context.monotonic - $s.connection.monotonic) < 60 and $context.receivedAt >= $s.connection.receivedAt and ($context.receivedAt - $s.connection.receivedAt) < 60;
 def live($sessions): . as $t | $sessions[session_key] as $entry
   | .reportedState != "finished" and $entry != null and fresh($entry.session) and $entry.inactive[$t.taskId] == null;
+# Working with no report for 6 hours ended without one, even while heartbeats
+# keep its session connected (ActivityLogic.silentWork uses the same age).
+def stale_work: .reportedState == "working" and ($context.receivedAt - .lastReceivedAt) >= 21600;
+# Live work stays protected; completed review/failure without blockers may go.
+def dismissible($sessions): (live($sessions) and (((.reportedState|IN("ready-for-review","failed")) and (.blockers|length) == 0)|not) and (stale_work|not))|not;
 def clock($connected): {receivedAt:$context.receivedAt,monotonic:$context.monotonic,bootId:$context.bootId,connected:$connected};
 def associate($a): [$projects.projects[] as $p | $p.checkouts[] | select(.path == $a.cwd) | {status:"registered",projectId:$p.id,checkoutId:.id,cwd:$a.cwd}] as $found
   | if ($a|has("projectId")) and (all($found[]; .projectId != $a.projectId or .checkoutId != $a.checkoutId) or ($found|length == 0)) then error("ASSOCIATION_MISMATCH")
@@ -153,9 +159,13 @@ def mutation($r;$source;$prepared_metadata):
   elif $r.action == "dismiss" then
     ([.tasks[]|select(.taskId == $r.args.taskId)][0]//null) as $task
     | if $task == null then error("TASK_NOT_FOUND")
-      elif ((.sessions|session_index) as $sessions | $task|live($sessions)) and
-        (($task | (.reportedState|IN("ready-for-review","failed")) and (.blockers|length)==0)|not) then error("TASK_LIVE")
+      elif ((.sessions|session_index) as $sessions | $task|dismissible($sessions)|not) then error("TASK_LIVE")
       else .tasks |= map(select(.taskId != $r.args.taskId)) | .revision += 1 end
+  elif $r.action == "dismiss-many" then
+    # One write for the whole set; missing IDs are skipped, live tasks stay.
+    (.sessions|session_index) as $sessions | INDEX(.tasks[];.taskId) as $tasks
+    | (reduce $r.args.taskIds[] as $id ({}; if $tasks[$id] != null and ($tasks[$id]|dismissible($sessions)) then .[$id] = true else . end)) as $drop
+    | if ($drop|length) == 0 then . else .tasks |= map(select($drop[.taskId] == null)) | .revision += 1 end
   elif $r.action == "prune" then .revision += 1
   elif $r.action == "native" then $r.args.normalized as $n
     | if ($n|fields(["action","args"];["nativeMetadata"])) and ($n.action|IN("register","report")) and ($n|del(.nativeMetadata)|request_valid) and (($n|has("nativeMetadata")|not) or $prepared_metadata or ($n.nativeMetadata|metadata)) then
@@ -167,6 +177,11 @@ def mutation($r;$source;$prepared_metadata):
 # All event/registration fields are checked again after canonical path preparation.
 # Pure mutate also rechecks metadata; full final state validation is unconditional.
 def mutation($r;$source): mutation($r;$source;false);
+# Per-ID outcome of a dismiss-many: removed, not present before, or still kept.
+def dismiss_result($before;$after;$r):
+  if $r.action == "dismiss-many" then INDEX($before.tasks[];.taskId) as $old | INDEX($after.tasks[];.taskId) as $new
+    | {result:{removed:[$r.args.taskIds[]|select($old[.] != null and $new[.] == null)],missing:[$r.args.taskIds[]|select($old[.] == null)],refused:[$r.args.taskIds[]|select($old[.] != null and $new[.] != null)]}}
+  else {} end;
 def project_state:
   (.sessions|session_index) as $sessions | .tasks |= map(. as $task | $sessions[session_key] as $entry | $entry.session as $s
     | .freshness = (if $entry.inactive[$task.taskId] != null then "connection-lost" elif fresh($s) then if $s.provenance == null or ($s.provenance|has("commandHash")|not) then "unconfirmed" else "connected" end else "connection-lost" end)
@@ -186,7 +201,7 @@ elif $operation == "mutate" then . as $before | mutation($request;"report") | if
 elif $operation == "project" then project_state
 elif $operation == "response" then project_state | {ok:true,state:.,error:null}
 elif $operation == "transaction" then
-  (. as $before | mutation($request;"report";true) | if . == $before then . else retain end) as $after
+  . as $before | (mutation($request;"report";true) | if . == $before then . else retain end) as $after
   # Final validation uses the same in-memory result before emitting either line.
-  | if $after|state_valid then $after,($after|project_state|{ok:true,state:.,error:null}) else error("ACTIVITY_INVALID") end
+  | if $after|state_valid then $after,($after|project_state|{ok:true,state:.,error:null} + dismiss_result($before;$after;$request)) else error("ACTIVITY_INVALID") end
 else error("INVALID_OPERATION") end

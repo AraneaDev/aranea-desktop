@@ -3,10 +3,38 @@ import QtQuick
 import Quickshell
 import "lib"
 import "plugins/araneadev.activity" as Activity
+import "plugins/araneadev.agents" as Agents
 
 ShellRoot {
+  id: host
+  // Every IPC reply the paged client read, to check each one fits the transport.
+  property var replies: []
   QmlTest {
     id: t
+  }
+  // UTF-8 size of one IPC reply, the unit the transport limit is counted in.
+  function bytes(value) {
+    return unescape(encodeURIComponent(value)).length
+  }
+  // Answers the client from the in-process owner exactly as the IPC handler would.
+  Activity.ActivityClient {
+    id: client
+    pollInterval: 60000
+    runner: function (argv, done) {
+      var reply = argv[2] === 'snapshot' ? JSON.stringify(owner.ipcSnapshot()) : argv[2] === 'snapshotPage' ? JSON.stringify(owner.ipcSnapshotPage(argv[3], Number(argv[4]))) : argv[2] === 'task' ? JSON.stringify(owner.ipcTask(argv[3])) : ''
+      host.replies.push(reply)
+      done(reply ? 0 : 1, reply, '')
+    }
+  }
+  Agents.AgentTasks {
+    id: view
+    width: 320
+    maxHeight: 500
+    snapshot: client.snapshot
+    detailTask: client.taskDetails
+    onDetailsNeeded: function (taskId) {
+      client.readTask(taskId)
+    }
   }
   Activity.ActivityController {
     id: owner
@@ -94,6 +122,236 @@ ShellRoot {
     t.equal(snapshot.sessions[0].nativeMetadata.currentTaskId, 'current', 'current thread metadata retained')
     t.equal(owner.storeState.sessions[0].receipts.length, 512, 'authoritative replay receipts unchanged')
     t.equal(owner.storeState.sessions[0].nativeMetadata.callbackOwners.length, 512, 'authoritative callback correlation unchanged')
+    paged()
+  }
+  // Many retained tasks with long reports reach the panel in bounded replies.
+  function paged() {
+    var long = 'Long reported result with words. '.repeat(124).slice(0, 4096)
+    var tasks = [], sessions = []
+    for (var i = 0; i < 300; i++) {
+      var diagnostics = []
+      for (var d = 0; d < 20; d++)
+        diagnostics.push({
+          summary: long,
+          receivedAt: 900
+        })
+      tasks.push({
+        taskId: 'claude:session-' + (i % 8) + ':prompt:' + i,
+        provider: 'claude',
+        providerSessionId: 'session-' + (i % 8),
+        producerEpoch: 'epoch',
+        reportedState: 'ready-for-review',
+        description: 'Task ' + i + ' ' + long,
+        result: long,
+        question: '',
+        blockers: [],
+        diagnostics: diagnostics,
+        verification: {
+          status: 'unknown',
+          summary: '',
+          commands: []
+        },
+        association: {
+          status: 'unassigned',
+          projectId: null,
+          checkoutId: null,
+          cwd: '/home/user/work/checkout-' + i
+        },
+        lastReceivedAt: 900,
+        source: 'native'
+      })
+    }
+    for (var s = 0; s < 8; s++)
+      sessions.push({
+        provider: 'claude',
+        providerSessionId: 'session-' + s,
+        producerEpoch: 'epoch',
+        connection: {
+          connected: false,
+          receivedAt: 900
+        },
+        provenance: null,
+        nativeMetadata: {
+          currentTaskId: null,
+          turns: []
+        }
+      })
+    owner.storeState = {
+      schemaVersion: 1,
+      revision: 11,
+      tasks: tasks,
+      sessions: sessions
+    }
+    t.check(bytes(JSON.stringify(owner.snapshot())) > 1000000, 'fixture is far larger than one IPC reply')
+    client.refresh()
+    t.check(host.replies.length > 1, 'large snapshot is read in several pages')
+    t.check(host.replies.every(function (reply) {
+      return reply && bytes(reply) < 64000
+    }), 'every IPC reply stays under 64 KB')
+    t.equal(client.snapshot.tasks.length, 300, 'client assembles every retained task')
+    t.equal(client.snapshot.revision, 11, 'assembled snapshot keeps owner metadata')
+    t.check(!client.snapshot.taskPage, 'paging bookkeeping is not part of the snapshot')
+    var listed = client.snapshot.tasks[299]
+    t.check(listed.preview && listed.result.length === 101 && /…$/.test(listed.result), 'list rows carry a short marked preview')
+    t.equal(listed.diagnostics, [], 'list rows leave diagnostics to details')
+    t.equal(view.taskRows.length, 300, 'panel lists every task')
+    t.check(view.openDetails(listed.taskId), 'details open for a listed task')
+    t.equal(view.selectedRow.result, long, 'details read and show the full result')
+    t.equal(view.selectedRow.diagnostics.length, 4096, 'details show the diagnostics')
+    t.equal(host.replies[host.replies.length - 1].indexOf('"ok":true'), 1, 'details read is one small reply')
+    t.check(bytes(host.replies[host.replies.length - 1]) < 64000, 'details reply stays under 64 KB')
+    view.selectedId = ''
+    retentionCap()
+  }
+  // The store's retention cap (700 tasks, 4 KB texts) loads in a few pages.
+  function retentionCap() {
+    var long = 'Long reported result with words. '.repeat(124).slice(0, 4096)
+    var uuid = '12345678-1234-1234-1234-123456789abc'
+    var tasks = []
+    for (var i = 0; i < 700; i++) {
+      var diagnostics = []
+      for (var d = 0; d < 20; d++)
+        diagnostics.push({
+          summary: long,
+          receivedAt: 900
+        })
+      tasks.push({
+        taskId: 'claude:' + uuid.slice(0, 32) + (1000 + i),
+        provider: 'claude',
+        providerSessionId: uuid,
+        producerEpoch: uuid,
+        reportedState: 'ready-for-review',
+        description: long,
+        result: long,
+        question: '',
+        blockers: [],
+        diagnostics: diagnostics,
+        verification: {
+          status: 'unknown',
+          summary: '',
+          commands: []
+        },
+        association: {
+          status: 'registered',
+          projectId: 'project-' + uuid,
+          checkoutId: 'checkout-' + uuid,
+          cwd: '/home/user/work/some-project/checkout-' + i
+        },
+        lastReceivedAt: 900,
+        source: 'native'
+      })
+    }
+    owner.storeState = {
+      schemaVersion: 1,
+      revision: 13,
+      tasks: tasks,
+      sessions: [
+        {
+          provider: 'claude',
+          providerSessionId: uuid,
+          producerEpoch: uuid,
+          connection: {
+            connected: false,
+            receivedAt: 900
+          },
+          provenance: null,
+          nativeMetadata: {
+            currentTaskId: null,
+            turns: []
+          }
+        }
+      ]
+    }
+    host.replies = []
+    client.refresh()
+    t.equal(client.snapshot.tasks.length, 700, 'every task at the retention cap loads')
+    t.check(host.replies.length <= 10, 'retention cap loads in at most 10 replies (' + host.replies.length + ')')
+    t.check(host.replies.every(function (reply) {
+      return bytes(reply) < 64000
+    }), 'every reply at the retention cap stays under 64 KB')
+    boundedHeaderAfterCap()
+  }
+  // Unknown page tokens and task IDs are refused, then the header bound runs.
+  function boundedHeaderAfterCap() {
+    t.equal(owner.ipcSnapshotPage('stale-token', 1).error.code, 'SNAPSHOT_EXPIRED', 'unknown page token refused')
+    t.equal(owner.ipcTask('missing').error.code, 'TASK_NOT_FOUND', 'details of an unknown task refused')
+    boundedHeader()
+  }
+  // Many retained operations and a largest-size row still fit the first reply.
+  function boundedHeader() {
+    var wide = '€'.repeat(4096)
+    var blockers = [], diagnostics = [], ops = []
+    for (var b = 0; b < 32; b++)
+      blockers.push({
+        blockerId: 'b'.repeat(250) + b,
+        question: wide
+      })
+    for (var d = 0; d < 20; d++)
+      diagnostics.push({
+        summary: wide,
+        receivedAt: 900
+      })
+    var big = {
+      taskId: 'x'.repeat(256),
+      provider: 'claude',
+      providerSessionId: 's'.repeat(256),
+      producerEpoch: 'e'.repeat(256),
+      reportedState: 'needs-input',
+      description: wide,
+      result: wide,
+      question: wide,
+      blockers: blockers,
+      diagnostics: diagnostics,
+      verification: {
+        status: 'reported-fail',
+        summary: wide,
+        commands: Array(16).fill('c'.repeat(512))
+      },
+      association: {
+        status: 'unassigned',
+        projectId: null,
+        checkoutId: null,
+        cwd: '/' + 'p'.repeat(4000)
+      },
+      lastReceivedAt: 900,
+      source: 'report'
+    }
+    for (var i = 0; i < 100; i++)
+      ops.push({
+        id: 'op-' + i,
+        ownerId: owner.ownerId,
+        taskId: 'task-' + i,
+        action: 'reopen',
+        state: 'completed',
+        outcome: 'partial',
+        attempt: 1,
+        steps: [
+          {
+            role: 'terminal',
+            status: 'observed',
+            binding: {
+              address: '0x' + 'a'.repeat(300)
+            }
+          }
+        ],
+        error: {
+          code: 'SESSION_UNCONFIRMED',
+          message: 'm'.repeat(600),
+          recovery: 'r'.repeat(200)
+        },
+        task: big
+      })
+    owner.operations = ops
+    owner.storeState = {
+      schemaVersion: 1,
+      revision: 12,
+      tasks: [big],
+      sessions: []
+    }
+    var first = JSON.stringify(owner.ipcSnapshot())
+    t.check(bytes(first) < 64000, 'first reply with 100 retained operations and a largest row stays under 64 KB (' + bytes(first) + ')')
+    t.check(JSON.parse(first).operations.length > 0, 'recent operation outcomes still reach the panel')
+    owner.operations = []
     t.done()
   }
 }

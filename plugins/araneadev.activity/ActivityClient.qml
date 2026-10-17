@@ -1,5 +1,6 @@
 // Independent IPC observer; accepted owner work never belongs to this item.
 import QtQuick
+import "ActivityLogic.js" as Logic
 import "../araneadev.projects" as Projects
 
 Item {
@@ -15,6 +16,8 @@ Item {
   property bool available: false
   // Structured errors retain actionable domain codes.
   property var error: null
+  // IPC method whose reply last set or cleared error ('snapshot' for list reads).
+  property string errorMethod: ''
   // True only while submitting or observing accepted work.
   property bool pending: false
   // Accepted ID survives disconnect, closure and explicit reconnection.
@@ -27,6 +30,18 @@ Item {
   property int generation: 0
   // Later reads supersede earlier reads without cancelling operation observation.
   property int snapshotGeneration: 0
+  // The read whose later pages are still being fetched (0 when none). Another
+  // refresh meanwhile waits for it instead of starting over, so a large list
+  // always finishes loading.
+  property int pagingRead: 0
+  // When pagingRead began; a read stuck longer than 15 s no longer blocks.
+  property double pagingSince: 0
+  // A refresh asked for while pages were loading runs once they are done.
+  property bool refreshQueued: false
+  // Full task for the details view (snapshot rows are previews), from readTask.
+  property var taskDetails: null
+  // Later details reads supersede earlier ones.
+  property int detailGeneration: 0
   // Only an explicit OWNER_NOT_READY refusal may reuse this payload.
   property string submissionJson: ''
   // Bounded initial readiness retries stop before any acceptance.
@@ -54,17 +69,23 @@ Item {
     submissionJson = ''
   }
   // IPC decoding rejects stale callbacks and surfaces uncertain transport results.
-  function invoke(method: string, args: var, done: var): void {
+  // failed (optional) runs when the transport or reply is unusable.
+  function invoke(method: string, args: var, done: var, failed: var): void {
     if (captureActive)
       return
     var revision = generation, read = snapshotGeneration
     var complete = function (code, output, diagnostics) {
-      if (client.captureActive || revision !== client.generation || method === 'snapshot' && read !== client.snapshotGeneration)
+      var listRead = method === 'snapshot' || method === 'snapshotPage'
+      if (client.captureActive || revision !== client.generation || listRead && read !== client.snapshotGeneration) {
+        if (failed)
+          failed()
         return
+      }
       var result = null
       try {
         result = JSON.parse(output)
       } catch (e) {}
+      client.errorMethod = method
       if (code !== 0 || !result || typeof result !== 'object') {
         client.available = false
         client.error = {
@@ -72,12 +93,14 @@ Item {
           message: diagnostics || 'Activity is not available. Reconnect to the running operation.',
           recovery: 'Reconnect without starting the work again.'
         }
-        if (method !== 'snapshot') {
+        if (!listRead) {
           client.pending = false
           client.submissionJson = ''
           poll.stop()
           retry.stop()
         }
+        if (failed)
+          failed()
         return
       }
       client.available = true
@@ -94,10 +117,83 @@ Item {
   function refresh(): bool {
     if (captureActive)
       return false
-    snapshotGeneration++
-    invoke('snapshot', [], function (response) {
-      snapshot = response
+    if (pagingRead && pagingRead === snapshotGeneration && Date.now() - pagingSince < 15000) {
+      refreshQueued = true
+      return true
+    }
+    var read = ++snapshotGeneration
+    pagingRead = 0
+    var finished = function () {
+      if (client.pagingRead !== read)
+        return
+      client.pagingRead = 0
+      if (client.refreshQueued) {
+        client.refreshQueued = false
+        Qt.callLater(client.refresh)
+      }
+    }
+    invoke('snapshot', [], function (first) {
+      var page = first.taskPage
+      var tasks = Array.isArray(first.tasks) ? first.tasks.slice() : []
+      var complete = function () {
+        var view = Object.assign({}, first, {
+          tasks: tasks.map(Logic.expandPreview)
+        })
+        delete view.taskPage
+        snapshot = view
+        finished()
+      }
+      if (!page || typeof page.token !== 'string' || typeof page.total !== 'number' || tasks.length >= page.total) {
+        complete()
+        return
+      }
+      client.pagingRead = read
+      client.pagingSince = Date.now()
+      // Each page carries at least one row, so this ends after total pages at most.
+      // A refused or short page keeps the last snapshot until the next read.
+      var more = function () {
+        if (read !== client.snapshotGeneration) {
+          finished()
+          return
+        }
+        invoke('snapshotPage', [page.token, String(tasks.length)], function (response) {
+          // Only a page of this very read (token and total) may join it.
+          if (read !== client.snapshotGeneration || !response.ok || response.token !== page.token || response.total !== page.total || response.offset !== tasks.length || !Array.isArray(response.tasks) || !response.tasks.length) {
+            finished()
+            return
+          }
+          tasks = tasks.concat(response.tasks)
+          if (tasks.length >= page.total)
+            complete()
+          else
+            more()
+        }, finished)
+      }
+      more()
     })
+    return true
+  }
+  // Read one task in full for the details view. This read is read-only and
+  // runs beside any submission: it never touches pending, error, available or
+  // the submission generations, and only a later details read supersedes it.
+  // Failures keep the last details.
+  function readTask(taskId: string): bool {
+    if (captureActive || !Logic.validId(taskId))
+      return false
+    var read = ++detailGeneration
+    var complete = function (code, output) {
+      if (client.captureActive || read !== client.detailGeneration || code !== 0)
+        return
+      var response = null
+      try {
+        response = JSON.parse(output)
+      } catch (e) {}
+      if (response && response.ok && response.task && response.task.taskId === taskId)
+        client.taskDetails = response.task
+    }
+    try {
+      runner([ipcPath, 'aranea.activity', 'task', taskId], complete)
+    } catch (e) {}
     return true
   }
   // A deliberate new user action starts a new submission; transport ambiguity never retries.
@@ -145,6 +241,14 @@ Item {
   }
   // Explicit dismissal uses the owner's serialized store mutation and ordinary observation.
   function dismiss(taskId: string): bool {
+    return submitDismissal('dismiss', taskId)
+  }
+  // A set of task IDs removed in one store write, observed as one operation.
+  function dismissMany(taskIds: var): bool {
+    return Array.isArray(taskIds) && submitDismissal('dismissMany', JSON.stringify(taskIds))
+  }
+  // Shared submission for one task or a set; the owner validates the argument.
+  function submitDismissal(method: string, argument: string): bool {
     if (captureActive || pending)
       return false
     generation++
@@ -152,7 +256,7 @@ Item {
     ownerId = ''
     currentOperation = null
     pending = true
-    invoke('dismiss', [taskId], function (response) {
+    invoke(method, [argument], function (response) {
       if (!response.ok || !response.operationId) {
         pending = false
         error = response.error
