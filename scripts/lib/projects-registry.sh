@@ -193,6 +193,10 @@ projects_registry_prepare_request() {
         printf '%s\n' "$request"
       fi
       ;;
+    review-mark)
+      # The store owns review time; callers cannot supply or backdate it.
+      jq -c --argjson reviewedAt "$(date +%s%3N)" '.args.reviewedAt=$reviewedAt' <<<"$request"
+      ;;
     root-add)
       path=$(projects_registry_path "$(jq -r '.args.path' <<<"$request")") || return $?
       jq -c --arg path "$path" --arg id "$(projects_registry_id r)" '.args.path=$path | .args.id=$id' <<<"$request"
