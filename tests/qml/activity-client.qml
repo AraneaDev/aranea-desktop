@@ -111,8 +111,48 @@ ShellRoot {
         }
       }), '')
       t.equal(client.taskDetails.result, 'full', 'details task kept')
+      mismatchedPage({
+        token: 'other-read',
+        total: 2
+      }, 'page of another read')
+      mismatchedPage({
+        token: 'read-7',
+        total: 3
+      }, 'page with another total')
       finishCapture()
     })
+  }
+  // A page that does not belong to the read in progress abandons that read
+  // and keeps the last snapshot.
+  function mismatchedPage(fields, name) {
+    var kept = client.snapshot
+    client.refresh()
+    var first = calls.length - 1
+    calls[first].done(0, JSON.stringify({
+      ownerId: 'o',
+      revision: 7,
+      tasks: [
+        {
+          taskId: 'x'
+        }
+      ],
+      operations: [],
+      taskPage: {
+        token: 'read-7',
+        total: 2
+      }
+    }), '')
+    calls[first + 1].done(0, JSON.stringify(Object.assign({
+      ok: true,
+      offset: 1,
+      tasks: [
+        {
+          taskId: 'y'
+        }
+      ]
+    }, fields)), '')
+    t.equal(client.snapshot, kept, name + ' keeps the last snapshot')
+    t.equal(client.pagingRead, 0, name + ' ends the read')
   }
   // Capture refuses every later read and action.
   function finishCapture() {

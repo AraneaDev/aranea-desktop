@@ -157,7 +157,8 @@ Item {
           return
         }
         invoke('snapshotPage', [page.token, String(tasks.length)], function (response) {
-          if (read !== client.snapshotGeneration || !response.ok || response.offset !== tasks.length || !Array.isArray(response.tasks) || !response.tasks.length) {
+          // Only a page of this very read (token and total) may join it.
+          if (read !== client.snapshotGeneration || !response.ok || response.token !== page.token || response.total !== page.total || response.offset !== tasks.length || !Array.isArray(response.tasks) || !response.tasks.length) {
             finished()
             return
           }
