@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.31.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.31.0...v2.31.1) (2026-10-17)
+
+
+### Fixes
+
+* **screenshots:** capture Projects on the desktop ([#175](https://github.com/AraneaDev/aranea-desktop/issues/175)) ([d8d2a40](https://github.com/AraneaDev/aranea-desktop/commit/d8d2a408d0d19ab3f06e682a68c6eeb71c856467))
+
 ## [2.31.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.30.0...v2.31.0) (2026-10-17)
 
 
