@@ -694,7 +694,7 @@ processes are not removed by action cleanup.
 
 ## Task checkouts and Git
 
-These commands create and remove task checkouts and fetch or pull a checkout.
+These commands create and remove task checkouts, fetch, pull or push a checkout, and read or mark a task checkout review.
 Every command accepts `--json` and preserves the schema 1 JSONL protocol. When
 `--checkout` is omitted for `git fetch`/`git pull`, the project's selected
 checkout is used.
@@ -702,6 +702,9 @@ checkout is used.
 ```text
 aranea projects git fetch PROJECT_ID [--checkout CHECKOUT_ID]
 aranea projects git pull PROJECT_ID [--checkout CHECKOUT_ID]
+aranea projects git push PROJECT_ID [--checkout CHECKOUT_ID]
+aranea projects review PROJECT_ID --checkout CHECKOUT_ID
+aranea projects review mark PROJECT_ID --checkout CHECKOUT_ID
 aranea projects task new PROJECT_ID --branch BRANCH
 aranea projects task remove PROJECT_ID --checkout CHECKOUT_ID
     [--check] [--confirm-unpushed]
@@ -725,6 +728,24 @@ Result fields, carried as the final CLI event's `data`:
 - `git pull`: `{projectId,checkoutId,remote,from,to,updated}`. It fetches, then
   runs `git merge --ff-only @{upstream}`; it never creates a merge commit or
   stashes.
+- `git push`: `{projectId,checkoutId,remote,branch,upstream,pushed}`. It runs
+  `git push --set-upstream <remote> <branch>` for the checkout's current branch
+  only. It never forces and never pushes other branches, tags or submodules.
+  The remote is chosen as for `git fetch`.
+- `review`: read-only, and it never fetches.
+  `{projectId,checkoutId,branch,base,mergeBase,head,ahead,behind,commits,files,uncommitted,truncated}`.
+  Only task checkouts can be reviewed. The base is chosen as for `task new`
+  (`refs/remotes/<remote>/HEAD`, then `<remote>/main`, `<remote>/master`, then
+  local `main`, `master`). `commits` is `[{sha,subject}]`, newest first, at most
+  50. `files` is `[{path,added,removed}]` from `git diff --numstat
+  <mergeBase>...HEAD`, at most 200; binary files report `added` and `removed`
+  as `null`. `uncommitted` is `{dirty,untracked}`. `truncated` is true when
+  either list was cut.
+- `review mark`: `{projectId,checkoutId,head,taskFinishedAt}`. It saves the
+  checkout's current head and the time of its latest finished agent task
+  (`null` when there is none or the activity state cannot be read) as reviewed.
+  The review card returns when the head changes or a task finishes later.
+  Removing the checkout drops the mark.
 - `task new`: `{projectId,checkoutId,path,branch,base}`. It fetches, then starts
   the new branch (with `--no-track`) from `refs/remotes/<remote>/HEAD`, else
   `<remote>/main`, else `<remote>/master`; without a remote, from local `main`,
@@ -761,18 +782,23 @@ Refusals use these codes:
 - `AUTH_REQUIRED`: the remote needs credentials; run `git fetch` once in a terminal.
 - `GIT_TIMEOUT`: Git did not finish in time. Nothing is deleted after a timeout.
 - `GIT_ERROR`: any other Git failure, with Git's first error line.
-- `NO_REMOTE`: fetch with no remote.
+- `NO_REMOTE`: fetch or push with no remote.
+- `NO_BRANCH`: push from a detached HEAD.
+- `PUSH_REJECTED`: the remote has newer commits ("The remote has newer commits;
+  fetch and update first."). Nothing is forced.
 - `NO_UPSTREAM`: pull on a branch that tracks nothing, or a detached HEAD.
 - `NOT_FAST_FORWARD`: pull on diverged branches.
 - `LOCAL_CHANGES`: pull would overwrite local changes.
 - `INVALID_BRANCH`: not a valid branch name, starts with `-`, or contains `@{`.
 - `BRANCH_EXISTS`: a local branch of that name exists.
-- `NO_DEFAULT_BRANCH`: no remote default, `main` or `master` to start from.
+- `NO_DEFAULT_BRANCH`: no remote default, `main` or `master` to start from or
+  to review against.
 - `PATH_EXISTS`: the target folder already exists.
 - `REGISTER_FAILED`: the checkout was created (or Git stopped after creating
   its folder, for example in a slow `post-checkout` hook) but could not be
   registered; the recovery names the folder and how to register or remove it.
-- `PRIMARY_CHECKOUT`: removal of the main checkout was requested.
+- `PRIMARY_CHECKOUT`: removal, `review` or `review mark` of the main checkout
+  was requested.
 - `CHECKOUT_DIRTY`: uncommitted or untracked changes.
 - `CHECKOUT_BUSY`: a protected action run exists for the checkout.
 - `ACTIONS_UNAVAILABLE`: the action store could not be read, so removal fails closed.
@@ -785,4 +811,5 @@ Refusals use these codes:
 The `capabilities` result carries `projectGit`:
 `{schemaVersion:1,worktreeLocation:"<repo>-worktrees/<branch>",base:"remote default branch, else local main/master",pull:"fast-forward only",removeKeepsBranch:true,networkSeconds:60,localSeconds:15}`,
 and lists the operations `projects.git.fetch`, `projects.git.pull`,
+`projects.git.push`, `projects.review`, `projects.review.mark`,
 `projects.task.new` and `projects.task.remove`.
