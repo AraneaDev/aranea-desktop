@@ -30,7 +30,9 @@ function sample(id, mode, count) {
   if (mode === "problem") mode = "daily-unknown"
   var daily = mode && mode.indexOf("daily") === 0
   // A linked task checkout is selected so Remove task checkout shows too.
-  if (mode === "daily-task") project.lastCheckoutId = "c-review"
+  if (mode === "daily-task" || mode === "review") project.lastCheckoutId = "c-review"
+  // The review capture shows an agent task checkout that is ready for review.
+  if (mode === "review") project.checkouts[1].branch = "agent/navigation-polish"
   var agentPreview = mode && mode.indexOf("agents") === 0
   if (daily || agentPreview || mode === "profiles" || mode === "profile-editor") {
     project.profiles = [
@@ -267,12 +269,19 @@ function sample(id, mode, count) {
           : null
     }
   }
-  if (mode === "daily-task" && state.projects.length) {
+  if ((mode === "daily-task" || mode === "review") && state.projects.length) {
     var taskGit = JSON.parse(JSON.stringify(gitCache[JSON.stringify([project.id, "c-preview"])]))
     taskGit.data.checkoutId = "c-review"
     taskGit.data.path = project.checkouts[1].path
-    taskGit.data.branch = "review"
-    taskGit.data.upstream = "origin/review"
+    taskGit.data.branch = project.checkouts[1].branch
+    taskGit.data.upstream = "origin/" + project.checkouts[1].branch
+    if (mode === "review") {
+      // A clean, committed task checkout, matching the review card.
+      taskGit.data.ahead = 3
+      taskGit.data.behind = 0
+      taskGit.data.counts = { staged: 0, unstaged: 0, untracked: 0, conflicts: 0 }
+      taskGit.data.files = []
+    }
     gitCache[JSON.stringify([project.id, "c-review"])] = taskGit
   }
   var snapshot = {
@@ -373,9 +382,62 @@ function sample(id, mode, count) {
       }
     ]
   }
+  var reviewTime = Math.floor(Date.now() / 1000)
+  var reviewFixture = mode === "review"
   return {
+    projectReviews: reviewFixture
+      ? {
+          "c-review": {
+            projectId: project.id,
+            error: null,
+            data: {
+              projectId: project.id,
+              checkoutId: "c-review",
+              branch: "agent/navigation-polish",
+              base: "origin/main",
+              mergeBase: "0123456789abcdef0123456789abcdef01234567",
+              head: "89abcdef0123456789abcdef0123456789abcdef",
+              ahead: 3,
+              behind: 0,
+              commits: [
+                { sha: "89abcdef0123456789abcdef0123456789abcdef", subject: "Keep focus in the sidebar after a refresh" },
+                { sha: "4567890123abcdef4567890123abcdef45678901", subject: "Add keyboard shortcuts to the project list" },
+                { sha: "bcdef0123456789abcdef0123456789abcdef012", subject: "Group navigation links by section" }
+              ],
+              files: [
+                { path: "src/navigation/Sidebar.js", added: 64, removed: 12 },
+                { path: "src/navigation/shortcuts.js", added: 38, removed: 0 },
+                { path: "src/navigation/Sidebar.test.js", added: 52, removed: 3 },
+                { path: "src/styles/navigation.css", added: 9, removed: 4 },
+                { path: "README.md", added: 6, removed: 1 }
+              ],
+              uncommitted: { dirty: false, untracked: false },
+              truncated: false
+            }
+          }
+        }
+      : {},
     projectActions:
-      mode === "activity"
+      reviewFixture
+        ? {
+            snapshot: {
+              revision: 1,
+              definitions: [
+                {
+                  id: "a-tests",
+                  projectId: project.id,
+                  revision: 1,
+                  name: "Run tests",
+                  kind: "command",
+                  argv: ["npm", "test"],
+                  cwdRelative: "."
+                }
+              ],
+              runs: [],
+              requests: []
+            }
+          }
+        : mode === "activity"
         ? {
             snapshot: {
               revision: 1,
@@ -408,7 +470,29 @@ function sample(id, mode, count) {
           }
         : {},
     activitySnapshot:
-      mode === "activity"
+      reviewFixture
+        ? {
+            tasks: [
+              {
+                taskId: "t-navigation",
+                provider: "codex",
+                description: "Polish project navigation",
+                reportedState: "ready-for-review",
+                freshness: "connected",
+                nativeSessionEligible: true,
+                lastReceivedAt: reviewTime,
+                verification: { status: "reported-pass" },
+                association: {
+                  status: "registered",
+                  projectId: project.id,
+                  checkoutId: "c-review",
+                  cwd: project.checkouts[1].path
+                }
+              }
+            ],
+            operations: []
+          }
+        : mode === "activity"
         ? {
             tasks: [
               {

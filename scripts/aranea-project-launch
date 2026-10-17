@@ -26,7 +26,9 @@ if /usr/bin/jq -e 'type=="object" and has("kind")' <<<"$request" >/dev/null; the
     ((.mergeBase|type)=="string") and (.mergeBase|test("^[0-9a-f]{40}$")) and
     ((.terminalId|type)=="string") and (.terminalId|IN("kitty","alacritty","foot","ghostty"))
   ' <<<"$request" >/dev/null || fail INVALID_LAUNCH 'Only a diff of a registered checkout is allowed.'
-  project_state_root=${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}
+  # shellcheck source=scripts/lib/paths.sh
+  source "${BASH_SOURCE[0]%/*}/lib/paths.sh"
+  project_state_root=$(aranea_state_root)
   project_registry=$project_state_root/projects.json
   project_registered=false
   if [[ -r "$project_registry" ]] && /usr/bin/jq -e --arg cwd "$(/usr/bin/jq -r .cwd <<<"$request")" \

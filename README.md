@@ -209,6 +209,10 @@ demonstration data; the desktop background is Signal Shrine.
 | -------------------------------------------------------------- | --------------------------------------------------- |
 | ![Plain problem with Details](screenshots/project-problem.png) | ![Quick switcher](screenshots/project-switcher.png) |
 
+| Ready for review                                    |
+| --------------------------------------------------- |
+| ![Ready for review](screenshots/project-review.png) |
+
 ### Pickers and applications
 
 | Clipboard                                      | Emoji                                   | Wallpaper picker                                  |

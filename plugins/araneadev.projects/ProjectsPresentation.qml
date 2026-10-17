@@ -441,6 +441,7 @@ Item {
       },
       actions: actionSnapshot(),
       gitCache: gitClient.cache,
+      reviews: reviewClient.reviews,
       activity: {
         snapshot: activityClient.snapshot,
         available: activityClient.available,
@@ -472,6 +473,7 @@ Item {
     var f = payload.fixture
     restoreActions(f.projectActions || {})
     gitClient.cache = f.projectGitCache || {}
+    reviewClient.reviews = f.projectReviews || {}
     activityClient.snapshot = f.activitySnapshot || {
       tasks: [],
       operations: []
@@ -514,6 +516,7 @@ Item {
       return 'invalid'
     var saved = JSON.parse(payloadJson), focus = captureSaved.focus, p = saved.projects
     gitClient.cache = saved.gitCache || {}
+    reviewClient.reviews = saved.reviews || {}
     activityClient.snapshot = saved.activity.snapshot
     activityClient.available = saved.activity.available
     activityClient.error = saved.activity.error
