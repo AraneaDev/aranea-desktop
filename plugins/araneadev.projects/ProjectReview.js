@@ -68,7 +68,11 @@ function reviewState(checkout, tasks, review) {
   var mark = checkout.review
   if (!mark) return "ready"
   if (review && review.head !== mark.reviewedHead) return "ready"
-  if ((done.lastReceivedAt || 0) > (mark.reviewedTaskAt || 0)) return "ready"
+  // lastReceivedAt is in seconds; reviewedAt is in milliseconds.
+  var finished = done.lastReceivedAt || 0
+  if (typeof mark.reviewedTaskAt === "number") {
+    if (finished > mark.reviewedTaskAt) return "ready"
+  } else if (finished * 1000 > (mark.reviewedAt || 0)) return "ready"
   return "reviewed"
 }
 

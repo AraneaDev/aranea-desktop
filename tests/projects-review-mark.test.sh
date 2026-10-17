@@ -52,6 +52,7 @@ mark_validates() {
     '{"head":"abc","taskFinishedAt":1}' \
     "$(jq -cn --arg h "${head_a:0:39}A" '{head:$h,taskFinishedAt:1}')" \
     "$(jq -cn --arg h "${head_a:0:39}g" '{head:$h,taskFinishedAt:1}')" \
+    "$(jq -cn --arg h "$head_a"$'\n' '{head:$h,taskFinishedAt:1}')" \
     "$(jq -cn --arg h "$head_a" '{head:$h,taskFinishedAt:"x"}')" \
     "$(jq -cn --arg h "$head_a" '{head:$h,taskFinishedAt:-1}')" \
     "$(jq -cn --arg h "$head_a" '{head:$h,taskFinishedAt:1,reviewedAt:5}')"; do

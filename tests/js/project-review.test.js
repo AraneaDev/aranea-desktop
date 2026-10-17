@@ -61,6 +61,15 @@ test("marks", () => {
   assert.equal(r.reviewState(co({ review: mark }), [task("finished", 6)], null), "ready")
 })
 
+test("a mark without a task time covers tasks finished by reviewedAt (seconds against milliseconds)", () => {
+  const mark = { reviewedHead: "a".repeat(40), reviewedTaskAt: null, reviewedAt: 10000 }
+  const rev = { head: "a".repeat(40) }
+  assert.equal(r.reviewState(co({ review: mark }), [task("finished", 9)], rev), "reviewed")
+  assert.equal(r.reviewState(co({ review: mark }), [task("finished", 10)], rev), "reviewed")
+  assert.equal(r.reviewState(co({ review: mark }), [task("finished", 11)], rev), "ready")
+  assert.equal(r.reviewState(co({ review: mark }), [task("finished", 11)], null), "ready")
+})
+
 test("projectHasReview", () => {
   const tasks = [task("finished", 1)]
   const project = { id: "p", checkouts: [{ id: "c1", primary: false }] }

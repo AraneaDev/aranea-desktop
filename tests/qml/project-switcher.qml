@@ -689,6 +689,18 @@ ShellRoot {
         t.equal(t.findChild(surface, 'projectSwitcherAction:p-ret').text, 'Busy right now', 'another row reads Busy right now')
         t.equal(t.findChild(surface, 'projectSwitcherAction:p-bare').text, 'Busy right now', 'and so does the setup row')
         t.equal(t.findChild(surface, 'projectSwitcherAction:p-start').text, 'Starting…', 'the unconfirmed row reads Starting')
+        var selectsBefore = host.selects.length
+        t.check(!surface.switcherGo({
+          id: 'p-start',
+          action: {
+            kind: 'review',
+            target: {
+              projectId: 'p-start',
+              checkoutId: 'x-p-start'
+            }
+          }
+        }), 'a review row does nothing while the switcher is busy')
+        t.equal(host.selects.length, selectsBefore, 'a busy review row selects no checkout')
         host.note()
         emptyCase()
       })

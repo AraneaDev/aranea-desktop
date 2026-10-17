@@ -378,7 +378,7 @@ Item {
   }
   // Enter on a review row: open Projects on that task checkout's Overview; nothing launches.
   function switcherReview(row) {
-    if (root.inert || !root.opened || !row || !switcherSelect(row.id))
+    if (root.inert || !root.opened || !row || switcher.busy || !switcherSelect(row.id))
       return false
     var target = row.action.target
     root.mode = ''
