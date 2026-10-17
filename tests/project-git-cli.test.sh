@@ -104,7 +104,55 @@ capabilities_list_git() {
   jq -se 'last.data as $d | all(["projects.git.fetch","projects.git.pull","projects.task.new","projects.task.remove"][]; . as $n | any($d.operations[]; .name==$n)) and $d.projectGit.worktreeLocation=="<repo>-worktrees/<branch>"' "$events" >/dev/null
 }
 
-cases=(fetch_envelope checkout_defaults_to_last task_new_and_remove task_new_ignores_selected_checkout failure_envelope usage_errors capabilities_list_git)
+# A task checkout with one commit, pushed nowhere yet.
+task_with_commit() {
+  setup
+  cli_run projects task new "$project_id" --branch t
+  task_id=$(jq -sr 'last.data.checkoutId' "$events")
+  task_path=$(jq -sr 'last.data.path' "$events")
+  git -C "$task_path" -c user.name=T -c user.email=t@example.invalid commit -q --allow-empty -m work
+}
+# Catch a review that does not report the commits ahead of the base.
+review_reads() {
+  task_with_commit
+  cli_run projects review "$project_id" --checkout "$task_id"
+  last '.operation=="projects.review" and .status=="observed" and .message=="Review read." and .data.ahead==1'
+}
+# Catch a mark that is not saved on the checkout, or that fails without activity state.
+review_mark_saves() {
+  task_with_commit
+  local head
+  head=$(git -C "$task_path" rev-parse HEAD)
+  cli_run projects review mark "$project_id" --checkout "$task_id"
+  jq -se --arg h "$head" 'last|.message=="Review marked." and .data.head==$h and .data.taskFinishedAt==null' "$events" >/dev/null
+  "$store" snapshot | jq -e --arg c "$task_id" --arg h "$head" '.state.projects[0].checkouts[]|select(.id==$c)|.review.reviewedHead==$h' >/dev/null
+}
+# Catch a push that does not report the pushed branch.
+push_pushes() {
+  task_with_commit
+  cli_run projects git push "$project_id" --checkout "$task_id"
+  last '.operation=="projects.git.push" and .status=="observed" and .data.pushed==true'
+}
+# Catch review commands without a checkout that do not exit 2.
+review_usage() {
+  setup
+  local s
+  for args in "review $project_id" "review mark $project_id"; do
+    s=0
+    # shellcheck disable=SC2086
+    cli_run projects $args || s=$?
+    [[ $s == 2 ]]
+    last '.code=="INVALID_USAGE"'
+  done
+}
+# Catch review and push missing from the capabilities.
+capabilities_list_review() {
+  setup
+  cli_run capabilities
+  jq -se 'last.data as $d | all(["projects.review","projects.review.mark","projects.git.push"][]; . as $n | any($d.operations[]; .name==$n))' "$events" >/dev/null
+}
+
+cases=(fetch_envelope checkout_defaults_to_last task_new_and_remove task_new_ignores_selected_checkout failure_envelope usage_errors capabilities_list_git review_reads review_mark_saves push_pushes review_usage capabilities_list_review)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e

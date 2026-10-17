@@ -26,7 +26,7 @@ if [[ ${1:-} == agents ]]; then
   agents_cli_main "$@"
 elif [[ ${1:-} == projects && (${2:-} == actions || ${2:-} == runs) ]]; then
   project_actions_cli_main "$@"
-elif [[ ${1:-} == projects && (${2:-} == git || ${2:-} == task) ]]; then
+elif [[ ${1:-} == projects && (${2:-} == git || ${2:-} == task || ${2:-} == review) ]]; then
   project_git_cli_main "$@"
 else
   projects_cli_main "$@"
