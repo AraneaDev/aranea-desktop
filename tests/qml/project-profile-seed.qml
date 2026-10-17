@@ -224,14 +224,29 @@ ShellRoot {
             t.check(!!problem, 'page problem block exists')
             t.equal(problem.problem, null, 'a seed failure shows in the header only, not the page box')
             t.check(!t.findChild(surface, 'projectsPageNote').visible, 'nor as a plain page note')
-            // Any other registry error still uses the page box.
-            entry.projectController.errorObject = {
-              code: 'REGISTRY_CONFLICT',
-              message: 'The registry changed since the supplied revision.'
-            }
-            t.check(!!problem.problem && problem.problem.kind === 'changed', 'other registry errors still show the page box')
-            entry.projectController.errorObject = null
-            fallback()
+            var switcher = t.findChild(surface, 'projectSwitcher')
+            t.equal(switcher.loadProblem, null, 'nor in the quick switcher')
+            // Another project selected: the seed failure still belongs to its own header only.
+            var failedRecord = projectsPageProject('p-fail')
+            host.show([failedRecord, host.project('p-b', [host.editor('f-b', 'VS Code', 'code')])], 'p-b', 4)
+            t.step(60, function () {
+              t.equal(surface.selectedSeedFailure, null, 'project B has no seed failure of its own')
+              t.check(!!surface.seedFailures['p-fail'], 'project A keeps its seed failure')
+              t.equal(problem.problem, null, 'no page box for another project\'s seed failure')
+              t.check(!t.findChild(surface, 'projectsPageNote').visible, 'no page note for another project\'s seed failure')
+              t.equal(switcher.loadProblem, null, 'no switcher problem for another project\'s seed failure')
+              // Any other registry error still uses the page box and the switcher.
+              entry.projectController.error = 'The registry changed since the supplied revision.'
+              entry.projectController.errorObject = {
+                code: 'REGISTRY_CONFLICT',
+                message: 'The registry changed since the supplied revision.'
+              }
+              t.check(!!problem.problem && problem.problem.kind === 'changed', 'other registry errors still show the page box')
+              t.check(!!switcher.loadProblem && switcher.loadProblem.kind === 'changed', 'other registry errors still show in the switcher')
+              entry.projectController.error = ''
+              entry.projectController.errorObject = null
+              fallback()
+            })
           })
         })
       })

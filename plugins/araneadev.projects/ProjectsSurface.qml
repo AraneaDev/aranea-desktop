@@ -588,8 +588,13 @@ Item {
   readonly property var selectedSeedFailure: projectsPage.selectedProject ? seedFailures[projectsPage.selectedProject.id] || null : null
   // A probe that could not run differs from "no tools installed"; say which.
   readonly property bool seedProbeFailed: !!selectedSeedFailure && selectedSeedFailure.code === 'PROBE_FAILED'
-  // The registry error is the selected project's stored seed failure; the header alone shows it.
-  readonly property bool seedOwnsRegistryError: !!selectedSeedFailure && selectedSeedFailure === root.projectController.errorObject
+  // The registry error is a stored seed failure of any project; only that project's header shows it.
+  readonly property bool seedOwnsRegistryError: {
+    var current = root.projectController.errorObject, failures = seedFailures
+    return !!current && Object.keys(failures).some(function (id) {
+      return failures[id] === current
+    })
+  }
   // Registry error text for the page box, without one the header already shows.
   readonly property string pageRegistryError: seedOwnsRegistryError ? '' : root.projectController.error
   // Ask the backend once per session to save defaults for a project without profiles.
@@ -1055,7 +1060,7 @@ Item {
       displayOnly: panel.root.inert
       pointerGate: pointerGate
       systemBusy: panel.switcherPending
-      loadProblem: panel.root.projectController.error || panel.root.projectController.errorObject ? Problems.problem(panel.root.projectController.errorObject || {
+      loadProblem: !panel.seedOwnsRegistryError && (panel.root.projectController.error || panel.root.projectController.errorObject) ? Problems.problem(panel.root.projectController.errorObject || {
         message: panel.root.projectController.error
       }, {
         surface: 'switcher',
