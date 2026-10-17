@@ -12,6 +12,7 @@ result="$TMPDIR/result.json"
 failures=0
 # Lock holders started by cases; killed at exit even when a case fails early.
 lock_holder_pids="$TMPDIR/lock-holders"
+# shellcheck disable=SC2016
 sandbox_on_exit 'while read -r pid; do kill "$pid" 2>/dev/null || true; done <"$lock_holder_pids" 2>/dev/null || true'
 # A bare "remote", a clone registered as the project, and a second clone that pushes.
 setup() {
