@@ -5,6 +5,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 import "SettingsLogic.js" as Logic
 
@@ -188,7 +189,7 @@ ColumnLayout {
     SettingsLabel {
       Layout.fillWidth: true
       text: page.dirty && !page.validation.ok ? page.validation.message : 'Use unique 24-hour times. Save sorts entries and keeps the schedule enabled setting.'
-      color: page.dirty && !page.validation.ok ? Aranea.DesignTokens.attention : Color.foreground
+      color: page.dirty && !page.validation.ok ? Aranea.DesignTokens.attention : Commons.Color.foreground
       opacity: 0.75
     }
     GridLayout {

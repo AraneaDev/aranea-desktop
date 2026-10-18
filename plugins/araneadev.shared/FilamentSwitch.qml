@@ -11,6 +11,7 @@
 import QtQuick
 import QtQuick.Effects
 import qs.Commons
+import qs.Commons as Commons
 
 Item {
   id: sw
@@ -83,7 +84,7 @@ Item {
     radius: width / 2
     anchors.verticalCenter: parent.verticalCenter
     x: sw.checked ? sw.width - width : 0
-    color: Color.background
+    color: Commons.Color.background
     border.width: Math.max(1, Style.space(2))
     border.color: sw.checked ? DesignTokens.accent : Util.alpha(DesignTokens.foreground, 0.22)
     opacity: sw.busy ? (DesignTokens.motionEnabled ? sw.pulseOpacity : 0.7) : 1

@@ -3,6 +3,7 @@
 import QtQuick
 import "../araneadev.shared" as Aranea
 import qs.Commons
+import qs.Commons as Commons
 
 Item {
   id: root
@@ -21,7 +22,7 @@ Item {
   // Public contract member.
   property string fontFamily: Aranea.Typography.uiFamily
   // Public contract member.
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   // Public contract member.
   signal filterChanged(string value)
   // Public contract member.

@@ -16,6 +16,7 @@ import QtQuick
 import QtTest
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 import "lib"
 import "plugins/araneadev.shared" as Aranea
 import "plugins/araneadev.notifications" as Notif
@@ -144,7 +145,7 @@ ShellRoot {
   // Today's border spec for a card at URGENCY (NotificationCard before the
   // consistency pass, unselected).
   function todaysBorderSpec(urgency) {
-    return JSON.stringify(Border.surfaceSpec("notifications", "border", urgency === 2 ? Color.urgent : Color.notifications.border, Math.max(1, Style.space(1))))
+    return JSON.stringify(Border.surfaceSpec("notifications", "border", urgency === 2 ? Commons.Color.urgent : Commons.Color.notifications.border, Math.max(1, Style.space(1))))
   }
 
   // Runs STEPS ([delay, fn] pairs) one after another, then ends the run.
@@ -233,7 +234,7 @@ ShellRoot {
 
   Component.onCompleted: run([[350, function () {
         // ---------- Toasts keep today's look ----------
-        t.check(sameColor(toast.color, Color.notifications.background), "a toast's fill is today's")
+        t.check(sameColor(toast.color, Commons.Color.notifications.background), "a toast's fill is today's")
         t.equal(JSON.stringify(toast.cardBorderSpec), todaysBorderSpec(1), "a toast's border spec is today's")
         t.equal(toast.radius, 6, "a toast keeps its corner radius")
         t.equal(toast.implicitWidth, Style.space(380), "a toast keeps its width")
@@ -245,12 +246,12 @@ ShellRoot {
         t.check(toast.implicitHeight > lowToast.implicitHeight, "a toast with a body is taller than one without")
         var rail = one(toast, "urgencyRail")
         t.equal(rail.width, Style.space(3), "the urgency rail keeps its width")
-        t.check(sameColor(rail.color, Color.notifications.countdown), "a normal toast's rail is the countdown colour")
+        t.check(sameColor(rail.color, Commons.Color.notifications.countdown), "a normal toast's rail is the countdown colour")
         t.check(Math.abs(rail.opacity - 0.9) < 1e-6, "at today's opacity")
-        t.check(sameColor(critToast.color, Util.alpha(Color.urgent, 0.08)), "a critical toast keeps its red tint")
+        t.check(sameColor(critToast.color, Util.alpha(Commons.Color.urgent, 0.08)), "a critical toast keeps its red tint")
         t.equal(JSON.stringify(critToast.cardBorderSpec), todaysBorderSpec(2), "and its red border")
-        t.check(sameColor(one(critToast, "urgencyRail").color, Color.urgent), "and its red rail")
-        t.check(sameColor(one(lowToast, "urgencyRail").color, Color.notifications.border), "a low toast's rail is the border colour")
+        t.check(sameColor(one(critToast, "urgencyRail").color, Commons.Color.urgent), "and its red rail")
+        t.check(sameColor(one(lowToast, "urgencyRail").color, Commons.Color.notifications.border), "a low toast's rail is the border colour")
         t.check(Math.abs(one(lowToast, "urgencyRail").opacity - 0.55) < 1e-6, "at today's dimmer opacity")
         t.equal(litOutlines(toasts), 0, "no toast draws a cursor outline")
         t.check(!toast.hovered, "no toast is hovered yet")
@@ -262,7 +263,7 @@ ShellRoot {
         pointer.mouseMove(toast, toast.width / 2 + 4, toast.height / 2)
       }], [80, function () {
         t.check(toast.hovered, "a toast under the pointer is hovered (its countdown pauses)")
-        t.check(sameColor(toast.color, Util.alpha(Color.notifications.countdown, 0.045)), "and keeps today's hover tint")
+        t.check(sameColor(toast.color, Util.alpha(Commons.Color.notifications.countdown, 0.045)), "and keeps today's hover tint")
         t.equal(litOutlines(toasts), 0, "hover draws no outline on a toast")
         t.check(!one(toast, "hoverFill").visible, "a toast draws no center hover fill")
 
@@ -284,7 +285,7 @@ ShellRoot {
       }], [80, function () {
         var card = list.itemAtIndex(3)
         t.check(card.hovered, "the center card is under the pointer")
-        t.check(sameColor(card.color, Color.notifications.background), "hover keeps a center card's own colour")
+        t.check(sameColor(card.color, Commons.Color.notifications.background), "hover keeps a center card's own colour")
         t.check(one(card, "hoverFill").visible, "and draws the shared hover fill over it")
         t.check(!one(list.itemAtIndex(4), "hoverFill").visible, "on that card only")
         t.equal(litOutlines(list), 0, "hover draws no outline")
@@ -305,7 +306,7 @@ ShellRoot {
         }
         t.equal(litOutlines(list), 1, "one outline with cursor.active")
         t.equal(litOutlines(list.itemAtIndex(3)), 1, "on the cursor's card")
-        t.check(sameColor(list.itemAtIndex(3).color, Color.notifications.background), "the cursor's card keeps its fill")
+        t.check(sameColor(list.itemAtIndex(3).color, Commons.Color.notifications.background), "the cursor's card keeps its fill")
         list.cursor = {
           active: true,
           index: 6
@@ -430,7 +431,7 @@ ShellRoot {
         pointer.mouseMove(list, stillPoint.x + 2, stillPoint.y)
       }], [80, function () {
         var card = list.itemAtIndex(3)
-        t.check(sameColor(one(card, "closeButton").color, Color.notifications.countdown), "a real move onto a card's close tints it")
+        t.check(sameColor(one(card, "closeButton").color, Commons.Color.notifications.countdown), "a real move onto a card's close tints it")
         list.rows = rowsOf(resortedEntries())
       }], [80, function () {
         var card = list.itemAtIndex(3)

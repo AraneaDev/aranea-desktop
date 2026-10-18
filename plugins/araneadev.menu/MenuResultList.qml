@@ -14,6 +14,7 @@
 import QtQuick
 import QtQuick.Effects
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 import "../araneadev.shared/ClickSettle.js" as ClickSettle
@@ -34,13 +35,13 @@ Item {
   // Public contract member.
   property bool fullRootHeader: false
   // Public contract member.
-  property color background: Color.menu.background
+  property color background: Commons.Color.menu.background
   // Public contract member.
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   // Public contract member.
-  property color selectedBackground: Color.menu.selectedBackground
+  property color selectedBackground: Commons.Color.menu.selectedBackground
   // Public contract member.
-  property color selectedText: Color.menu.selectedText
+  property color selectedText: Commons.Color.menu.selectedText
   // Public contract member.
   property string fontFamily: Aranea.Typography.uiFamily
   // Public contract member.

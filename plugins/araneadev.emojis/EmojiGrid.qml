@@ -6,6 +6,7 @@
 // qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 
@@ -25,11 +26,11 @@ GridView {
   // Corner radius passed to result cells.
   property int cornerRadius: Style.cornerRadius
   // Fill used for the hovered result cell.
-  property color selectedBackground: Color.menu.selectedBackground
+  property color selectedBackground: Commons.Color.menu.selectedBackground
   // Accent colour of the picker (the empty-state icon).
-  property color selectedText: Color.menu.selectedText
+  property color selectedText: Commons.Color.menu.selectedText
   // Foreground used by the empty-state message.
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   // The gate that tells real pointer moves from cells moving under a still
   // pointer; the window shares its own, else the grid's.
   property var pointerGate: ownGate

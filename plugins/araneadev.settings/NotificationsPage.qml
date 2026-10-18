@@ -4,6 +4,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 ColumnLayout {
@@ -74,7 +75,7 @@ ColumnLayout {
     Rectangle {
       Layout.fillWidth: true
       implicitHeight: 1
-      color: Util.alpha(Color.foreground, 0.12)
+      color: Util.alpha(Commons.Color.foreground, 0.12)
     }
     SettingsLabel {
       text: 'Quiet hours'

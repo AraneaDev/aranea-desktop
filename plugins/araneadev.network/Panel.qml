@@ -12,6 +12,7 @@ import Quickshell.Io
 import Quickshell.Networking
 import qs.Ui
 import qs.Commons
+import qs.Commons as Commons
 import "Model.js" as Model
 import "NetworkLogic.js" as NetworkLogic
 import "../araneadev.shared/ShowcaseLogic.js" as Showcase
@@ -508,9 +509,9 @@ Panel {
   // view doesn't use them; they stay as stock wrote them so
   // tools/upstream-drift can line this file up with stock's.
   // qmllint disable missing-property
-  readonly property color hoverFill: bar ? Style.hoverFillFor(bar.foreground, Color.accent) : "transparent"
+  readonly property color hoverFill: bar ? Style.hoverFillFor(bar.foreground, Commons.Color.accent) : "transparent"
   // Fill color for the row/pill the keyboard or mouse selection currently sits on.
-  readonly property color selectedFill: bar ? Style.selectedFillFor(bar.foreground, Color.accent) : "transparent"
+  readonly property color selectedFill: bar ? Style.selectedFillFor(bar.foreground, Commons.Color.accent) : "transparent"
   // qmllint enable missing-property
 
   // scannerEnabled lives on the shared WifiDevice, which has no reference

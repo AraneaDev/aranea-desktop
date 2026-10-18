@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 Popup {
@@ -75,8 +76,8 @@ Popup {
   y: parent ? (parent.height - height) / 2 : 0
   padding: Style.space(16)
   background: Aranea.SurfaceCard {
-    fillColor: Color.background
-    borderSpecOverride: Border.flat(Util.alpha(Color.foreground, 0.16), 1)
+    fillColor: Commons.Color.background
+    borderSpecOverride: Border.flat(Util.alpha(Commons.Color.foreground, 0.16), 1)
   }
   contentItem: ProjectsSidebar {
     id: list

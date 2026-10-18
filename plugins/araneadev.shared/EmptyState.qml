@@ -4,6 +4,7 @@
 
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 Item {
   id: empty
@@ -17,9 +18,9 @@ Item {
   // Separate glyph family; legacy consumers retain their existing override.
   property string iconFontFamily: fontFamily
   // Accent colour for the icon.
-  property color iconColor: Color.accent
+  property color iconColor: Commons.Color.accent
   // Foreground colour for the message.
-  property color foreground: Color.foreground
+  property color foreground: Commons.Color.foreground
   // Icon opacity.
   property real iconOpacity: 0.8
   // Maximum width of the centered labels.

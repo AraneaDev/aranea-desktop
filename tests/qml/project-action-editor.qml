@@ -2,6 +2,7 @@
 import QtQuick
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 import "lib"
 import "plugins/araneadev.projects" as ProjectUi
 
@@ -35,7 +36,7 @@ ShellRoot {
   }
   // Require readable placeholder contrast for enabled and readonly argument fields.
   function placeholderReadable(field) {
-    var background = composite(field.background.color, Color.background)
+    var background = composite(field.background.color, Commons.Color.background)
     var foreground = composite(field.placeholderTextColor, background)
     var a = luminance(foreground), b = luminance(background)
     console.log('EDITORPLACEHOLDER color=' + field.placeholderTextColor + ' contrast=' + ((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)))

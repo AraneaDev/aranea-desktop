@@ -4,6 +4,7 @@
 // qmllint disable missing-property
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 Item {
@@ -14,9 +15,9 @@ Item {
   // Font family shared by the lock surface.
   property string fontFamily: Aranea.Typography.uiFamily
   // Primary branding text colour.
-  property color textColor: Color.lock.text
+  property color textColor: Commons.Color.lock.text
   // Secondary branding text colour.
-  property color placeholderColor: Color.lock.placeholder
+  property color placeholderColor: Commons.Color.lock.placeholder
   // Edge length of the square spider box in logical pixels. The mark is
   // rasterized at exactly this size times the device pixel ratio, so it is
   // never upscaled.

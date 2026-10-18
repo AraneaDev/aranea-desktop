@@ -7,6 +7,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "AgentsLogic.js" as AgentsLogic
 import "AgentTasksLogic.js" as TasksLogic
@@ -228,7 +229,7 @@ Panel {
   }
 
   // The popup's background colour, for picking a light or dark mark.
-  readonly property color surface: Color.popups.background
+  readonly property color surface: Commons.Color.popups.background
 
   // Stand-in agents for README screenshots (the showcase IPC method,
   // AgentsLogic.parseShowcase); null outside a capture, and cleared
@@ -702,7 +703,7 @@ Panel {
     if (!p)
       return []
     var candidates = []
-    if (colorLuminance(surfaceColor || Color.background) >= 0.5)
+    if (colorLuminance(surfaceColor || Commons.Color.background) >= 0.5)
       candidates.push(Qt.resolvedUrl("assets/" + p.providerId + "-light.svg"))
     candidates.push(Qt.resolvedUrl("assets/" + p.providerId + ".svg"))
     return candidates

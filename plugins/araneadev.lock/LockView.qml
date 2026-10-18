@@ -7,6 +7,7 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 Item {
@@ -72,7 +73,7 @@ Item {
   // Border spec for the field: the lock surface's error border in errorState,
   // its active border otherwise (Aranea's theme sets a left-to-right mint to
   // violet gradient there, [lock] border-active in shell.toml).
-  readonly property var inputBorderSpec: errorState ? Border.surfaceSpec("lock", "border-error", Color.lock.borderError, root.outlineThickness, "border-alpha") : Border.surfaceSpec("lock", "border-active", Color.lock.borderActive, root.outlineThickness, "border-alpha")
+  readonly property var inputBorderSpec: errorState ? Border.surfaceSpec("lock", "border-error", Commons.Color.lock.borderError, root.outlineThickness, "border-alpha") : Border.surfaceSpec("lock", "border-active", Commons.Color.lock.borderActive, root.outlineThickness, "border-alpha")
 
   // Emitted on Enter with the typed password (only when it is non-empty).
   signal submitPassword(string password)
@@ -131,7 +132,7 @@ Item {
 
   Rectangle {
     anchors.fill: parent
-    color: Color.background
+    color: Commons.Color.background
 
     Image {
       id: wallpaper
@@ -210,10 +211,10 @@ Item {
       inputBorderSpec: root.inputBorderSpec
       cornerRadius: Style.space(6)
       fontFamily: Aranea.Typography.uiFamily
-      foreground: Color.lock.text
-      placeholderColor: Color.lock.placeholder
-      errorColor: Color.lock.textError
-      selectionColor: Color.lock.selection
+      foreground: Commons.Color.lock.text
+      placeholderColor: Commons.Color.lock.placeholder
+      errorColor: Commons.Color.lock.textError
+      selectionColor: Commons.Color.lock.selection
       onSubmitPassword: function (password) {
         root.submitPassword(password)
       }
@@ -231,8 +232,8 @@ Item {
       z: 1
       logoSource: Aranea.RuntimePaths.brandUrl
       fontFamily: Aranea.Typography.uiFamily
-      textColor: Color.lock.text
-      placeholderColor: Color.lock.placeholder
+      textColor: Commons.Color.lock.text
+      placeholderColor: Commons.Color.lock.placeholder
     }
 
     LockClock {
@@ -242,8 +243,8 @@ Item {
       clockText: root.clockText
       dateText: root.dateText
       fontFamily: Aranea.Typography.uiFamily
-      textColor: Color.lock.text
-      placeholderColor: Color.lock.placeholder
+      textColor: Commons.Color.lock.text
+      placeholderColor: Commons.Color.lock.placeholder
     }
 
     Text {
@@ -252,7 +253,7 @@ Item {
       anchors.horizontalCenterOffset: font.letterSpacing / 2
       y: parent.height - height - 54
       text: root.fingerprintConfigured ? "TOUCH SENSOR OR ENTER PASSWORD" : "ENTER PASSWORD TO CONTINUE"
-      color: Color.lock.placeholder
+      color: Commons.Color.lock.placeholder
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Math.round(Style.font.bodySmall * 0.82)
       font.letterSpacing: 1.5

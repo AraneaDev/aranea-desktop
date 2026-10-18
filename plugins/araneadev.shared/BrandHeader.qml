@@ -3,6 +3,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 
 RowLayout {
   id: header
@@ -18,9 +19,9 @@ RowLayout {
   // Font family for all header text.
   property string fontFamily: Style.font.menuFamily
   // Main header text color.
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   // Accent color for the count text.
-  property color accent: Color.menu.selectedText
+  property color accent: Commons.Color.menu.selectedText
   // Letter spacing applied to header text.
   property real letterSpacing: 0.20
   // Glyph image shown before the heading.

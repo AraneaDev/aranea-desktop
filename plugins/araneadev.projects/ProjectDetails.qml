@@ -6,6 +6,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui as Ui
 import "../araneadev.shared" as Aranea
 import "ProjectOverview.js" as Overview
@@ -533,7 +534,7 @@ ColumnLayout {
           Rectangle {
             Layout.fillWidth: true
             implicitHeight: 1
-            color: Util.alpha(Color.foreground, 0.10)
+            color: Util.alpha(Commons.Color.foreground, 0.10)
           }
         }
       }

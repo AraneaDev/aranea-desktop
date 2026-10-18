@@ -18,6 +18,7 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell.Services.SystemTray
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "TrayModel.js" as TrayModel
 import "TrayLogic.js" as TrayLogic
@@ -59,7 +60,7 @@ BarWidget {
   property var activeTrayAnchor: null
   // The bar's foreground colour, or the default when not hosted by a bar.
   // qmllint disable missing-property
-  readonly property color foreground: bar ? bar.foreground : Color.foreground
+  readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
   // qmllint enable missing-property
   // Item ids pinned to the bar (always visible), from the entry's settings.
   readonly property var pinnedIds: settings.pinned instanceof Array ? settings.pinned : []

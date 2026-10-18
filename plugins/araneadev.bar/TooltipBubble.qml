@@ -2,6 +2,7 @@
 // qmllint disable missing-property
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 
@@ -13,11 +14,11 @@ BorderSurface {
   // Proportional tooltip font, overridable independently from bar glyphs.
   property string fontFamily: Aranea.Typography.uiFamily
   // Tooltip fill colour from the semantic palette.
-  property color backgroundColor: Color.tooltip.background
+  property color backgroundColor: Commons.Color.tooltip.background
   // Tooltip border colour from the semantic palette.
-  property color borderColor: Color.tooltip.border
+  property color borderColor: Commons.Color.tooltip.border
   // Tooltip text colour from the semantic palette.
-  property color textColor: Color.tooltip.text
+  property color textColor: Commons.Color.tooltip.text
 
   implicitWidth: label.implicitWidth + Style.space(20)
   implicitHeight: label.implicitHeight + Style.space(14)

@@ -7,6 +7,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "PolkitLogic.js" as PolkitLogic
 import "../araneadev.shared" as Aranea
@@ -46,11 +47,11 @@ ColumnLayout {
   // Public contract member.
   property string fontFamily: Aranea.Typography.uiFamily
   // Public contract member.
-  property color foreground: Color.polkit.text
+  property color foreground: Commons.Color.polkit.text
   // Public contract member.
-  property color dim: Util.alpha(Color.polkit.text, Aranea.DesignTokens.secondaryOpacity)
+  property color dim: Util.alpha(Commons.Color.polkit.text, Aranea.DesignTokens.secondaryOpacity)
   // Public contract member.
-  property color accent: Color.polkit.accent
+  property color accent: Commons.Color.polkit.accent
   // Public contract member.
   property real letterSpacing: 0
   // When the request opened (Date.now()), for the DETAILS click settle.

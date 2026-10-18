@@ -9,6 +9,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 import "OsdModel.js" as OsdModel
 
@@ -219,9 +220,9 @@ Item {
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.bottom: parent.bottom
       anchors.bottomMargin: Style.space(62)
-      fillColor: Util.alpha(Color.background, 0.9)
+      fillColor: Util.alpha(Commons.Color.background, 0.9)
       surface: "popups"
-      borderColor: Color.popups.border
+      borderColor: Commons.Color.popups.border
       borderSpecOverride: Aranea.PanelChrome.popupBorder(true)
       opacity: surfaceMotion.opacity
 
@@ -238,7 +239,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           horizontalAlignment: Text.AlignLeft
           text: root.icon
-          color: Color.popups.text
+          color: Commons.Color.popups.text
           font.family: Aranea.Typography.iconFamily
           font.pixelSize: Style.font.title
         }
@@ -259,7 +260,7 @@ Item {
           horizontalAlignment: Text.AlignLeft
           text: root.message
           elide: Text.ElideNone
-          color: Color.popups.text
+          color: Commons.Color.popups.text
           font.family: Aranea.Typography.technicalFamily
           font.pixelSize: Style.font.title
         }
@@ -268,7 +269,7 @@ Item {
           width: root.messageWidth
           anchors.verticalCenter: parent.verticalCenter
           text: root.message
-          color: Color.popups.text
+          color: Commons.Color.popups.text
           font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.body
           elide: Text.ElideRight

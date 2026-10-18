@@ -3,6 +3,7 @@
 import QtQuick
 import "../../araneadev.shared" as Aranea
 import qs.Commons
+import qs.Commons as Commons
 
 Item {
   id: preview
@@ -28,9 +29,9 @@ Item {
   // Font family supplied by the clipboard window.
   property string fontFamily: Aranea.Typography.uiFamily
   // Main preview text colour.
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   // Preview border colour.
-  property color borderColor: Color.menu.border
+  property color borderColor: Commons.Color.menu.border
   // Corner radius for the swatch.
   property real cornerRadius: Style.cornerRadius
   // Cap top the preview's first line aligns to.

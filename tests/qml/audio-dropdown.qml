@@ -324,7 +324,7 @@ ShellRoot {
     t.check(t.findChild(rows[0], "selectedFill").visible && !t.findChild(rows[1], "selectedFill").visible, "the default output carries the selected highlight")
     rows[2].activate()
     rows[1].activate()
-    t.equal(JSON.stringify(actions), JSON.stringify([["outputDevice",
+    t.equal(t.canonical(actions), t.canonical([["outputDevice",
         {
           index: 1,
           key: "2"
@@ -334,7 +334,7 @@ ShellRoot {
     rows[2].entered()
     t.equal(actions.length, hoversBefore, "hovering an unplugged device doesn't move the cursor")
     rows[1].entered()
-    t.equal(JSON.stringify(actions[actions.length - 1]), JSON.stringify(["hover",
+    t.equal(t.canonical(actions[actions.length - 1]), t.canonical(["hover",
       {
         section: "output",
         index: 1

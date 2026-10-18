@@ -4,6 +4,7 @@
 import QtQuick
 import "../araneadev.shared" as Aranea
 import qs.Commons
+import qs.Commons as Commons
 
 Column {
   id: clock
@@ -15,9 +16,9 @@ Column {
   // Font family shared by the lock surface.
   property string fontFamily: Aranea.Typography.uiFamily
   // Primary time colour.
-  property color textColor: Color.lock.text
+  property color textColor: Commons.Color.lock.text
   // Secondary date colour.
-  property color placeholderColor: Color.lock.placeholder
+  property color placeholderColor: Commons.Color.lock.placeholder
 
   spacing: Style.space(8)
 

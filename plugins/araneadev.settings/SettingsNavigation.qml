@@ -5,6 +5,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 Item {
@@ -99,7 +100,7 @@ Item {
             textFormat: Text.PlainText
             font.family: Style.font.menuFamily
             font.pixelSize: Style.font.caption
-            color: categoryButton.selected ? Aranea.DesignTokens.accent : Color.foreground
+            color: categoryButton.selected ? Aranea.DesignTokens.accent : Commons.Color.foreground
           }
           SettingsLabel {
             Layout.fillWidth: true

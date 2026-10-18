@@ -7,6 +7,7 @@
 
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 
@@ -18,11 +19,11 @@ Item {
   // Height of the fingerprint prompt (the window's field height).
   property int fieldHeight: Style.space(44)
   // Foreground colour for text and field chrome.
-  property color foreground: Color.polkit.text
+  property color foreground: Commons.Color.polkit.text
   // Accent colour for the frame, the lock and the fingerprint glyph.
-  property color accent: Color.polkit.accent
+  property color accent: Commons.Color.polkit.accent
   // Error colour used during failed authentication.
-  property color errorColor: Color.polkit.textError
+  property color errorColor: Commons.Color.polkit.textError
   // Whether the field is displaying a failed attempt.
   property bool errorFlash: false
   // Whether password characters should be shown plainly.

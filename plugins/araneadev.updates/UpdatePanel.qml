@@ -11,6 +11,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 import "UpdateLogic.js" as UpdateLogic
@@ -194,7 +195,7 @@ Item {
 
             Text {
               text: modelData.source
-              color: Color.popups.text
+              color: Commons.Color.popups.text
               font.bold: true
               font.pixelSize: Style.font.body
               font.family: Aranea.Typography.uiFamily
@@ -203,7 +204,7 @@ Item {
 
             Text {
               text: modelData.count + (modelData.count === 1 ? " item" : " items")
-              color: Color.popups.text
+              color: Commons.Color.popups.text
               opacity: 0.7
               font.pixelSize: Style.font.caption
               font.family: Aranea.Typography.technicalFamily

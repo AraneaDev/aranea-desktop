@@ -5,6 +5,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 Aranea.SurfaceCard {
@@ -108,7 +109,7 @@ Aranea.SurfaceCard {
 
   objectName: 'splitMenu'
   // In-window overlays cannot blur underlying content; keep the theme RGB opaque.
-  fillColor: Qt.rgba(Color.popups.background.r, Color.popups.background.g, Color.popups.background.b, 1)
+  fillColor: Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1)
   visible: opened
   focus: opened
   z: 100

@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 Popup {
@@ -33,9 +34,9 @@ Popup {
   y: Math.max(0, (parent.height - height) / 2)
   padding: Style.space(16)
   background: Rectangle {
-    color: Color.background
+    color: Commons.Color.background
     radius: Style.space(8)
-    border.color: Util.alpha(Color.foreground, 0.25)
+    border.color: Util.alpha(Commons.Color.foreground, 0.25)
   }
   contentItem: ColumnLayout {
     spacing: Style.space(12)

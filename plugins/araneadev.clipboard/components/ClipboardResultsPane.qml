@@ -9,6 +9,7 @@
 
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../ClipboardLogic.js" as ClipboardLogic
 import "../../araneadev.shared" as Aranea
@@ -52,13 +53,13 @@ Item {
   // Font family used by rows and the preview.
   property string fontFamily: Aranea.Typography.uiFamily
   // Main content colour.
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   // Selected-row foreground colour.
-  property color selectedText: Color.menu.selectedText
+  property color selectedText: Commons.Color.menu.selectedText
   // Selected-row background colour.
-  property color selectedBackground: Color.menu.selectedBackground
+  property color selectedBackground: Commons.Color.menu.selectedBackground
   // Preview border colour.
-  property color borderColor: Color.menu.border
+  property color borderColor: Commons.Color.menu.border
   // Card corner radius shared with the preview.
   property real cornerRadius: Style.cornerRadius
   // Message shown when no display rows are available.

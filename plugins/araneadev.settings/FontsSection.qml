@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "SettingsLogic.js" as Logic
 import "../araneadev.shared" as Aranea
 
@@ -135,7 +136,7 @@ SettingsSection {
     Layout.fillWidth: true
     visible: !!text
     text: section.error || section.result || (!section.available ? 'Font preferences unavailable. Retry, or reset and Apply to restore defaults.' : '')
-    color: section.error ? Color.red : Color.foreground
+    color: section.error ? Commons.Color.red : Commons.Color.foreground
     opacity: 0.8
   }
 }

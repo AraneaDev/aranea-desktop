@@ -82,7 +82,7 @@ ShellRoot {
         }
       ])
       onAction: function (name, arg) {
-        events.push(name + ":" + JSON.stringify(arg))
+        events.push(name + ":" + t.canonical(arg))
       }
     }
   }
@@ -123,7 +123,7 @@ ShellRoot {
             t.check(button.visible && button.width > 0, "the forget button is still shown under the pointer")
             t.equal(events.filter(function (e) {
               return e.indexOf("hover:") === 0
-            }), ["hover:{\"section\":\"known\",\"index\":0,\"action\":true}"], "entering the button reports one action hover and nothing per move")
+            }), ["hover:{\"action\":true,\"index\":0,\"section\":\"known\"}"], "entering the button reports one action hover and nothing per move")
             pointer.mouseMove(row, at.x, row.height + 60)
             t.step(100, function () {
               t.check(!button.visible && button.width === 0, "leaving the row hides the forget button")
@@ -151,7 +151,7 @@ ShellRoot {
                 t.step(100, function () {
                   t.equal(events.filter(function (e) {
                     return e.indexOf("hover:") === 0
-                  }), ["hover:{\"section\":\"known\",\"index\":1,\"action\":true}"], "a real hover on row 1's forget button reports its action hover")
+                  }), ["hover:{\"action\":true,\"index\":1,\"section\":\"known\"}"], "a real hover on row 1's forget button reports its action hover")
                   events = []
                   dropdown.view = buildView([
                     {

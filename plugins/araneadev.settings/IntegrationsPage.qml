@@ -5,6 +5,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 ColumnLayout {
@@ -104,9 +105,9 @@ ColumnLayout {
           Layout.fillWidth: true
           Layout.preferredHeight: Style.space(28)
           radius: Style.space(3)
-          color: Util.alpha(Color.foreground, 0.04)
+          color: Util.alpha(Commons.Color.foreground, 0.04)
           border.width: 1
-          border.color: Util.alpha(Color.foreground, 0.15)
+          border.color: Util.alpha(Commons.Color.foreground, 0.15)
           Aranea.FocusFrame {
             anchors.fill: parent
             focused: keyField.activeFocus
@@ -129,7 +130,7 @@ ColumnLayout {
               page.request('keybind-add', {
                 key: text.trim()
               })
-            color: Color.foreground
+            color: Commons.Color.foreground
             font.family: Aranea.Typography.technicalFamily
             font.pixelSize: Style.font.body
             enabled: !page.displayOnly && !page.pending

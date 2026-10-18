@@ -10,6 +10,7 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 import "EmojiSearch.js" as EmojiSearch
 import "EmojiLogic.js" as EmojiLogic
@@ -75,19 +76,19 @@ Item {
   readonly property bool showRecents: !root.filterText && root.recents.length > 0
 
   // Card fill colour (menu background).
-  property color background: Color.menu.background
+  property color background: Commons.Color.menu.background
   // Text colour for glyphs, labels and hints (menu text).
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   // Card border colour; feeds borderSpec.
-  property color border: Color.menu.border
+  property color border: Commons.Color.menu.border
   // Border description handed to the card, from the menu surface style.
   property var borderSpec: Aranea.PanelChrome.surfaceBorder("menu", "border", border, Aranea.DesignTokens.borderWidth, true)
   // Colour of the full-screen backdrop behind the card.
-  property color scrim: Color.menu.scrim
+  property color scrim: Commons.Color.menu.scrim
   // Fill of the selected cell.
-  property color selectedBackground: Color.menu.selectedBackground
+  property color selectedBackground: Commons.Color.menu.selectedBackground
   // Accent colour: selected-cell ring, section labels and chrome accent.
-  property color selectedText: Color.menu.selectedText
+  property color selectedText: Commons.Color.menu.selectedText
   // Corner radius of the card and of each cell.
   readonly property int cornerRadius: Aranea.DesignTokens.cornerRadius
   // Font for all text in the picker (menu family).

@@ -10,6 +10,7 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 import "ClipboardLogic.js" as ClipboardLogic
 
@@ -74,19 +75,19 @@ Item {
   // Shares the [menu] surface tokens; themes that style the menu also
   // style the clipboard. Selected-row colors composed in the
   // singleton so consumers drop them straight into Rectangle bindings.
-  property color background: Color.menu.background
+  property color background: Commons.Color.menu.background
   // Text colour (menu text token).
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   // Border colour (menu border token); also tints the preview divider.
-  property color border: Color.menu.border
+  property color border: Commons.Color.menu.border
   // Border description for the card, from the theme's [menu] border settings.
   property var borderSpec: Aranea.PanelChrome.surfaceBorder("menu", "border", border, Aranea.DesignTokens.borderWidth, true)
   // Colour laid over the screen behind the card.
-  property color scrim: Color.menu.scrim
+  property color scrim: Commons.Color.menu.scrim
   // Background of the row under the cursor.
-  property color selectedBackground: Color.menu.selectedBackground
+  property color selectedBackground: Commons.Color.menu.selectedBackground
   // Text colour of the row under the cursor; also the accent of the chrome.
-  property color selectedText: Color.menu.selectedText
+  property color selectedText: Commons.Color.menu.selectedText
   // Corner radius of the card and rows.
   readonly property int cornerRadius: Aranea.DesignTokens.cornerRadius
   // Font for all picker text (the menu font).

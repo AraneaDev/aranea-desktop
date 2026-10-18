@@ -3,6 +3,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 Item {
@@ -21,15 +22,15 @@ Item {
   // Keyboard selection, with index one matching the upstream default.
   property int selectedIndex: 1
   // Confirmation card fill supplied by the host palette.
-  property color background: Color.background
+  property color background: Commons.Color.background
   // Prompt and unselected action text color.
-  property color foreground: Color.foreground
+  property color foreground: Commons.Color.foreground
   // Dimmed backdrop behind the centered card.
-  property color scrim: Util.alpha(Color.background, 0.7)
+  property color scrim: Util.alpha(Commons.Color.background, 0.7)
   // Fill used by the selected cancellation action.
-  property color selectedBackground: Util.alpha(Color.foreground, 0.08)
+  property color selectedBackground: Util.alpha(Commons.Color.foreground, 0.08)
   // Accent used by the selected cancellation action and card border.
-  property color selectedText: Color.accent
+  property color selectedText: Commons.Color.accent
   // Dynamic upstream font sizes and family.
   readonly property var fontStyle: Style.font
   // Font family shared by prompt and action labels.
@@ -146,8 +147,8 @@ Item {
 
               width: Style.space(88)
               height: Style.space(34)
-              color: selected ? (destructive ? Util.alpha(Color.urgent, 0.22) : root.selectedBackground) : "transparent"
-              borderSpec: Border.flat(destructive ? (selected ? Color.urgent : Util.alpha(Color.urgent, 0.56)) : Util.alpha(root.foreground, selected ? 0.22 : 0.14), Style.normalBorderWidth)
+              color: selected ? (destructive ? Util.alpha(Commons.Color.urgent, 0.22) : root.selectedBackground) : "transparent"
+              borderSpec: Border.flat(destructive ? (selected ? Commons.Color.urgent : Util.alpha(Commons.Color.urgent, 0.56)) : Util.alpha(root.foreground, selected ? 0.22 : 0.14), Style.normalBorderWidth)
               radius: 0
 
               FocusFrame {
@@ -159,7 +160,7 @@ Item {
                 textFormat: Text.PlainText
                 anchors.centerIn: parent
                 text: action.modelData
-                color: action.destructive ? (action.selected ? Color.urgent : root.foreground) : (action.selected ? root.selectedText : root.foreground)
+                color: action.destructive ? (action.selected ? Commons.Color.urgent : root.foreground) : (action.selected ? root.selectedText : root.foreground)
                 font.family: root.fontFamily
                 font.pixelSize: root.fontStyle.caption
               }

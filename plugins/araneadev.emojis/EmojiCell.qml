@@ -6,6 +6,7 @@
 // qmllint disable missing-property
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 import "../araneadev.shared/ClickSettle.js" as ClickSettle
 
@@ -40,9 +41,9 @@ Rectangle {
   // Corner radius for the cell surface.
   property int cornerRadius: Style.cornerRadius
   // Fill of the hovered cell.
-  property color selectedBackground: Color.menu.selectedBackground
+  property color selectedBackground: Commons.Color.menu.selectedBackground
   // Accent colour of the picker (kept for callers; the cursor is the mint outline).
-  property color selectedText: Color.menu.selectedText
+  property color selectedText: Commons.Color.menu.selectedText
   // Emitted when the pointer really moved onto the cell holding KEY.
   signal hoverMoved(string key)
   // Emitted when the pointer leaves the cell.

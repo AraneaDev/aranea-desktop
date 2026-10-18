@@ -4,6 +4,7 @@ import Quickshell.Io
 import QtQuick
 import QtQuick.Window
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "WorkspaceModel.js" as WorkspaceModel
 import "../araneadev.shared" as Aranea
@@ -207,7 +208,7 @@ Item {
     Text {
       anchors.centerIn: parent
       text: "☷"
-      color: root.bar ? root.bar.foreground : Color.foreground
+      color: root.bar ? root.bar.foreground : Commons.Color.foreground
       font.family: Aranea.Typography.iconFamily
       font.pixelSize: Style.font.title
       enabled: false
@@ -218,7 +219,7 @@ Item {
       width: Style.space(18)
       height: Style.space(2)
       radius: height / 2
-      color: root.bar ? root.bar.urgent : Color.accent
+      color: root.bar ? root.bar.urgent : Commons.Color.accent
       visible: root.panelOpen
     }
   }
@@ -243,7 +244,7 @@ Item {
       thickness: Style.space(2)
       presented: root.visible && (!root.bar || !root.bar.barHidden) && (!root.Window.window || root.Window.window.visible)
       motionEnabled: root.motionEnabled
-      color: root.bar ? root.bar.urgent : Color.accent
+      color: root.bar ? root.bar.urgent : Commons.Color.accent
     }
     Grid {
       id: indicatorGrid
@@ -304,7 +305,7 @@ Item {
       textFormat: Text.PlainText
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.body
-      color: root.bar ? root.bar.foreground : Color.foreground
+      color: root.bar ? root.bar.foreground : Commons.Color.foreground
       verticalAlignment: Text.AlignVCenter
       elide: Text.ElideRight
     }

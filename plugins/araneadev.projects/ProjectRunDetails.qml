@@ -6,6 +6,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 import "../araneadev.projects/ProjectActionRecords.js" as Records
 import "ProjectProblems.js" as Problems
@@ -247,10 +248,10 @@ ColumnLayout {
       wrapMode: TextEdit.WrapAnywhere
       font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.caption
-      color: Color.foreground
+      color: Commons.Color.foreground
       background: Rectangle {
         radius: Style.space(3)
-        color: Util.alpha(Color.foreground, 0.065)
+        color: Util.alpha(Commons.Color.foreground, 0.065)
       }
     }
   }

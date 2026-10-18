@@ -6,6 +6,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 import "AgentSuggestion.js" as Suggestion
@@ -1041,8 +1042,8 @@ Item {
     width: panel.switcherMode ? panel.switcherSize.width : panel.width
     height: panel.switcherMode ? panel.switcherSize.height : panel.height
     contentPadding: Style.space(16)
-    fillColor: Qt.rgba(Color.background.r, Color.background.g, Color.background.b, 1)
-    borderSpecOverride: Border.flat(Util.alpha(Color.foreground, 0.16), 1)
+    fillColor: Qt.rgba(Commons.Color.background.r, Commons.Color.background.g, Commons.Color.background.b, 1)
+    borderSpecOverride: Border.flat(Util.alpha(Commons.Color.foreground, 0.16), 1)
     ProjectSwitcher {
       id: switcher
       anchors.fill: parent
@@ -1194,7 +1195,7 @@ Item {
                   implicitWidth: Style.space(6)
                   implicitHeight: Style.space(28)
                   radius: width / 2
-                  color: Util.alpha(Color.foreground, 0.5)
+                  color: Util.alpha(Commons.Color.foreground, 0.5)
                 }
                 background: Rectangle {
                   color: 'transparent'
