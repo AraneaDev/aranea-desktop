@@ -80,8 +80,16 @@ jobs:
           # shellcheck disable=SC2016
           echo 'Server = https://archive.archlinux.org/repos/2026/10/06/$repo/os/$arch' > /etc/pacman.d/mirrorlist
 
+      # The archive mirror sometimes stalls ("Operation too slow"). Wait out
+      # slow transfers and retry; downloaded packages stay in the cache.
       - name: Install packages
-        run: pacman -Syyuu --noconfirm --needed git curl jq ripgrep python nodejs npm quickshell qt6-declarative imagemagick librsvg libxml2 lua sway dbus libcap diffutils
+        run: |
+          for attempt in 1 2 3; do
+            pacman -Syyuu --noconfirm --needed --disable-download-timeout git curl jq ripgrep python nodejs npm quickshell qt6-declarative imagemagick librsvg libxml2 lua sway dbus libcap diffutils && exit 0
+            echo "Package install attempt $attempt failed; retrying" >&2
+            sleep $((attempt * 20))
+          done
+          exit 1
 
       # Arch's sway carries cap_sys_nice as a file capability, and a container
       # that may not grant it cannot exec sway at all ("Operation not
