@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.31.3](https://github.com/AraneaDev/aranea-desktop/compare/v2.31.2...v2.31.3) (2026-10-18)
+
+
+### Fixes
+
+* **agents:** make agent tasks clearable with a large history ([#179](https://github.com/AraneaDev/aranea-desktop/issues/179)) ([25ff2c7](https://github.com/AraneaDev/aranea-desktop/commit/25ff2c79f01dbe13894f1673184521ac46bb9be1))
+
 ## [2.31.2](https://github.com/AraneaDev/aranea-desktop/compare/v2.31.1...v2.31.2) (2026-10-17)
 
 
