@@ -82,8 +82,16 @@ ColumnLayout {
   property string draftProjectId: ''
   // Locate-folder presentation drafts survive delegate recreation under stable identities.
   property var relocationDrafts: ({})
-  // Show installed tool choices whenever saved adapters are missing or unavailable.
-  readonly property bool toolChoiceRequired: !supported('editors', project && project.tools ? project.tools.editorId || (tools.defaults || {}).editorId : null) || !supported('terminals', project && project.tools ? project.tools.terminalId || (tools.defaults || {}).terminalId : null)
+  // Show installed tool choices whenever an adapter the saved roles need is missing or unavailable.
+  readonly property bool toolChoiceRequired: !project || !resolvePreferences(savedRoles(project), project.tools || {}).ok
+  // Draft validation shares the profile rules: only roles that open need their tools.
+  readonly property var draftResolution: resolvePreferences(draft.roles || [], draft)
+  // Save is offered only for a valid draft of the selected project.
+  readonly property bool preferencesValid: !!project && draftResolution.ok
+  // Why the draft cannot be saved, or empty.
+  readonly property string preferencesProblem: draftResolution.error
+  // Terminal choices apply to explicit terminals and to agents or Neovim hosted in one.
+  readonly property bool draftNeedsTerminal: (draft.roles || []).indexOf('terminal') >= 0 || (draft.roles || []).indexOf('agent') >= 0 || (draft.roles || []).indexOf('editor') >= 0 && draft.editorId === 'nvim'
   // Explicit backend configuration request.
   signal configureRequested(string projectId, var draft)
   // Typed sole-owner request; no launch queue or binding state lives in this view.
@@ -171,6 +179,21 @@ ColumnLayout {
       return t.id === id
     })
   }
+  // Saved ordinary-Open roles; absent roles keep the editor and terminal default.
+  function savedRoles(p: var): var {
+    return p && Array.isArray(p.openRoles) ? p.openRoles.slice() : ['editor', 'terminal']
+  }
+  // Resolve only the adapters these roles open; the agent provider is chosen at launch.
+  function resolvePreferences(roles: var, chosen: var): var {
+    return Profiles.resolve({
+      roles: roles,
+      tools: {
+        editorId: chosen.editorId || null,
+        terminalId: chosen.terminalId || null,
+        agentId: project && project.tools ? project.tools.agentId || null : null
+      }
+    }, tools)
+  }
   // Initialize configuration drafts using saved preferences then supported defaults.
   function discardDraft(): void {
     var p = project || {}
@@ -178,11 +201,28 @@ ColumnLayout {
     var defaults = tools.defaults || {}
     draft = {
       name: p.name || '',
+      roles: savedRoles(p),
       editorId: saved.editorId || defaults.editorId || '',
       terminalId: saved.terminalId || defaults.terminalId || '',
       workspaceMode: p.workspaceMode || 'dedicated'
     }
     dirty = false
+    fieldError = ''
+  }
+  // Roles stay in the registry's canonical order; adapter drafts are kept for re-selection.
+  function toggleRole(role: string): void {
+    if (displayOnly || ['editor', 'terminal', 'agent'].indexOf(role) < 0)
+      return
+    var current = draft.roles || []
+    var roles = current.indexOf(role) >= 0 ? current.filter(function (r) {
+      return r !== role
+    }) : current.concat([role])
+    draft = Object.assign({}, draft, {
+      roles: ['editor', 'terminal', 'agent'].filter(function (r) {
+        return roles.indexOf(r) >= 0
+      })
+    })
+    dirty = true
     fieldError = ''
   }
   // Edit one allowlisted presentation value without invoking any client.
@@ -195,14 +235,24 @@ ColumnLayout {
     dirty = true
     fieldError = ''
   }
-  // Save only valid chosen adapters and workspace mode through the backend client.
+  // Save the roles plus only the adapters they open; unused saved adapters stay untouched.
   function applyDraft(): void {
     if (displayOnly || pending || !project)
       return
-    fieldError = !draft.name ? 'Enter a project name before saving.' : !supported('editors', draft.editorId) ? 'Choose an installed supported editor before saving.' : !supported('terminals', draft.terminalId) ? 'Choose an installed supported terminal before saving.' : ['dedicated', 'current'].indexOf(draft.workspaceMode) < 0 ? 'Choose a dedicated or current workspace before saving.' : ''
+    var resolved = draftResolution
+    fieldError = !draft.name ? 'Enter a project name before saving.' : !resolved.ok ? resolved.error : ['dedicated', 'current'].indexOf(draft.workspaceMode) < 0 ? 'Choose a dedicated or current workspace before saving.' : ''
     if (fieldError)
       return
-    configureRequested(project.id, Object.assign({}, draft))
+    var request = {
+      name: draft.name
+    }
+    if (resolved.tools.editorId)
+      request.editorId = resolved.tools.editorId
+    if (resolved.tools.terminalId)
+      request.terminalId = resolved.tools.terminalId
+    request.workspaceMode = draft.workspaceMode
+    request.openRoles = draft.roles.slice()
+    configureRequested(project.id, request)
   }
   // A save acknowledges only values still represented by its authoritative readback.
   function acknowledgeDraft(savedProject: var): void {
@@ -211,11 +261,18 @@ ColumnLayout {
     var saved = savedProject.tools || {}, defaults = tools.defaults || {}
     var confirmed = {
       name: savedProject.name || '',
+      roles: savedRoles(savedProject),
       editorId: saved.editorId || defaults.editorId || '',
       terminalId: saved.terminalId || defaults.terminalId || '',
       workspaceMode: savedProject.workspaceMode || 'dedicated'
     }
+    var needed = resolvePreferences(confirmed.roles, confirmed).tools
     if (Object.keys(confirmed).every(function (key) {
+      if (key === 'roles')
+        return SignalValue.same(draft.roles, confirmed.roles)
+      // Adapters the saved roles do not open are not part of the acknowledged save.
+      if (key === 'editorId' && !needed.editorId || key === 'terminalId' && !needed.terminalId)
+        return true
       return draft[key] === confirmed[key]
     })) {
       draft = confirmed
@@ -619,6 +676,36 @@ ColumnLayout {
       onTextEdited: details.setDraft('name', text)
     }
     Aranea.UiLabel {
+      text: 'Open starts'
+    }
+    Repeater {
+      model: [
+        {
+          id: 'editor',
+          label: 'Editor'
+        },
+        {
+          id: 'terminal',
+          label: 'Terminal'
+        },
+        {
+          id: 'agent',
+          label: 'Agent'
+        }
+      ]
+      Aranea.ActionButton {
+        id: openRole
+        required property var modelData
+        objectName: 'projectOpenRole:' + modelData.id
+        text: modelData.label
+        selected: (details.draft.roles || []).indexOf(modelData.id) >= 0
+        enabled: !details.displayOnly
+        pointerGate: details.pointerGate
+        onClicked: details.toggleRole(openRole.modelData.id)
+      }
+    }
+    Aranea.UiLabel {
+      visible: (details.draft.roles || []).indexOf('editor') >= 0
       text: 'Editor'
     }
     Repeater {
@@ -626,6 +713,7 @@ ColumnLayout {
       Aranea.ActionButton {
         id: editor
         required property var modelData
+        visible: (details.draft.roles || []).indexOf('editor') >= 0
         text: modelData.label
         selected: details.draft.editorId === modelData.id
         enabled: !details.displayOnly
@@ -634,13 +722,15 @@ ColumnLayout {
       }
     }
     Aranea.UiLabel {
-      text: 'Terminal'
+      visible: details.draftNeedsTerminal
+      text: (details.draft.roles || []).indexOf('terminal') >= 0 ? 'Terminal' : 'Terminal (hosts the agent or Neovim)'
     }
     Repeater {
       model: details.choices('terminals')
       Aranea.ActionButton {
         id: terminal
         required property var modelData
+        visible: details.draftNeedsTerminal
         text: modelData.label
         selected: details.draft.terminalId === modelData.id
         enabled: !details.displayOnly
@@ -673,7 +763,7 @@ ColumnLayout {
       Aranea.ActionButton {
         objectName: 'projectSavePreferences'
         text: 'Save preferences'
-        enabled: !details.displayOnly && !details.pending && !!details.project && details.supported('editors', details.draft.editorId) && details.supported('terminals', details.draft.terminalId)
+        enabled: !details.displayOnly && !details.pending && details.preferencesValid
         pointerGate: details.pointerGate
         onClicked: details.applyDraft()
       }
