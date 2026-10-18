@@ -40,7 +40,16 @@ function payload(surface) {
   let mode = ""
   if (surface === "project-actions") fixture = builder("ProjectActionsPreview.js")("passed")
   else if (states[surface]) fixture = preview(...states[surface])
-  else return null
+  else if (surface === "project-preferences") {
+    // Preferences of the sample, set to open a terminal and an agent but no editor.
+    fixture = preview("project-details")
+    fixture.projectSection = "preferences"
+    fixture.projectTools.agents = [
+      { id: "claude", label: "Claude Code", available: true, supported: true }
+    ]
+    for (const project of fixture.projectsState.projects)
+      if (project.id === fixture.projectId) project.openRoles = ["terminal", "agent"]
+  } else return null
   if (surface === "project-switcher") mode = "switcher"
   return {
     section: "projects",
