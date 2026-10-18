@@ -287,7 +287,21 @@ ShellRoot {
       revision: 2
     }))
     t.equal(calls.length, 0, 'stale checkout and displayed revision refuse action')
-    overview.actionRequested('start', target)
+    // The card's own Run button, as Enter activates it, not the signal.
+    function buttonText(item, text) {
+      if (item.text === text && typeof item.activate === 'function')
+        return item
+      var kids = t.childrenOf(item)
+      for (var k = 0; k < kids.length; k++) {
+        var found = kids[k] ? buttonText(kids[k], text) : null
+        if (found)
+          return found
+      }
+      return null
+    }
+    var runButton = buttonText(t.findChild(overview, 'overviewCommands'), 'Run')
+    t.check(!!runButton && runButton.enabled, 'the checks card offers an enabled Run button')
+    runButton.activate()
     t.equal(calls.length, 1, 'explicit Run routes once through actual shared client UUID boundary')
     calls[0].done(0, '00000000-0000-4000-8000-000000000001', '')
     t.equal(calls[1].method, 'start', 'explicit Run uses existing backend')
