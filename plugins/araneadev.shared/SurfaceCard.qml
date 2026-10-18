@@ -2,7 +2,6 @@
 // BorderSurface implementation while centralizing the common border contract.
 // qmllint disable missing-property
 import QtQuick
-import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 

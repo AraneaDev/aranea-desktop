@@ -2,7 +2,6 @@
 import QtQuick
 import QtTest
 import Quickshell
-import qs.Commons
 import qs.Commons as Commons
 import "lib"
 import "plugins/araneadev.shared" as Aranea

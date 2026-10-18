@@ -1,7 +1,6 @@
 // Actual editor validates fields, preserves literal argument rows and never launches.
 import QtQuick
 import Quickshell
-import qs.Commons
 import qs.Commons as Commons
 import "lib"
 import "plugins/araneadev.projects" as ProjectUi
