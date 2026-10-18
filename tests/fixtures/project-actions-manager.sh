@@ -72,7 +72,8 @@ PROPS
         if [[ -e "$root/check-release" ]]; then
           jq -e --arg u "${!#}" 'any(.runs[];.unitName==$u and (.processState=="succeeded" or .processState=="failed" or .processState=="stopped") and .submissionUnconfirmed)' "$ARANEA_STATE_ROOT/project-actions.json" >/dev/null
         fi
-        if [[ -e $root/gc-on-release ]]; then
+        if [[ -e $root/gc-on-release || -e $root/gc-on-stop ]]; then
+          # systemd unloads a stopped transient unit at once.
           rm -f "$root/${!#}"
           exit 0
         fi

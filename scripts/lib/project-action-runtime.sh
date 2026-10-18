@@ -249,6 +249,17 @@ runtime_read_proof() {
   [[ $(jq .definitionSnapshot "$scratch/run" | project_actions_definition_hash) == "$(jq -r .definitionHash "$scratch/run")" ]]
 }
 
+# A requested stop of the pinned invocation is proved when this boot's manager
+# no longer has the unit: systemd unloads a stopped transient unit at once,
+# and nothing runs in a unit that does not exist. Missing stop intent, an
+# unpinned invocation or another boot never takes this path.
+runtime_stopped_absent() {
+  [[ $proof_missing == true ]] || return 1
+  jq -e '.stopRequested==true and .invocationId!=null' "$scratch/run" >/dev/null || return 1
+  jq -cn '{state:"completed",outcome:"observed",processState:"stopped",readiness:"unknown",exitCode:null,exitSignal:null,error:null,submissionUnconfirmed:false}' >"$scratch/patch"
+  runtime_observe
+}
+
 # Distinguish persisted main-process exit evidence from completed cgroup cleanup.
 runtime_terminal_evidence() {
   jq -e '.state=="completed" and .invocationId!=null and (.processState=="succeeded" or .processState=="failed" or .processState=="stopped")' "$scratch/run" >/dev/null
@@ -304,6 +315,7 @@ runtime_refresh() {
     return 0
   fi
   if ! runtime_proof; then
+    runtime_stopped_absent && return 0
     local failure=$proof_error
     runtime_uncertain "$failure"
     runtime_error "$failure" 'The exact owned invocation could not be observed.'
@@ -355,6 +367,7 @@ runtime_stop() {
     return 0
   fi
   if ! runtime_proof; then
+    runtime_stopped_absent && return 0
     local failure=$proof_error
     runtime_uncertain "$failure"
     runtime_error "$failure" 'The retained run cannot be safely stopped without its exact identity.'

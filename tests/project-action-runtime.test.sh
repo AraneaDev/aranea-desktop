@@ -411,3 +411,31 @@ jq -e '.output=="historical"' "$TMPDIR/result" >/dev/null
 cp "$manager/pending" "$manager/$history_unit"
 sed -i 's/InvocationID=.*/InvocationID=22222222222222222222222222222222/' "$manager/$history_unit"
 refuse logs RUN_IDENTITY_LOST <"$TMPDIR/history-run"
+
+# systemd unloads a stopped transient unit at once. A stop the manager
+# confirmed for the pinned invocation settles as stopped, not unconfirmed.
+echo running >"$manager/mode"
+jq '.definition.name="Gone" | .definition.kind="service" | .definition.timeoutSeconds=null | .definition.previewUrl=null' "$TMPDIR/configure" | call configure
+gone=$(jq -r '.state.definitions[-1].id' "$TMPDIR/result")
+jq --arg a "$gone" '.actionId=$a | .requestId="req-00000000-0000-4000-8000-000000000029"' "$TMPDIR/start" | call start
+gone_unit=$(jq -r .run.unitName "$TMPDIR/result")
+jq -cn --arg r "$(jq -r .run.id "$TMPDIR/result")" '{runId:$r}' >"$TMPDIR/gone-run"
+call refresh <"$TMPDIR/gone-run"
+touch "$manager/gc-on-stop"
+call stop <"$TMPDIR/gone-run"
+jq -e '.run.processState=="stopped" and .run.stopRequested and (.run.submissionUnconfirmed|not)' "$TMPDIR/result" >/dev/null
+[[ ! -e $manager/$gone_unit ]]
+call refresh <"$TMPDIR/gone-run"
+jq -e '.run.processState=="stopped"' "$TMPDIR/result" >/dev/null
+rm "$manager/gc-on-stop"
+# A unit that vanished without a requested stop stays unconfirmed; a later
+# Stop then settles it, as nothing can run in a unit that does not exist.
+jq --arg a "$gone" '.actionId=$a | .requestId="req-00000000-0000-4000-8000-000000000030"' "$TMPDIR/start" | call start
+vanished_unit=$(jq -r .run.unitName "$TMPDIR/result")
+jq -cn --arg r "$(jq -r .run.id "$TMPDIR/result")" '{runId:$r}' >"$TMPDIR/vanished-run"
+call refresh <"$TMPDIR/vanished-run"
+rm "$manager/$vanished_unit"
+refuse refresh OBSERVATION_UNAVAILABLE <"$TMPDIR/vanished-run"
+jq -e '.run.processState=="unconfirmed"' "$TMPDIR/result" >/dev/null
+call stop <"$TMPDIR/vanished-run"
+jq -e '.run.processState=="stopped" and .run.stopRequested' "$TMPDIR/result" >/dev/null
