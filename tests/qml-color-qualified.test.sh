@@ -7,6 +7,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 
 # Code lines only: comments may still name Color.qml.
 bare="$(grep -rnE '(^|[^.A-Za-z0-9_])Color\.[a-zA-Z]' \
