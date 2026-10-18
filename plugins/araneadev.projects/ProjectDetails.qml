@@ -507,7 +507,7 @@ ColumnLayout {
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: details.toolChoiceRequired && ['preferences', 'all'].indexOf(details.viewSection) >= 0
-    text: 'Choose an installed supported editor and terminal, then Save preferences.'
+    text: 'Choose what Open starts and the installed tools it needs, then Save preferences.'
   }
   ColumnLayout {
     Layout.fillWidth: true
@@ -678,30 +678,34 @@ ColumnLayout {
     Aranea.UiLabel {
       text: 'Open starts'
     }
-    Repeater {
-      model: [
-        {
-          id: 'editor',
-          label: 'Editor'
-        },
-        {
-          id: 'terminal',
-          label: 'Terminal'
-        },
-        {
-          id: 'agent',
-          label: 'Agent'
+    Flow {
+      Layout.fillWidth: true
+      spacing: Style.space(8)
+      Repeater {
+        model: [
+          {
+            id: 'editor',
+            label: 'Editor'
+          },
+          {
+            id: 'terminal',
+            label: 'Terminal'
+          },
+          {
+            id: 'agent',
+            label: 'Agent'
+          }
+        ]
+        Aranea.ActionButton {
+          id: openRole
+          required property var modelData
+          objectName: 'projectOpenRole:' + modelData.id
+          text: modelData.label
+          selected: (details.draft.roles || []).indexOf(modelData.id) >= 0
+          enabled: !details.displayOnly
+          pointerGate: details.pointerGate
+          onClicked: details.toggleRole(openRole.modelData.id)
         }
-      ]
-      Aranea.ActionButton {
-        id: openRole
-        required property var modelData
-        objectName: 'projectOpenRole:' + modelData.id
-        text: modelData.label
-        selected: (details.draft.roles || []).indexOf(modelData.id) >= 0
-        enabled: !details.displayOnly
-        pointerGate: details.pointerGate
-        onClicked: details.toggleRole(openRole.modelData.id)
       }
     }
     Aranea.UiLabel {

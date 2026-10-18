@@ -316,6 +316,10 @@ ShellRoot {
     page.recoveryCheckoutId = 'c-external'
     page.captureRestore(recoverySnapshot)
     t.equal(page.recoveryCheckoutId, 'c-anchor', 'capture retains exact owner recovery checkout destination')
+    var olderDraft = JSON.parse(JSON.stringify(recoverySnapshot))
+    delete olderDraft.detailsDraft.roles
+    page.captureRestore(olderDraft)
+    t.equal(page.details.draft.roles, page.details.savedRoles(page.details.project), 'a restored draft without roles takes the project roles')
     owner.snapshot = {
       sessionId: 'session-two',
       availability: {

@@ -144,7 +144,7 @@ ShellRoot {
     var validDraft = Object.assign({}, page.details.draft)
     invalidDrafts.forEach(function (invalid) {
       page.details.setDraft(invalid.key, invalid.value)
-      var before = JSON.stringify(page.details.draft)
+      var before = t.canonical(page.details.draft)
       guard.saveRequested()
       t.check(invalid.reason.test(guard.error), 'invalid preferences Save explains ' + invalid.key + ' in the modal')
       var feedback = t.findChild(page.details, 'projectPreferenceError')
@@ -156,7 +156,7 @@ ShellRoot {
       t.equal(guard.error, retainedError, 'capture restores preferences validation feedback for ' + invalid.key)
       t.check(guard.opened && entry.projectId === original.id && page.details.dirty, 'invalid preferences Save retains editor and selection for ' + invalid.key)
       t.equal(JSON.stringify(guard.pendingTarget), retainedTarget, 'invalid preferences Save retains destination for ' + invalid.key)
-      t.equal(JSON.stringify(page.details.draft), before, 'invalid preferences Save retains exact draft for ' + invalid.key)
+      t.equal(t.canonical(page.details.draft), before, 'invalid preferences Save retains exact draft for ' + invalid.key)
       t.equal(host.saves.length, 0, 'invalid preferences Save sends no transport for ' + invalid.key)
       page.details.setDraft(invalid.key, validDraft[invalid.key])
       t.equal(guard.error, '', 'correcting preferences clears validation feedback for ' + invalid.key)

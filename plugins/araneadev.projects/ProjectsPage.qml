@@ -327,7 +327,10 @@ ColumnLayout {
     details.profileEditor.expectedProfileRevision = saved.profileRevision || 0
     details.profileEditor.fieldError = saved.profileFieldError || ''
     details.submittedProfileDraft = saved.submittedProfileDraft || null
-    details.draft = saved.detailsDraft
+    // A draft saved before Preferences had roles takes the project's.
+    details.draft = Object.assign({
+      roles: details.savedRoles(details.project)
+    }, saved.detailsDraft)
     details.dirty = saved.detailsDirty
     details.fieldError = saved.detailsFieldError || ''
     details.customized = saved.customized
