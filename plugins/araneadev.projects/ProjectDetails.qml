@@ -9,6 +9,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui as Ui
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/SignalValue.js" as SignalValue
 import "ProjectOverview.js" as Overview
 import "ProjectProfiles.js" as Profiles
 import "ProjectProblems.js" as Problems
@@ -134,7 +135,7 @@ ColumnLayout {
     if (!submitted || (args.expectedProfileRevision || 0) !== expected || (submitted.id || '') !== (profileEditor.draft.id || ''))
       return
     var confirmed = (savedProject.profiles || []).some(function (p) {
-      return (!submitted.id || submitted.id === p.id) && p.revision === expected + 1 && p.name === submitted.name && JSON.stringify(p.roles) === JSON.stringify(submitted.roles) && ['editorId', 'terminalId', 'agentId'].every(function (key) {
+      return (!submitted.id || submitted.id === p.id) && p.revision === expected + 1 && p.name === submitted.name && SignalValue.same(p.roles, submitted.roles) && ['editorId', 'terminalId', 'agentId'].every(function (key) {
         return p.tools[key] === submitted.tools[key]
       })
     })

@@ -9,6 +9,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/SignalValue.js" as SignalValue
 import "AgentSuggestion.js" as Suggestion
 import "ProjectsNavigation.js" as Navigation
 import "ProjectOverview.js" as Overview
@@ -170,7 +171,7 @@ Item {
     if (root.inert || client.pending || !target || target.projectId !== client.projectId || target.checkoutId !== client.checkoutId)
       return
     var row = overviewModel.services.concat(overviewModel.checks).find(function (r) {
-      return JSON.stringify(r.target) === JSON.stringify(target)
+      return SignalValue.same(r.target, target)
     })
     if (!row || !row.controls.some(function (c) {
       return c.method === method
@@ -1604,7 +1605,7 @@ Item {
                   }
                   onWorkspaceRequested: function (method, target) {
                     if (panel.root.inert || panel.root.projectClient.submitting || !panel.overviewModel.workspaces.some(function (r) {
-                      return JSON.stringify(r.target) === JSON.stringify(target) && r.controls.some(function (c) {
+                      return SignalValue.same(r.target, target) && r.controls.some(function (c) {
                         return c.method === method
                       })
                     }))

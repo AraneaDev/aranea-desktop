@@ -111,6 +111,18 @@ ShellRoot {
       t.check(menu.opened, "Favorites route opened once rows existed")
       t.equal(menu.activeMenu, "apps.favorites", "the Favorites list is shown")
 
+      // Provider rows arrive through the rowsReady signal, as a sequence
+      // since Qt 6.12; they still swap into the items.
+      t.findChild(menu, "menuProviders").rowsReady("setup", [
+        {
+          id: "setup.signalled",
+          kind: "action",
+          label: "Signalled Row",
+          action: "fixture-action"
+        }
+      ])
+      t.equal(menu.itemOrder.indexOf("setup.signalled") >= 0, true, "signal-delivered provider rows swap into the items")
+
       // Twelve pins, then the thirteenth is refused with a notice.
       for (var p = 0; p < 12; p++)
         menu.toggleFavoriteApp("app" + p)
