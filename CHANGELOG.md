@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.32.3](https://github.com/AraneaDev/aranea-desktop/compare/v2.32.2...v2.32.3) (2026-10-19)
+
+
+### Fixes
+
+* **agents:** preserve clear-history task IDs through IPC ([#190](https://github.com/AraneaDev/aranea-desktop/issues/190)) ([7d4ff92](https://github.com/AraneaDev/aranea-desktop/commit/7d4ff92c8f160e6162757fe8ac94b1a95654acd3))
+
 ## [2.32.2](https://github.com/AraneaDev/aranea-desktop/compare/v2.32.1...v2.32.2) (2026-10-19)
 
 
