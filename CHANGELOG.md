@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.32.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.31.3...v2.32.0) (2026-10-19)
+
+
+### Features
+
+* **projects:** open any mix of tools from Preferences, with Qt 6.12 and run-control fixes ([#182](https://github.com/AraneaDev/aranea-desktop/issues/182)) ([77de034](https://github.com/AraneaDev/aranea-desktop/commit/77de034dfbbfdfe886df8f507ba0a1605ad3357b))
+
 ## [2.31.3](https://github.com/AraneaDev/aranea-desktop/compare/v2.31.2...v2.31.3) (2026-10-18)
 
 
