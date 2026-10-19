@@ -45,3 +45,6 @@ SpringPanel 1.0 SpringPanel.qml
 MenuPopup 1.0 MenuPopup.qml
 SplitButton 1.0 SplitButton.qml
 OrbitalHalo 1.0 OrbitalHalo.qml
+singleton PluginReloadState 1.0 PluginReloadState.qml
+PluginReloadGuard 1.0 PluginReloadGuard.qml
+PluginReloadController 1.0 PluginReloadController.qml

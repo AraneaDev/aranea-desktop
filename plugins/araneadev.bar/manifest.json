@@ -5,11 +5,13 @@
   "version": "1.0.0",
   "author": "AraneaDev",
   "description": "Aranea composition for the Omarchy status bar",
-  "kinds": ["bar"],
+  "kinds": ["bar", "service"],
   "entryPoints": {
-    "bar": "Bar.qml"
+    "bar": "Bar.qml",
+    "service": "ReloadService.qml"
   },
   "omarchy": {
     "clonedFrom": "omarchy.bar"
-  }
+  },
+  "keepLoaded": true
 }

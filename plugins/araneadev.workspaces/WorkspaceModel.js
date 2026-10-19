@@ -766,26 +766,7 @@ function barContext(workspaceId, snapshot) {
   var candidates = []
   snapshot.projects.forEach(function (/** @type {*} */ project) {
     ;(project.checkouts || []).forEach(function (/** @type {*} */ checkout) {
-      var scoped = Object.assign({}, snapshot, {
-        projects: [
-          Object.assign({}, project, {
-            checkouts: [checkout],
-            associations: (project.associations || []).filter(
-              function (/** @type {*} */ association) {
-                return association.checkoutId === checkout.id
-              }
-            )
-          })
-        ],
-        environments: (snapshot.environments || []).filter(function (/** @type {*} */ environment) {
-          return environment.projectId === project.id && environment.checkoutId === checkout.id
-        })
-      })
-      var context = projectContext(workspaceId, scoped)
-      if (!context) return
-      // A launched environment retains workspace context across owner restarts.
-      // A bare saved assignment still needs observed tools. Neither grants ownership.
-      var observed = (snapshot.bindings || []).some(function (/** @type {*} */ binding) {
+      var verifiedBindings = (snapshot.bindings || []).filter(function (/** @type {*} */ binding) {
         return (
           binding &&
           binding.projectId === project.id &&
@@ -799,18 +780,74 @@ function barContext(workspaceId, snapshot) {
           !/^0x0+$/.test(binding.address) &&
           binding.evidence &&
           binding.evidence.processVerified === true &&
-          ["process-only", "process-app-id"].indexOf(binding.evidence.mode) >= 0 &&
-          (!context.environmentId || binding.environmentId === context.environmentId)
+          ["process-only", "process-app-id"].indexOf(binding.evidence.mode) >= 0
         )
       })
+      var scoped = Object.assign({}, snapshot, {
+        projects: [
+          Object.assign({}, project, {
+            checkouts: [checkout],
+            associations: (project.associations || []).filter(
+              function (/** @type {*} */ association) {
+                return association.checkoutId === checkout.id
+              }
+            )
+          })
+        ],
+        environments: (snapshot.environments || [])
+          .filter(function (/** @type {*} */ environment) {
+            return (
+              environment.projectId === project.id &&
+              environment.checkoutId === checkout.id &&
+              environment.workspaceId === Number(workspaceId)
+            )
+          })
+          .sort(function (/** @type {*} */ a, /** @type {*} */ b) {
+            var aOpen = verifiedBindings.some(function (/** @type {*} */ binding) {
+              return binding.environmentId === a.id
+            })
+            var bOpen = verifiedBindings.some(function (/** @type {*} */ binding) {
+              return binding.environmentId === b.id
+            })
+            return (
+              Number(bOpen) - Number(aOpen) ||
+              (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0)
+            )
+          })
+      })
+      var context = projectContext(workspaceId, scoped)
+      if (!context) return
+      // A launched environment retains workspace context across owner restarts.
+      // A bare saved assignment still needs observed tools. Neither grants ownership.
+      var observed = verifiedBindings.length > 0
       if (!observed && !context.environmentId) return
       context.label = String(project.name || project.id)
       if (!context.environmentId && checkout.branch)
         context.detail = "Registered branch: " + checkout.branch + "\n" + context.detail
-      candidates.push(context)
+      candidates.push({
+        context: context,
+        observed: observed,
+        createdAt: context.environmentId ? Number(scoped.environments[0].createdAt) || 0 : 0
+      })
     })
   })
-  return candidates.length === 1 ? candidates[0] : null
+  // Live tools outrank launch history. When no tools are confirmed, the most
+  // recent launch supplies inspection context for a reused workspace.
+  var observedCandidates = candidates.filter(function (/** @type {*} */ candidate) {
+    return candidate.observed
+  })
+  if (observedCandidates.length)
+    return observedCandidates.length === 1 ? observedCandidates[0].context : null
+  var latest = Math.max.apply(
+    null,
+    candidates.map(function (/** @type {*} */ candidate) {
+      return candidate.createdAt
+    })
+  )
+  var recent = candidates.filter(function (/** @type {*} */ candidate) {
+    return candidate.createdAt === latest
+  })
+  return recent.length === 1 ? recent[0].context : null
 }
 
 /** Resolve project text for an occupied overview row with unique live context.
