@@ -6,6 +6,7 @@
 
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 import "InboxLogic.js" as InboxLogic
@@ -375,13 +376,13 @@ Panel {
       height: Style.space(12)
       width: Math.max(height, badgeText.implicitWidth + Style.space(6))
       radius: height / 2
-      color: root.badge.tone === "critical" ? Color.urgent : Color.notifications.countdown
+      color: root.badge.tone === "critical" ? Commons.Color.urgent : Commons.Color.notifications.countdown
 
       Text {
         id: badgeText
         anchors.centerIn: parent
         text: root.badge.label
-        color: Color.background
+        color: Commons.Color.background
         font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
         font.bold: true

@@ -3,6 +3,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 Rectangle {
@@ -12,7 +13,7 @@ Rectangle {
   // Children participate in the internal vertical layout.
   default property alias content: body.data
   implicitHeight: body.implicitHeight + padding * 2
-  color: Util.alpha(Color.foreground, 0.035)
+  color: Util.alpha(Commons.Color.foreground, 0.035)
   radius: Style.space(6)
   border.color: Util.alpha(Aranea.DesignTokens.foreground, 0.08)
   border.width: 1

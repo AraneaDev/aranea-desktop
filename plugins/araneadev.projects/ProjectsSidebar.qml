@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 import "ProjectsNavigation.js" as Navigation
 import "ProjectReview.js" as Review
@@ -218,7 +219,7 @@ ColumnLayout {
       objectName: 'projectSearch'
       Layout.fillWidth: true
       placeholderText: sidebar.searchPlaceholder
-      palette.placeholderText: Util.alpha(Color.foreground, 0.55)
+      palette.placeholderText: Util.alpha(Commons.Color.foreground, 0.55)
       text: sidebar.query
       onTextEdited: sidebar.query = text
       enabled: sidebar.navigationEnabled
@@ -227,9 +228,9 @@ ColumnLayout {
       }
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.body
-      color: Color.foreground
+      color: Commons.Color.foreground
       background: Rectangle {
-        color: Util.alpha(Color.foreground, 0.06)
+        color: Util.alpha(Commons.Color.foreground, 0.06)
         radius: Style.space(3)
       }
     }
@@ -271,7 +272,7 @@ ColumnLayout {
         implicitWidth: Style.space(6)
         implicitHeight: Style.space(28)
         radius: width / 2
-        color: Util.alpha(Color.foreground, 0.5)
+        color: Util.alpha(Commons.Color.foreground, 0.5)
       }
       background: Rectangle {
         color: 'transparent'

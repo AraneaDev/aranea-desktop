@@ -7,6 +7,7 @@
 import QtQuick
 import QtQuick.Shapes
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 import "../araneadev.shared/ClickSettle.js" as ClickSettle
@@ -39,11 +40,11 @@ BorderSurface {
   // Font family used for all tile text.
   property string fontFamily: Aranea.Typography.uiFamily
   // Main tile text colour.
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   // Secondary tile text colour.
   property color contextText: Util.alpha(foreground, Aranea.DesignTokens.secondaryOpacity)
   // Accent colour for the icon and edge marks.
-  property color selectedText: Color.menu.selectedText
+  property color selectedText: Commons.Color.menu.selectedText
   // Scale applied to the shell font sizes.
   property real menuFontScale: 1.0
   // Letter spacing applied to tile text.

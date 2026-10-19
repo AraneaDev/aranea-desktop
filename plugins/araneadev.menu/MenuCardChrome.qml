@@ -2,6 +2,7 @@
 // qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 import "../araneadev.shared/ClickSettle.js" as ClickSettle
@@ -48,11 +49,11 @@ Item {
   // Public contract member.
   property string brandingGlyphsPath: ""
   // Public contract member.
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   // Public contract member.
   property color contextText: Util.alpha(foreground, Aranea.DesignTokens.secondaryOpacity)
   // Public contract member.
-  property color selectedText: Color.menu.selectedText
+  property color selectedText: Commons.Color.menu.selectedText
   // Public contract member.
   property color footerText: contextText
   // Public contract member.

@@ -6,6 +6,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 
@@ -194,8 +195,8 @@ Item {
     id: card
     anchors.fill: parent
     contentPadding: Style.space(16)
-    fillColor: Qt.rgba(Color.popups.background.r, Color.popups.background.g, Color.popups.background.b, 1)
-    borderSpecOverride: Border.flat(Util.alpha(Color.foreground, 0.16), 1)
+    fillColor: Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1)
+    borderSpecOverride: Border.flat(Util.alpha(Commons.Color.foreground, 0.16), 1)
     FocusScope {
       anchors.fill: parent
       anchors.margins: Style.space(panel.shortScreen ? 12 : 16)
@@ -279,7 +280,7 @@ Item {
               contentItem: Rectangle {
                 implicitWidth: Style.space(4)
                 radius: width / 2
-                color: Util.alpha(Color.foreground, 0.45)
+                color: Util.alpha(Commons.Color.foreground, 0.45)
               }
               background: Rectangle {
                 color: 'transparent'

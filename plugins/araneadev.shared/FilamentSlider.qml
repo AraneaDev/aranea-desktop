@@ -13,6 +13,7 @@
 import QtQuick
 import QtQuick.Effects
 import qs.Commons
+import qs.Commons as Commons
 
 Item {
   id: slider
@@ -202,7 +203,7 @@ Item {
     radius: width / 2
     anchors.verticalCenter: parent.verticalCenter
     x: Math.max(0, Math.min(slider.width - width, (slider.width - width) * slider.progress))
-    color: Color.background
+    color: Commons.Color.background
     border.width: Math.max(1, Style.space(2))
     border.color: slider.muted ? slider.quietColor : DesignTokens.accent
     opacity: slider.busy ? (DesignTokens.motionEnabled ? slider.pulseOpacity : 0.7) : 1

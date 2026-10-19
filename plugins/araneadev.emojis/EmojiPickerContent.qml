@@ -7,6 +7,7 @@
 
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 
@@ -48,11 +49,11 @@ Item {
   // Font family used by picker components.
   property string fontFamily: Aranea.Typography.uiFamily
   // Main picker foreground colour.
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   // Selected result foreground colour.
-  property color selectedText: Color.menu.selectedText
+  property color selectedText: Commons.Color.menu.selectedText
   // Selected result background colour.
-  property color selectedBackground: Color.menu.selectedBackground
+  property color selectedBackground: Commons.Color.menu.selectedBackground
   // Cell width supplied by Emojis.qml.
   property int cellWidth: Style.space(44)
   // Cell height supplied by Emojis.qml.

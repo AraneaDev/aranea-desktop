@@ -5,6 +5,7 @@ import Quickshell
 import QtQuick
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/SignalValue.js" as SignalValue
 import "../araneadev.projects" as Projects
 import "MenuModel.js" as MenuModel
 import "MenuLayout.js" as MenuLayout
@@ -647,11 +648,13 @@ Item {
   // Bash providers that fill submenus on demand; their rows swap into the items.
   MenuProviders {
     id: providers
+    objectName: "menuProviders"
     items: root.items
     itemOrder: root.itemOrder
     onAppsRequested: root.loadApps()
     onRowsReady: function (menuId, rows) {
-      root.applyProviderRows(menuId, rows)
+      // Signal-delivered rows are a sequence, which swapProviderRows would drop.
+      root.applyProviderRows(menuId, SignalValue.plain(rows))
     }
   }
 

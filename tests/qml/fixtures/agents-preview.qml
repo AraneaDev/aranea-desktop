@@ -2,6 +2,7 @@
 import QtQuick
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 import "plugins/araneadev.agents" as Agents
 
 ShellRoot {
@@ -65,8 +66,8 @@ ShellRoot {
     Rectangle {
       id: surface
       anchors.fill: parent
-      color: Color.background
-      border.color: Color.accent
+      color: Commons.Color.background
+      border.color: Commons.Color.accent
       radius: 14
       Column {
         anchors.fill: parent
@@ -74,7 +75,7 @@ ShellRoot {
         spacing: 12
         Text {
           text: 'Agents'
-          color: Color.foreground
+          color: Commons.Color.foreground
           font.pixelSize: Style.font.heading
           font.bold: true
         }

@@ -3,6 +3,7 @@
 // qmllint disable missing-property
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 Aranea.FilamentPill {
@@ -42,7 +43,7 @@ Aranea.FilamentPill {
     anchors.fill: parent
     z: -1
     radius: Style.space(3)
-    color: Util.alpha(Color.foreground, button.pointerPressed ? 0.14 : button.variant === 'secondary' ? 0.065 : 0)
+    color: Util.alpha(Commons.Color.foreground, button.pointerPressed ? 0.14 : button.variant === 'secondary' ? 0.065 : 0)
     Behavior on color {
       enabled: Aranea.DesignTokens.motionEnabled
       ColorAnimation {

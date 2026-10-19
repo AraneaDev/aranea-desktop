@@ -5,6 +5,7 @@
 // view: a fraction in, nothing out.
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 Item {
@@ -25,7 +26,7 @@ Item {
     anchors.right: parent.right
     anchors.verticalCenter: parent.verticalCenter
     height: Math.max(1, Style.spacing.hairline)
-    color: Util.alpha(Color.popups.text, 0.3)
+    color: Util.alpha(Commons.Color.popups.text, 0.3)
   }
   Rectangle {
     objectName: "osdStrandFill"

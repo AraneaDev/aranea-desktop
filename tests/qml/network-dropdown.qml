@@ -275,14 +275,14 @@ ShellRoot {
 
   // The last action as JSON.
   function last() {
-    return actions.length ? JSON.stringify(actions[actions.length - 1]) : ""
+    return actions.length ? t.canonical(actions[actions.length - 1]) : ""
   }
 
   // Whether an action NAME with ARG (compared as JSON) was reported.
   function reported(name, arg) {
-    var want = JSON.stringify([name, arg])
+    var want = t.canonical([name, arg])
     return actions.some(function (a) {
-      return JSON.stringify(a) === want
+      return t.canonical(a) === want
     })
   }
 

@@ -2,6 +2,7 @@
 // qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 Item {
   id: overlay
@@ -28,7 +29,7 @@ Item {
   // Public contract member.
   property bool dropAfter: false
   // Public contract member.
-  property color accent: Color.bar.active
+  property color accent: Commons.Color.bar.active
 
   visible: active
   Image {

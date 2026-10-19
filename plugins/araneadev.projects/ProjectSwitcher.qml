@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 import "ProjectSwitcher.js" as Switcher
 import "ProjectProblems.js" as Problems
@@ -215,7 +216,7 @@ ColumnLayout {
     objectName: 'projectSwitcherSearch'
     Layout.fillWidth: true
     placeholderText: 'Search projects…'
-    palette.placeholderText: Util.alpha(Color.foreground, 0.55)
+    palette.placeholderText: Util.alpha(Commons.Color.foreground, 0.55)
     enabled: !switcher.displayOnly
     onTextEdited: {
       switcher.query = text
@@ -223,9 +224,9 @@ ColumnLayout {
     }
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.body
-    color: Color.foreground
+    color: Commons.Color.foreground
     background: Rectangle {
-      color: Util.alpha(Color.foreground, 0.06)
+      color: Util.alpha(Commons.Color.foreground, 0.06)
       radius: Style.space(3)
     }
     Keys.onPressed: function (event) {

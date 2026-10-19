@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 ColumnLayout {
@@ -44,10 +45,10 @@ ColumnLayout {
     Rectangle {
       Layout.preferredWidth: Style.space(72)
       Layout.preferredHeight: Style.space(32)
-      color: Util.alpha(Color.foreground, 0.04)
+      color: Util.alpha(Commons.Color.foreground, 0.04)
       radius: Style.space(3)
       border.width: 1
-      border.color: Util.alpha(Color.foreground, 0.15)
+      border.color: Util.alpha(Commons.Color.foreground, 0.15)
       Aranea.FocusFrame {
         anchors.fill: parent
         focused: field.activeFocus
@@ -59,7 +60,7 @@ ColumnLayout {
         anchors.margins: Style.space(6)
         verticalAlignment: TextInput.AlignVCenter
         text: row.entry.time
-        color: Color.foreground
+        color: Commons.Color.foreground
         font.family: Aranea.Typography.technicalFamily
         font.pixelSize: Style.font.body
         enabled: row.editable

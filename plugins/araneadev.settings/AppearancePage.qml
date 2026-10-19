@@ -5,6 +5,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 ColumnLayout {
@@ -97,7 +98,7 @@ ColumnLayout {
       Rectangle {
         Layout.preferredWidth: Math.min(Style.space(224), parent.width)
         Layout.preferredHeight: Style.space(126)
-        color: Util.alpha(Color.foreground, 0.04)
+        color: Util.alpha(Commons.Color.foreground, 0.04)
         radius: Style.space(3)
         clip: true
         Image {

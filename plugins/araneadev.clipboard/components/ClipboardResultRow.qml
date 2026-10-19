@@ -5,6 +5,7 @@
 // qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "../../araneadev.shared" as Aranea
 import "../../araneadev.shared/ClickSettle.js" as ClickSettle
 
@@ -55,11 +56,11 @@ Rectangle {
   // Font family supplied by the clipboard window.
   property string fontFamily: Aranea.Typography.uiFamily
   // Main row text colour.
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   // Accent colour for the selected row and icon.
-  property color selectedText: Color.menu.selectedText
+  property color selectedText: Commons.Color.menu.selectedText
   // Selected-row background colour.
-  property color selectedBackground: Color.menu.selectedBackground
+  property color selectedBackground: Commons.Color.menu.selectedBackground
   // Row corner radius.
   property real cornerRadius: Style.cornerRadius
 

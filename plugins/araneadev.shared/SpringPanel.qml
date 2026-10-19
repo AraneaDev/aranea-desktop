@@ -6,6 +6,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 // Layer-shell popup attached to a bar widget icon, designed for
@@ -55,7 +56,7 @@ PanelWindow {
   // Dynamic upstream spacing values used by popup padding.
   readonly property var popupSpacing: Style.spacing
   // Dynamic upstream popup palette used by native card chrome.
-  readonly property var popupColors: Color.popups
+  readonly property var popupColors: Commons.Color.popups
   // Inset between the card border and hosted panel content.
   property int padding: popupSpacing.popupPadding
   // Requested outer card width after host fitting.

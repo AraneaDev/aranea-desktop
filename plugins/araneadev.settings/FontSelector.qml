@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 ColumnLayout {
@@ -57,9 +58,9 @@ ColumnLayout {
     Layout.preferredHeight: Style.space(28)
     visible: selector.expanded
     radius: Style.space(3)
-    color: Util.alpha(Color.foreground, 0.04)
+    color: Util.alpha(Commons.Color.foreground, 0.04)
     border.width: 1
-    border.color: Util.alpha(Color.foreground, 0.15)
+    border.color: Util.alpha(Commons.Color.foreground, 0.15)
     Aranea.FocusFrame {
       anchors.fill: parent
       focused: search.activeFocus
@@ -72,7 +73,7 @@ ColumnLayout {
       verticalAlignment: TextInput.AlignVCenter
       text: selector.query
       onTextEdited: selector.query = text
-      color: Color.foreground
+      color: Commons.Color.foreground
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       selectByMouse: true

@@ -3,6 +3,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 ProjectSectionCard {
@@ -35,7 +36,7 @@ ProjectSectionCard {
   Rectangle {
     Layout.fillWidth: true
     implicitHeight: 1
-    color: Util.alpha(Color.foreground, 0.1)
+    color: Util.alpha(Commons.Color.foreground, 0.1)
   }
   Aranea.UiLabel {
     Layout.fillWidth: true

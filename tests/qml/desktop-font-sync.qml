@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import "lib"
 import "plugins/araneadev.shared" as Shared
 
@@ -40,7 +41,7 @@ ShellRoot {
     adapterPath: '/aranea-test/missing-font-helper'
   }
   Component.onCompleted: t.step(200, function () {
-    Color.loadShell(theme.text())
+    Commons.Color.loadShell(theme.text())
     Style.fontBaseSize = 16
     t.equal(Style.font.body, 16, 'theme body text follows the shared base size')
     t.equal(Style.font.caption, 13, 'theme captions retain proportional scaling')

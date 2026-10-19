@@ -4,6 +4,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 Item {
@@ -17,7 +18,7 @@ Item {
   Rectangle {
     anchors.fill: parent
     radius: Style.space(4)
-    color: Util.alpha(Color.foreground, 0.025)
+    color: Util.alpha(Commons.Color.foreground, 0.025)
     border.width: 1
     border.color: Util.alpha(Aranea.DesignTokens.foreground, 0.08)
     Rectangle {

@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/SignalValue.js" as SignalValue
 import "ProjectProblems.js" as Problems
 
 ColumnLayout {
@@ -144,7 +145,7 @@ ColumnLayout {
       setupAwaitingFolder = false
       setupStep = 1
     }
-    if (action !== 'register' || !setupRegistrationPaths.length || !args.paths || JSON.stringify(args.paths.slice().sort()) !== JSON.stringify(setupRegistrationPaths.slice().sort()))
+    if (action !== 'register' || !setupRegistrationPaths.length || !args.paths || !SignalValue.same(args.paths.slice().sort(), setupRegistrationPaths.slice().sort()))
       return
     var ids = []
     for (var i = 0; i < setupRegistrationPaths.length; i++) {
@@ -326,7 +327,10 @@ ColumnLayout {
     details.profileEditor.expectedProfileRevision = saved.profileRevision || 0
     details.profileEditor.fieldError = saved.profileFieldError || ''
     details.submittedProfileDraft = saved.submittedProfileDraft || null
-    details.draft = saved.detailsDraft
+    // A draft saved before Preferences had roles takes the project's.
+    details.draft = Object.assign({
+      roles: details.savedRoles(details.project)
+    }, saved.detailsDraft)
     details.dirty = saved.detailsDirty
     details.fieldError = saved.detailsFieldError || ''
     details.customized = saved.customized
@@ -802,7 +806,8 @@ ColumnLayout {
   Connections {
     target: page.projectClient
     function onOperationChanged(operation) {
-      page.reconcileOperation(operation)
+      // Kept as details.operation, so stored as plain data.
+      page.reconcileOperation(SignalValue.plain(operation))
     }
     function onSnapshotChanged() {
       page.reconcileOperation(null)

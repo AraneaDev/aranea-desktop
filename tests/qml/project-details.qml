@@ -94,11 +94,77 @@ ShellRoot {
         name: 'Changed',
         editorId: 'code',
         terminalId: 'kitty',
-        workspaceMode: 'current'
+        workspaceMode: 'current',
+        openRoles: ['editor', 'terminal']
       }
     ], 'Apply persists exact draft configuration')
     details.discardDraft()
     t.equal(details.draft.name, 'Repo', 'Discard restores observed values')
+    t.equal(details.draft.roles, ['editor', 'terminal'], 'absent saved roles draft the editor and terminal default')
+    details.toggleRole('editor')
+    t.equal(details.draft.roles, ['terminal'], 'editor can be left out')
+    details.applyDraft()
+    t.equal(configurations[1], ['p-one',
+      {
+        name: 'Repo',
+        terminalId: 'kitty',
+        workspaceMode: 'dedicated',
+        openRoles: ['terminal']
+      }
+    ], 'terminal-only preferences save without an editor')
+    details.toggleRole('terminal')
+    t.check(!details.preferencesValid, 'at least one tool must open')
+    details.applyDraft()
+    t.equal(configurations.length, 2, 'no roles cannot be saved')
+    details.toggleRole('agent')
+    t.equal(details.draft.roles, ['agent'], 'agent can open on its own')
+    t.check(!details.preferencesValid && /agent/.test(details.preferencesProblem), 'agent-only needs an installed provider')
+    details.tools = Object.assign({}, details.tools, {
+      agents: [
+        {
+          id: 'claude',
+          label: 'Claude Code',
+          available: true,
+          supported: true
+        }
+      ]
+    })
+    t.check(details.preferencesValid, 'agent-only is valid once a provider is installed')
+    details.applyDraft()
+    t.equal(configurations[2], ['p-one',
+      {
+        name: 'Repo',
+        terminalId: 'kitty',
+        workspaceMode: 'dedicated',
+        openRoles: ['agent']
+      }
+    ], 'agent-only preferences keep the hosting terminal')
+    details.acknowledgeDraft(Object.assign({}, details.project, {
+      openRoles: ['agent']
+    }))
+    t.check(!details.dirty, 'saved roles acknowledge the draft')
+    details.tools = Object.assign({}, details.tools, {
+      editors: []
+    })
+    details.project = Object.assign({}, details.project, {
+      openRoles: ['agent']
+    })
+    t.check(!details.toolChoiceRequired, 'no installed editor does not force a choice when the project opens without one')
+    details.project = Object.assign({}, details.project, {
+      openRoles: undefined
+    })
+    details.tools = Object.assign({}, details.tools, {
+      editors: [
+        {
+          id: 'code',
+          label: 'Code',
+          available: true,
+          supported: true
+        }
+      ],
+      agents: []
+    })
+    details.discardDraft()
     details.operation = {
       projectId: 'p-one',
       checkoutId: 'c-main',
@@ -198,7 +264,7 @@ ShellRoot {
     details.openProject()
     details.applyDraft()
     t.equal(opens.length, 4, 'capture cannot submit Open')
-    t.equal(configurations.length, 1, 'capture cannot configure')
+    t.equal(configurations.length, 3, 'capture cannot configure')
     var fields = []
     function collectFields(item) {
       if (item.placeholderText !== undefined && item.background)

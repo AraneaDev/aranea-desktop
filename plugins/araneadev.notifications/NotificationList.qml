@@ -13,6 +13,7 @@
 // qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "components"
 import "InboxLogic.js" as InboxLogic
@@ -216,7 +217,7 @@ Item {
             topPadding: Style.space(2)
             bottomPadding: Style.space(2)
             text: "+" + (Number(rowLoader.row.hidden) || 0) + " more"
-            color: Qt.darker(Color.popups.text, 1.3)
+            color: Qt.darker(Commons.Color.popups.text, 1.3)
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
           }

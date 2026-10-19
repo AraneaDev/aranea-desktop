@@ -18,10 +18,30 @@ Item {
     }
   }
 
+  // JSON with object keys sorted. Since Qt 6.12 a var signal parameter
+  // arrives as a converted map: keys sorted, nested arrays as sequence
+  // objects that fail Array.isArray. Neither is part of any contract under
+  // test, so both compare as plain JSON. Array order still counts.
+  function canonical(value) {
+    return JSON.stringify(value, function (key, v) {
+      if (!v || typeof v !== "object" || Array.isArray(v))
+        return v
+      if (typeof v.length === "number" && Object.keys(v).every(function (k) {
+        return /^\d+$/.test(k)
+      }))
+        return Array.prototype.slice.call(v)
+      var sorted = {}
+      Object.keys(v).sort().forEach(function (k) {
+        sorted[k] = v[k]
+      })
+      return sorted
+    })
+  }
+
   // Compares two values as JSON and reports NAME, with both values on failure.
   function equal(actual, expected, name) {
-    var a = JSON.stringify(actual)
-    var e = JSON.stringify(expected)
+    var a = canonical(actual)
+    var e = canonical(expected)
     if (a === e) {
       console.log("QMLTEST PASS " + name)
     } else {

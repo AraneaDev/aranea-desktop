@@ -2,6 +2,7 @@
 import QtQuick
 import Quickshell.Io
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/SignalValue.js" as SignalValue
 import "SettingsLogic.js" as Logic
 
 QtObject {
@@ -278,7 +279,8 @@ QtObject {
   }
   // Validate and serialize mutations, then confirm against independent owner readback.
   function request(operation, args) {
-    args = args || (operation.indexOf('keybind-') === 0 ? ({}) : [])
+    // The pages' request signal delivers args as a sequence; Logic wants an array.
+    args = SignalValue.plain(args) || (operation.indexOf('keybind-') === 0 ? ({}) : [])
     if (showcaseActive || pending)
       return false
     if (operation === 'keybind-add' || operation === 'keybind-remove')

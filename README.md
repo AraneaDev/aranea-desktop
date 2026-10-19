@@ -209,9 +209,9 @@ demonstration data; the desktop background is Signal Shrine.
 | -------------------------------------------------------------- | --------------------------------------------------- |
 | ![Plain problem with Details](screenshots/project-problem.png) | ![Quick switcher](screenshots/project-switcher.png) |
 
-| Ready for review                                    |
-| --------------------------------------------------- |
-| ![Ready for review](screenshots/project-review.png) |
+| Ready for review                                    | Preferences: a terminal and an agent, no editor             |
+| --------------------------------------------------- | ----------------------------------------------------------- |
+| ![Ready for review](screenshots/project-review.png) | ![Project preferences](screenshots/project-preferences.png) |
 
 ### Pickers and applications
 

@@ -2,6 +2,7 @@
 import QtQuick
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 import "lib"
 import "plugins/araneadev.shared" as Shared
 
@@ -17,13 +18,13 @@ ShellRoot {
     interval: 120
     running: true
     onTriggered: {
-      Color.shellValues = {
+      Commons.Color.shellValues = {
         "popups.border-width": "0"
       }
       Qt.callLater(function () {
         t.equal(Border.top(panel.borderSpec), 0, "a configured zero popup border stays absent")
         t.equal(Border.left(panel.borderSpec), 0, "zero applies to each popup edge")
-        Color.shellValues = {
+        Commons.Color.shellValues = {
           "popups.border-width": "3",
           "popups.border-width-top": "1",
           "popups.border-width-right": "4",

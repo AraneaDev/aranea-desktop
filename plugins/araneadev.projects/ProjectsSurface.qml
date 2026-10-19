@@ -6,8 +6,10 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/SignalValue.js" as SignalValue
 import "AgentSuggestion.js" as Suggestion
 import "ProjectsNavigation.js" as Navigation
 import "ProjectOverview.js" as Overview
@@ -169,7 +171,7 @@ Item {
     if (root.inert || client.pending || !target || target.projectId !== client.projectId || target.checkoutId !== client.checkoutId)
       return
     var row = overviewModel.services.concat(overviewModel.checks).find(function (r) {
-      return JSON.stringify(r.target) === JSON.stringify(target)
+      return SignalValue.same(r.target, target)
     })
     if (!row || !row.controls.some(function (c) {
       return c.method === method
@@ -1041,8 +1043,8 @@ Item {
     width: panel.switcherMode ? panel.switcherSize.width : panel.width
     height: panel.switcherMode ? panel.switcherSize.height : panel.height
     contentPadding: Style.space(16)
-    fillColor: Qt.rgba(Color.background.r, Color.background.g, Color.background.b, 1)
-    borderSpecOverride: Border.flat(Util.alpha(Color.foreground, 0.16), 1)
+    fillColor: Qt.rgba(Commons.Color.background.r, Commons.Color.background.g, Commons.Color.background.b, 1)
+    borderSpecOverride: Border.flat(Util.alpha(Commons.Color.foreground, 0.16), 1)
     ProjectSwitcher {
       id: switcher
       anchors.fill: parent
@@ -1194,7 +1196,7 @@ Item {
                   implicitWidth: Style.space(6)
                   implicitHeight: Style.space(28)
                   radius: width / 2
-                  color: Util.alpha(Color.foreground, 0.5)
+                  color: Util.alpha(Commons.Color.foreground, 0.5)
                 }
                 background: Rectangle {
                   color: 'transparent'
@@ -1603,7 +1605,7 @@ Item {
                   }
                   onWorkspaceRequested: function (method, target) {
                     if (panel.root.inert || panel.root.projectClient.submitting || !panel.overviewModel.workspaces.some(function (r) {
-                      return JSON.stringify(r.target) === JSON.stringify(target) && r.controls.some(function (c) {
+                      return SignalValue.same(r.target, target) && r.controls.some(function (c) {
                         return c.method === method
                       })
                     }))

@@ -9,6 +9,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 import "PolkitLogic.js" as PolkitLogic
 
@@ -222,7 +223,7 @@ PanelWindow {
         cornerRadius: panel.root.cornerRadius
         foreground: panel.root.foreground
         accent: panel.root.accent
-        errorColor: Color.polkit.textError
+        errorColor: Commons.Color.polkit.textError
         errorFlash: panel.root.errorFlash
         responseVisible: panel.root.responseVisible
         submitted: panel.root.submitted
@@ -243,7 +244,7 @@ PanelWindow {
         visible: panel.root.currentSupplementary.length > 0
         textFormat: Text.PlainText
         text: panel.root.currentSupplementary
-        color: panel.root.supplementaryIsError ? Color.polkit.textError : panel.root.dim
+        color: panel.root.supplementaryIsError ? Commons.Color.polkit.textError : panel.root.dim
         font.family: panel.root.fontFamily
         font.pixelSize: Style.font.caption
         wrapMode: Text.Wrap

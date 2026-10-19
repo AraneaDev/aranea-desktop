@@ -9,6 +9,7 @@ import Quickshell.Wayland
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 import "BarModel.js" as BarModel
@@ -96,11 +97,11 @@ Item {
   property string fontFamily: Style.font.family
   // Bound to the central Color singleton so the bar tracks shell.toml's
   // [bar] section. Property names kept for the rest of this file's bindings.
-  property color themeForeground: Color.bar.text
+  property color themeForeground: Commons.Color.bar.text
   // Contrast color passed to omarchy-bar-text-color as the alternative foreground.
-  property color themeContrastForeground: Color.background
+  property color themeContrastForeground: Commons.Color.background
   // Foreground picked by the contrast probe for the transparent bar.
-  property color transparentForeground: Color.bar.text
+  property color transparentForeground: Commons.Color.bar.text
   // Theme foreground for widgets, independent of the transparency probe.
   property color foreground: themeForeground
   // Foreground actually used on the bar: the probed color when transparent, else the theme's.
@@ -110,9 +111,9 @@ Item {
   // Whether Aranea motion is on (shared Aranea.MotionState preference).
   property bool motionEnabled: Aranea.MotionState.motionEnabled
   // Bar background color, from the Color singleton.
-  property color background: Color.bar.background
+  property color background: Commons.Color.bar.background
   // Accent color for urgent or active states, from the Color singleton.
-  property color urgent: Color.bar.active
+  property color urgent: Commons.Color.bar.active
 
   Behavior on barForeground {
     enabled: root.motionEnabled && root.foregroundAnimationEnabled
@@ -1597,11 +1598,11 @@ Item {
       gradient: Gradient {
         GradientStop {
           position: 0
-          color: Util.alpha(Color.background, 0.97)
+          color: Util.alpha(Commons.Color.background, 0.97)
         }
         GradientStop {
           position: 1
-          color: Util.alpha(Color.background, 0.78)
+          color: Util.alpha(Commons.Color.background, 0.78)
         }
       }
     }
@@ -1625,7 +1626,7 @@ Item {
         }
         GradientStop {
           position: 0.15
-          color: Color.accent
+          color: Commons.Color.accent
         }
         GradientStop {
           position: 0.85
@@ -1857,7 +1858,7 @@ Item {
       targetWidth: targetRect ? targetRect.width : 0
       targetHeight: targetRect ? targetRect.height : 0
       dropAfter: root.barDragAfter
-      accent: Color.accent
+      accent: Commons.Color.accent
     }
     // qmllint enable unqualified
   }

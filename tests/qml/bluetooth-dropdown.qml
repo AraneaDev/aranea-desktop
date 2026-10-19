@@ -443,7 +443,7 @@ ShellRoot {
         t.equal(connectedBorder.border.color, Aranea.DesignTokens.urgent, "forget brightens to full urgent once the cursor's action is on it")
         t.equal(connectedLabel.color, Aranea.DesignTokens.urgent, "the label brightens with it")
         connectedForgetOnCursor[0].activate()
-        t.equal(JSON.stringify(actions[actions.length - 1]), JSON.stringify(["forget",
+        t.equal(t.canonical(actions[actions.length - 1]), t.canonical(["forget",
           {
             section: "connected",
             index: 0,
@@ -453,7 +453,7 @@ ShellRoot {
 
         // Available rows emit primary when chosen.
         availableRows[1].activate()
-        t.equal(JSON.stringify(actions[actions.length - 1]), JSON.stringify(["primary",
+        t.equal(t.canonical(actions[actions.length - 1]), t.canonical(["primary",
           {
             section: "discovered",
             index: 1,
@@ -464,7 +464,7 @@ ShellRoot {
         // Right-click emits secondary.
         var pairedSecondary = t.findChildren(paired, "secondaryArea")
         pairedSecondary[1].clicked(null)
-        t.equal(JSON.stringify(actions[actions.length - 1]), JSON.stringify(["secondary",
+        t.equal(t.canonical(actions[actions.length - 1]), t.canonical(["secondary",
           {
             section: "known",
             index: 1,
@@ -477,7 +477,7 @@ ShellRoot {
         // (still over the row), via the section's own signal (there's no real pointer in
         // this offscreen harness to synthesize a true hover with).
         paired.actionHovered(2, true)
-        t.equal(JSON.stringify(actions[actions.length - 1]), JSON.stringify(["hover",
+        t.equal(t.canonical(actions[actions.length - 1]), t.canonical(["hover",
           {
             section: "known",
             index: 2,
@@ -485,7 +485,7 @@ ShellRoot {
           }
         ]), "hovering forget reports action: true")
         paired.actionHovered(2, false)
-        t.equal(JSON.stringify(actions[actions.length - 1]), JSON.stringify(["hover",
+        t.equal(t.canonical(actions[actions.length - 1]), t.canonical(["hover",
           {
             section: "known",
             index: 2,

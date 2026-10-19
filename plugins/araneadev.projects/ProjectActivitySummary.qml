@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 ColumnLayout {
@@ -64,7 +65,7 @@ ColumnLayout {
       Aranea.UiLabel {
         Layout.fillWidth: true
         text: row.modelData.title + ' · ' + row.modelData.status
-        color: row.modelData.attention ? Aranea.DesignTokens.urgent : Color.foreground
+        color: row.modelData.attention ? Aranea.DesignTokens.urgent : Commons.Color.foreground
       }
       Aranea.UiLabel {
         Layout.fillWidth: true

@@ -121,29 +121,30 @@ function renderQmlTokens(tokens) {
 pragma Singleton
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 QtObject {
   // Primary accent colour.
-  readonly property color accent: Color.accent
+  readonly property color accent: Commons.Color.accent
   // Secondary accent used by selected menu text.
-  readonly property color accentSecondary: Color.menu.selectedText
+  readonly property color accentSecondary: Commons.Color.menu.selectedText
   // Aranea's violet from design/tokens.toml (Omarchy's Color has none): the
   // far end of the Filament's lit strand and the Now playing progress.
   readonly property color strandEnd: ${JSON.stringify(tokens.colors.accent_secondary)}
   // Base background colour.
-  readonly property color background: Color.background
+  readonly property color background: Commons.Color.background
   // Default foreground colour.
-  readonly property color foreground: Color.foreground
+  readonly property color foreground: Commons.Color.foreground
   // Urgent and attention colour.
-  readonly property color urgent: Color.urgent
+  readonly property color urgent: Commons.Color.urgent
   // Semantic colors used by branding glyphs and lock overlays.
-  readonly property color ceremony: Color.notifications.countdown
+  readonly property color ceremony: Commons.Color.notifications.countdown
   // Attention color used by health status surfaces.
-  readonly property color attention: Color.notifications.countdown
+  readonly property color attention: Commons.Color.notifications.countdown
   // Base color used by the lock scrim.
-  readonly property color lockOverlay: Color.lock.background
+  readonly property color lockOverlay: Commons.Color.lock.background
   // Shared surface border colour.
-  readonly property color surfaceBorder: Color.tooltip.border
+  readonly property color surfaceBorder: Commons.Color.tooltip.border
   // Shared panel corner radius.
   readonly property int cornerRadius: Style.cornerRadius
   // Shared panel border width: the host's panel frame width (KeyboardPanel, PopupCard, OSD).
@@ -168,10 +169,10 @@ QtObject {
   readonly property bool motionEnabled: MotionState.motionEnabled
   // Fill of a clickable element under the pointer, shown only after a real
   // pointer move (the menu's and the pickers' hover fill).
-  readonly property color hoverFill: Util.alpha(Color.foreground, 0.08)
+  readonly property color hoverFill: Util.alpha(Commons.Color.foreground, 0.08)
   // Fill of the selected or current item (the default device, the chosen
   // option, the current workspace), apart from the keyboard outline.
-  readonly property color selectedFill: Util.alpha(Color.accent, 0.12)
+  readonly property color selectedFill: Util.alpha(Commons.Color.accent, 0.12)
   // Width of the accent marker on a selected row's left edge.
   readonly property int selectedMarkerWidth: Math.max(2, Style.space(2))
 }

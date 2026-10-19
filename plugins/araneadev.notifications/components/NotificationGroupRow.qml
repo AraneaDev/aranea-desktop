@@ -9,6 +9,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../../araneadev.shared" as Aranea
 import "../../araneadev.shared/ClickSettle.js" as ClickSettle
 
@@ -24,9 +25,9 @@ RowLayout {
   // Font family supplied by the containing panel.
   property string fontFamily: Aranea.Typography.uiFamily
   // Main text colour.
-  property color foreground: Color.popups.text
+  property color foreground: Commons.Color.popups.text
   // Accent colour used while the close action is hovered.
-  property color accent: Color.notifications.countdown
+  property color accent: Commons.Color.notifications.countdown
   // Muted colour for the close action at rest.
   property color dim: Qt.darker(foreground, 1.4)
   // Optional PointerMoveGate (qs.Ui) carrying layoutChangedAt; with it the

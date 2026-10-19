@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Hyprland
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 QtObject {
@@ -51,15 +52,15 @@ QtObject {
   // Bound to the central [menu] section in shell.toml via Color.qml.
   // Each color already includes its alpha companion (composed in the
   // singleton), so consumers can drop them straight into a Rectangle.
-  property color background: Color.menu.background
+  property color background: Commons.Color.menu.background
   // Menu text color.
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   // Card border color.
-  property color border: Color.menu.border
+  property color border: Commons.Color.menu.border
   // Border spec for the card, from the shell's menu border settings.
   property var borderSpec: Border.surfaceSpec("menu", "border", style.border, Aranea.DesignTokens.borderWidth)
   // Full-screen backdrop color behind the card.
-  property color scrim: Color.menu.scrim
+  property color scrim: Commons.Color.menu.scrim
   // Keep the new ornamentation derived from the stable shell palette.  The
   // shell's menu parser intentionally exposes only the established surface
   // tokens, so these are composited here instead of reaching for ad-hoc
@@ -68,11 +69,11 @@ QtObject {
   // Color of the root footer text.
   property color footerText: Util.alpha(style.foreground, Aranea.DesignTokens.secondaryOpacity)
   // Hover fill of the row under the pointer (fill only, as the pickers').
-  property color selectedBackground: Color.menu.selectedBackground
+  property color selectedBackground: Commons.Color.menu.selectedBackground
   // Text color of the outlined row; also tints hovered tiles.
-  property color selectedText: Color.menu.selectedText
+  property color selectedText: Commons.Color.menu.selectedText
   // Color of the shell's menu selected-border spec.
-  property color selectedBorder: Color.menu.selectedBorder
+  property color selectedBorder: Commons.Color.menu.selectedBorder
   // The shell's menu selected-border spec: rows draw no border on hover,
   // but its side widths still reserve the rows' content insets.
   property var selectedBorderSpec: Border.surfaceSpec("menu", "selected-border", style.selectedBorder, 0)

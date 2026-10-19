@@ -6,6 +6,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 
 ColumnLayout {
@@ -40,12 +41,12 @@ ColumnLayout {
   signal cancelRequested
   // Uniform theme surface for friendly input fields; plain text stays selectable.
   component InputField: TextField {
-    color: Color.foreground
-    placeholderTextColor: Util.alpha(Color.foreground, 0.65)
+    color: Commons.Color.foreground
+    placeholderTextColor: Util.alpha(Commons.Color.foreground, 0.65)
     padding: Style.space(8)
     background: Rectangle {
       radius: Style.space(3)
-      color: Util.alpha(Color.foreground, 0.065)
+      color: Util.alpha(Commons.Color.foreground, 0.065)
     }
   }
   ListModel {

@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell.Io
 import "../araneadev.shared" as Aranea
 import "ProjectActionRecords.js" as Records
+import "../araneadev.shared/SignalValue.js" as SignalValue
 
 Item {
   id: client
@@ -39,6 +40,8 @@ Item {
   property var error: null
   // Local helper/submission in flight; this never owns a service lifecycle.
   property bool pending: false
+  // A background run poll in flight; unlike pending it never disables controls.
+  property bool polling: false
   // Only an in-flight launch can leave acceptance uncertain after disconnect.
   property bool submitting: false
   // Blocks new submission until the exact receipt is recovered.
@@ -643,33 +646,39 @@ Item {
   }
   // Retained metadata read differs from an explicit fresh native observation.
   function observeRun(id: string): bool {
-    return runCommand('inspect', id)
+    return runCommand('inspect', id, false)
   }
   // Explicit fresh native observation for an exact retained ID.
   function refreshRun(id: string): bool {
-    return runCommand('refresh', id)
+    return runCommand('refresh', id, false)
   }
   // Explicit exact-run cancellation; the backend proves native ownership.
   function stop(id: string): bool {
-    return runCommand('stop', id)
+    return runCommand('stop', id, false)
   }
   // Explicit bounded journal read; plaintext and truncation are preserved.
   function logs(id: string): bool {
-    return runCommand('logs', id)
+    return runCommand('logs', id, false)
   }
   // Open only eligible exact running service; backend freshly rechecks ownership.
   function openPreview(id: string): bool {
     if (!currentRun || currentRun.id !== id || !Records.canOpenPreview(currentRun))
       return false
-    return runCommand('open-preview', id)
+    return runCommand('open-preview', id, false)
   }
-  // Exact-run callbacks cannot attach another run or an old selection.
-  function runCommand(method: string, id: string): bool {
-    if (captureActive || pending || !id)
+  // Exact-run callbacks cannot attach another run or an old selection. A
+  // background poll leaves pending alone and is superseded by any command.
+  function runCommand(method: string, id: string, background: bool): bool {
+    if (captureActive || pending || background && polling || !id)
       return false
     summaryGeneration++
     poll.stop()
-    pending = true
+    if (background)
+      polling = true
+    else
+      pending = true
+    if (!background)
+      polling = false
     var read = ++runGeneration
     var selectedProject = projectId, selectedCheckout = checkoutId
     invoke(method, {
@@ -677,19 +686,28 @@ Item {
     }, function () {
       return read === client.runGeneration && selectedProject === client.projectId && selectedCheckout === client.checkoutId
     }, function (response, failure) {
-      pending = false
+      if (background)
+        polling = false
+      else
+        pending = false
       available = !!response
       error = failure || response.error
       if (response && response.run) {
         if (response.run.id !== id || !matchesSelection(response.run)) {
           error = transportError('The returned run does not match the selected identity.')
         } else {
-          publishRun(response.run)
+          // An unchanged poll answer leaves the bound views alone.
+          if (!background || !SignalValue.same(response.run, currentRun))
+            publishRun(response.run)
+          else
+            schedulePoll()
           if (response.state) {
             snapshotGeneration++
-            snapshot = response.state
-            snapshotProjectId = selectedProject
-            changed()
+            if (!background || !SignalValue.same(response.state, snapshot)) {
+              snapshot = response.state
+              snapshotProjectId = selectedProject
+              changed()
+            }
           }
           if (method === 'logs') {
             output = typeof response.output === 'string' ? response.output : ''
@@ -767,9 +785,9 @@ Item {
   }
   // Visible polling observes protected intent without resubmission.
   function readRun(): void {
-    if (captureActive || !observationActive || !visible || pending || !matchesSelection(currentRun) || !Records.protectedRun(currentRun))
+    if (captureActive || !observationActive || !visible || pending || polling || !matchesSelection(currentRun) || !Records.protectedRun(currentRun))
       return
-    refreshRun(currentRun.id)
+    runCommand('refresh', currentRun.id, true)
   }
   Timer {
     id: poll

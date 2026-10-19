@@ -90,7 +90,7 @@ test("renderShellToml renders nested shell sections", async () => {
 test("renderQmlTokens exposes stable shared token aliases", async () => {
   const { renderQmlTokens } = await generatorPromise
   const output = renderQmlTokens(fixture)
-  assert.match(output, /readonly property color accent: Color\.accent/)
+  assert.match(output, /readonly property color accent: Commons\.Color\.accent/)
   assert.match(output, /readonly property int cornerRadius: Style\.cornerRadius/)
   assert.match(output, /readonly property int borderWidth: Math\.max\(1, Style\.space\(2\)\)/)
   assert.match(output, /readonly property bool motionEnabled: MotionState\.motionEnabled/)
@@ -103,7 +103,10 @@ test("renderQmlTokens draws the filament's far end in Aranea's violet", async ()
     colors: { ...fixture.colors, accent_secondary: "#123456" }
   })
   assert.match(output, /readonly property color strandEnd: "#123456"/)
-  assert.match(output, /readonly property color accentSecondary: Color\.menu\.selectedText/)
+  assert.match(
+    output,
+    /readonly property color accentSecondary: Commons\.Color\.menu\.selectedText/
+  )
 })
 
 test("renderIntegrationCss projects semantic palette variables", async () => {
@@ -118,9 +121,12 @@ test("renderIntegrationCss projects semantic palette variables", async () => {
 test("renderQmlTokens exposes semantic colors used by branding consumers", async () => {
   const { renderQmlTokens } = await generatorPromise
   const output = renderQmlTokens(fixture)
-  assert.match(output, /readonly property color ceremony: Color\.notifications\.countdown/)
-  assert.match(output, /readonly property color attention: Color\.notifications\.countdown/)
-  assert.match(output, /readonly property color lockOverlay: Color\.lock\.background/)
+  assert.match(output, /readonly property color ceremony: Commons\.Color\.notifications\.countdown/)
+  assert.match(
+    output,
+    /readonly property color attention: Commons\.Color\.notifications\.countdown/
+  )
+  assert.match(output, /readonly property color lockOverlay: Commons\.Color\.lock\.background/)
 })
 
 test("identity projections always use Aranea", async () => {

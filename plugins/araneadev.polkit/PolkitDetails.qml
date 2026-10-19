@@ -4,6 +4,7 @@ import QtQuick
 import "../araneadev.shared" as Aranea
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 
 ColumnLayout {
   id: details
@@ -13,11 +14,11 @@ ColumnLayout {
   // Font family used for both columns.
   property string fontFamily: Aranea.Typography.uiFamily
   // Main value text colour.
-  property color foreground: Color.polkit.text
+  property color foreground: Commons.Color.polkit.text
   // Muted key text colour.
   property color dim: Util.alpha(foreground, Aranea.DesignTokens.secondaryOpacity)
   // Selection highlight colour for copied values.
-  property color accent: Color.polkit.accent
+  property color accent: Commons.Color.polkit.accent
   // Letter spacing applied to keys.
   property real letterSpacing: 0.2
 

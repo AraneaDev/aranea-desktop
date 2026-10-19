@@ -8,6 +8,7 @@ import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
 import qs.Ui
 import qs.Commons
+import qs.Commons as Commons
 import "Model.js" as Model
 import "AudioLogic.js" as AudioLogic
 import "AudioBridge.js" as AudioBridge
@@ -282,9 +283,9 @@ Panel {
 
   // Row background tint under the mouse.
   // qmllint disable missing-property
-  readonly property color hoverFill: bar ? Style.hoverFillFor(bar.foreground, Color.accent) : "transparent"
+  readonly property color hoverFill: bar ? Style.hoverFillFor(bar.foreground, Commons.Color.accent) : "transparent"
   // Row background tint for the keyboard-selected row.
-  readonly property color selectedFill: bar ? Style.selectedFillFor(bar.foreground, Color.accent) : "transparent"
+  readonly property color selectedFill: bar ? Style.selectedFillFor(bar.foreground, Commons.Color.accent) : "transparent"
   // qmllint enable missing-property
 
   // How many rows a section currently has.

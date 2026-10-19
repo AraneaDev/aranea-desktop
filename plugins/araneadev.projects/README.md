@@ -123,7 +123,8 @@ aranea projects open PROJECT_ID --roles terminal --json
 ```
 
 Saved `openRoles` selects the tools for ordinary Open; absent roles default to
-editor and terminal. `--roles` overrides that selection once. Explicit new agent
+editor and terminal. Preferences sets them too: any mix of Editor, Terminal and
+Agent, such as a terminal or an agent on its own, needs only the tools it starts. `--roles` overrides that selection once. Explicit new agent
 sessions use agent-only roles unless `--roles` is supplied. Ordinary Open focuses
 a proven existing agent; Start explicitly creates another session. The last
 provider is recorded immediately before an attempted launch, even if that launch

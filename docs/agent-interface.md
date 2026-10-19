@@ -652,7 +652,9 @@ Exit 0 proves only that command succeeded, not project or agent-task verificatio
 Pending/running/unconfirmed processes **or** `submissionUnconfirmed:true` remain
 protected. Even a succeeded main process may have unconfirmed child cleanup.
 Missing manager, changed invocation or uncertain submission cannot establish Stop,
-permit duplicate execution, or discard ownership evidence. Boot, transient unit,
+permit duplicate execution, or discard ownership evidence. A requested Stop of the
+pinned invocation is established when this boot's manager no longer has the unit:
+systemd unloads a stopped transient unit at once. Boot, transient unit,
 immutable command marker and pinned invocation must match before control.
 
 `aranea capabilities --json` includes action operation schemas, `projectActions`

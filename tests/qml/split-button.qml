@@ -2,7 +2,7 @@
 import QtQuick
 import QtTest
 import Quickshell
-import qs.Commons
+import qs.Commons as Commons
 import "lib"
 import "plugins/araneadev.shared" as Aranea
 
@@ -69,7 +69,7 @@ ShellRoot {
     var primary = t.findChild(split, 'splitPrimary')
     var toggle = t.findChild(split, 'splitToggle')
     var menu = t.findChild(split, 'splitMenu')
-    Color.popups.background = Qt.rgba(0.1, 0.2, 0.3, 0.4)
+    Commons.Color.popups.background = Qt.rgba(0.1, 0.2, 0.3, 0.4)
     input.mouseClick(primary)
     t.equal(root.events, ['primary'], 'primary pointer click emits the default action')
     toggle.forceActiveFocus()

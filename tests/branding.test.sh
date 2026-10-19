@@ -25,8 +25,8 @@ grep -Fq 'Quiet systems. Connected focus.' "$repo_root/branding/screensaver.txt"
 test -f "$repo_root/branding/brand.env"
 grep -Fq "BRAND_NAME='Aranea'" "$repo_root/branding/brand.env"
 grep -Fq 'var(--aranea-surface-raised)' "$repo_root/integrations/browser/chromium/new-tab/style.css"
-grep -Fq 'readonly property color ceremony: Color.' "$repo_root/plugins/araneadev.shared/DesignTokens.qml"
-grep -Fq 'readonly property color attention: Color.' "$repo_root/plugins/araneadev.shared/DesignTokens.qml"
+grep -Fq 'readonly property color ceremony: Commons.Color.' "$repo_root/plugins/araneadev.shared/DesignTokens.qml"
+grep -Fq 'readonly property color attention: Commons.Color.' "$repo_root/plugins/araneadev.shared/DesignTokens.qml"
 grep -Fq '{{colors.accent}}' "$repo_root/design/templates/assets/branding/active.svg.in"
 if grep -Fq '{{' "$repo_root/branding/motifs"/*.svg "$repo_root/branding/glyphs"/{active,ready,power,sleep,warning,attention,error}.svg; then
   echo "generated branding assets contain unresolved template tokens" >&2

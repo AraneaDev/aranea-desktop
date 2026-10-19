@@ -4,6 +4,7 @@
 import QtQuick
 import "../araneadev.shared" as Aranea
 import qs.Commons
+import qs.Commons as Commons
 
 Text {
   // Technical observations and values retain the desktop monospace family.
@@ -11,6 +12,6 @@ Text {
   textFormat: Text.PlainText
   font.family: technical ? Aranea.Typography.technicalFamily : Aranea.Typography.uiFamily
   font.pixelSize: Style.font.caption
-  color: Color.foreground
+  color: Commons.Color.foreground
   wrapMode: Text.Wrap
 }

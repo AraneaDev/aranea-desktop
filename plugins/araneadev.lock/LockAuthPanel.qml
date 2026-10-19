@@ -3,6 +3,7 @@
 import QtQuick
 import "../araneadev.shared" as Aranea
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 Item {
@@ -40,15 +41,15 @@ Item {
   // Public contract member.
   property string fontFamily: Aranea.Typography.uiFamily
   // Public contract member.
-  property color foreground: Color.lock.text
+  property color foreground: Commons.Color.lock.text
   // Public contract member.
-  property color placeholderColor: Color.lock.placeholder
+  property color placeholderColor: Commons.Color.lock.placeholder
   // Public contract member.
-  property color errorColor: Color.lock.textError
+  property color errorColor: Commons.Color.lock.textError
   // Public contract member.
-  property color selectionColor: Color.lock.selection
+  property color selectionColor: Commons.Color.lock.selection
   // Public contract member.
-  property color accent: Color.lock.placeholder
+  property color accent: Commons.Color.lock.placeholder
   // Public contract member.
   signal submitPassword(string password)
   // Public contract member.
@@ -94,7 +95,7 @@ Item {
     width: root.fieldWidth
     height: root.fieldHeight
     anchors.centerIn: parent
-    color: Color.lock.background
+    color: Commons.Color.lock.background
     borderSpec: root.inputBorderSpec
     radius: root.cornerRadius
     clip: true

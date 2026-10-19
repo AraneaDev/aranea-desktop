@@ -16,6 +16,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../../araneadev.shared" as Aranea
 import "../NotificationLogic.js" as NotificationLogic
@@ -127,17 +128,17 @@ BorderSurface {
   readonly property string styledBody: NotificationLogic.styledBody(body, app, appIcon)
 
   // Muted text color: time label, close button, low-urgency accent.
-  readonly property color dimColor: Qt.darker(Color.notifications.text, 1.4)
+  readonly property color dimColor: Qt.darker(Commons.Color.notifications.text, 1.4)
   // Body text color, slightly darker than the summary.
-  readonly property color bodyColor: Qt.darker(Color.notifications.text, 1.15)
+  readonly property color bodyColor: Qt.darker(Commons.Color.notifications.text, 1.15)
   // Color of the urgency rail on the card's left edge.
-  readonly property color railColor: urgency === 2 ? Color.urgent : (urgency === 0 ? Color.notifications.border : Color.notifications.countdown)
+  readonly property color railColor: urgency === 2 ? Commons.Color.urgent : (urgency === 0 ? Commons.Color.notifications.border : Commons.Color.notifications.countdown)
   // Card fill: red-tinted for critical; a light tint on hover for toasts
   // only (center rows draw no hover fill); else the theme's.
-  readonly property color cardBackground: urgency === 2 ? Util.alpha(Color.urgent, 0.08) : (hovered && !compact ? Util.alpha(Color.notifications.countdown, 0.045) : Color.notifications.background)
+  readonly property color cardBackground: urgency === 2 ? Util.alpha(Commons.Color.urgent, 0.08) : (hovered && !compact ? Util.alpha(Commons.Color.notifications.countdown, 0.045) : Commons.Color.notifications.background)
   // Border: red for critical, else the theme's. The keyboard cursor draws
   // its own outline on top (hasCursor).
-  readonly property var cardBorderSpec: Aranea.PanelChrome.surfaceBorder("notifications", "border", urgency === 2 ? Color.urgent : Color.notifications.border, Math.max(1, Style.space(1)), urgency !== 2)
+  readonly property var cardBorderSpec: Aranea.PanelChrome.surfaceBorder("notifications", "border", urgency === 2 ? Commons.Color.urgent : Commons.Color.notifications.border, Math.max(1, Style.space(1)), urgency !== 2)
 
   // Whether a pointer click may act on this card: always without a gate
   // (toasts); with one, ClickSettle over the card's creation, the gate's
@@ -355,7 +356,7 @@ BorderSurface {
           anchors.centerIn: parent
           visible: root.hasGlyph && smallIconImage.status !== Image.Ready
           text: root.glyph
-          color: Color.notifications.text
+          color: Commons.Color.notifications.text
           font.family: Aranea.Typography.iconFamily
           font.pixelSize: Style.font.displayLarge
         }
@@ -366,7 +367,7 @@ BorderSurface {
         Layout.alignment: Qt.AlignVCenter
         visible: root.compactGlyph
         text: root.glyph
-        color: Color.notifications.text
+        color: Commons.Color.notifications.text
         font.family: Aranea.Typography.iconFamily
         font.pixelSize: Style.font.icon
       }
@@ -386,7 +387,7 @@ BorderSurface {
           visible: root.summary.length > 0
           text: root.summary
           font.family: root.fontFamily.length > 0 ? root.fontFamily : Aranea.Typography.uiFamily
-          color: Color.notifications.text
+          color: Commons.Color.notifications.text
           font.pixelSize: Style.font.title
           font.bold: true
           wrapMode: Text.WordWrap
@@ -428,7 +429,7 @@ BorderSurface {
           Layout.alignment: Qt.AlignRight
           textFormat: Text.PlainText
           text: String.fromCodePoint(0x2715)
-          color: (root.pointerGate ? root.closeHot : closeArea.containsMouse) ? Color.notifications.countdown : root.dimColor
+          color: (root.pointerGate ? root.closeHot : closeArea.containsMouse) ? Commons.Color.notifications.countdown : root.dimColor
           font.family: Aranea.Typography.iconFamily
           font.pixelSize: Style.font.body
           MouseArea {

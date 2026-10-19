@@ -10,6 +10,7 @@ import Quickshell.Bluetooth
 import Quickshell.Services.Pipewire
 import qs.Ui
 import qs.Commons
+import qs.Commons as Commons
 import "Model.js" as Model
 import "BluetoothLogic.js" as BluetoothLogic
 import "../araneadev.shared/ShowcaseLogic.js" as Showcase
@@ -237,9 +238,9 @@ Panel {
   // with stock's.
   // qmllint disable missing-property
   // Row fill color under mouse hover.
-  readonly property color hoverFill: bar ? Style.hoverFillFor(bar.foreground, Color.accent) : "transparent"
+  readonly property color hoverFill: bar ? Style.hoverFillFor(bar.foreground, Commons.Color.accent) : "transparent"
   // Row fill color for the keyboard-selected row.
-  readonly property color selectedFill: bar ? Style.selectedFillFor(bar.foreground, Color.accent) : "transparent"
+  readonly property color selectedFill: bar ? Style.selectedFillFor(bar.foreground, Commons.Color.accent) : "transparent"
   // qmllint enable missing-property
 
   // Number of devices in a section.

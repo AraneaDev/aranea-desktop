@@ -9,6 +9,7 @@
 import QtQuick
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 import "PolkitLogic.js" as PolkitLogic
 
@@ -18,19 +19,19 @@ Item {
   // Font for the card's text (the shell's menu font).
   property string fontFamily: Aranea.Typography.uiFamily
   // Bound to the central [polkit] section in shell.toml via Color.qml.
-  property color accent: Color.polkit.accent
+  property color accent: Commons.Color.polkit.accent
   // Card fill colour.
-  property color background: Color.polkit.background
+  property color background: Commons.Color.polkit.background
   // Main text colour.
-  property color foreground: Color.polkit.text
+  property color foreground: Commons.Color.polkit.text
   // Card border colour in the normal state.
-  property color border: Color.polkit.border
+  property color border: Commons.Color.polkit.border
   // Card border colour while the failure flash is on.
-  property color borderError: Color.polkit.borderError
+  property color borderError: Commons.Color.polkit.borderError
   // Border spec handed to BorderSurface; switches to the error border during errorFlash.
   property var borderSpec: Aranea.PanelChrome.surfaceBorder("polkit", errorFlash ? "border-error" : "border", errorFlash ? borderError : border, Aranea.DesignTokens.borderWidth, !errorFlash)
   // Lock-grade dim: at least 0.72, whatever the theme's scrim alpha is.
-  readonly property color scrim: Qt.rgba(Color.polkit.scrim.r, Color.polkit.scrim.g, Color.polkit.scrim.b, Math.max(Color.polkit.scrim.a, 0.72))
+  readonly property color scrim: Qt.rgba(Commons.Color.polkit.scrim.r, Commons.Color.polkit.scrim.g, Commons.Color.polkit.scrim.b, Math.max(Commons.Color.polkit.scrim.a, 0.72))
   // Secondary text colour: foreground at 58% alpha.
   readonly property color dim: Util.alpha(foreground, Aranea.DesignTokens.secondaryOpacity)
   // Letter spacing for the uppercase labels.

@@ -5,6 +5,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 import "SettingsLogic.js" as Logic
 
@@ -77,10 +78,10 @@ ColumnLayout {
     Rectangle {
       Layout.preferredWidth: Math.min(Style.space(248), parent.width)
       Layout.preferredHeight: presetGrid.implicitHeight + Style.space(8)
-      color: Util.alpha(Color.foreground, 0.025)
+      color: Util.alpha(Commons.Color.foreground, 0.025)
       radius: Style.space(3)
       border.width: 1
-      border.color: Util.alpha(Color.foreground, 0.08)
+      border.color: Util.alpha(Commons.Color.foreground, 0.08)
       GridLayout {
         id: presetGrid
         anchors.left: parent.left
@@ -116,9 +117,9 @@ ColumnLayout {
         Layout.preferredWidth: Math.min(Style.space(136), parent.width)
         Layout.preferredHeight: Style.space(28)
         radius: Style.space(3)
-        color: Util.alpha(Color.foreground, 0.04)
+        color: Util.alpha(Commons.Color.foreground, 0.04)
         border.width: 1
-        border.color: Util.alpha(Color.foreground, 0.15)
+        border.color: Util.alpha(Commons.Color.foreground, 0.15)
         Aranea.FocusFrame {
           anchors.fill: parent
           focused: scaleField.activeFocus
@@ -131,7 +132,7 @@ ColumnLayout {
           anchors.rightMargin: Style.space(8)
           verticalAlignment: TextInput.AlignVCenter
           text: page.scaleDraft
-          color: Color.foreground
+          color: Commons.Color.foreground
           font.family: Aranea.Typography.technicalFamily
           font.pixelSize: Style.font.body
           enabled: page.displayAvailable && !page.displayOnly && !page.pending
@@ -164,7 +165,7 @@ ColumnLayout {
   SettingsLabel {
     Layout.fillWidth: true
     text: page.scaleDirty && !page.scaleValidation.ok ? page.scaleValidation.message : !page.displayAvailable ? 'Scaling unavailable' : page.display.persistenceSupport === 'supported' ? 'Saving supported' : page.display.persistenceSupport === 'unsupported' ? 'Session only' : 'Persistence unavailable'
-    color: page.scaleDirty && !page.scaleValidation.ok ? Aranea.DesignTokens.attention : Color.foreground
+    color: page.scaleDirty && !page.scaleValidation.ok ? Aranea.DesignTokens.attention : Commons.Color.foreground
     opacity: 0.75
   }
   SettingsLabel {

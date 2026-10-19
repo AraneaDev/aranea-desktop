@@ -5,6 +5,7 @@ import Quickshell
 import "lib"
 import "plugins/araneadev.shared" as Shared
 import qs.Commons
+import qs.Commons as Commons
 
 ShellRoot {
   QmlTest {
@@ -16,12 +17,12 @@ ShellRoot {
     width: 120
     height: 80
     surface: "tooltip"
-    borderColor: Color.tooltip.border
+    borderColor: Commons.Color.tooltip.border
   }
 
   Shared.StatusRail {
     id: rail
-    railColor: Color.accent
+    railColor: Commons.Color.accent
   }
 
   Shared.StatusTextPair {
@@ -144,7 +145,7 @@ ShellRoot {
     t.equal(card.cornerRadius, Style.cornerRadius, "surface cards expose configurable corner radius")
     t.equal(Shared.DesignTokens.cornerRadius, Style.cornerRadius, "design tokens expose the canonical corner radius")
     t.equal(Shared.DesignTokens.borderWidth, Math.max(1, Style.space(2)), "the shared border width is the host panel frame width")
-    t.equal(Shared.DesignTokens.foreground, Color.foreground, "design tokens expose the canonical foreground")
+    t.equal(Shared.DesignTokens.foreground, Commons.Color.foreground, "design tokens expose the canonical foreground")
     t.equal(Shared.DesignTokens.motionEnabled, Shared.MotionState.motionEnabled, "design tokens follow the shared motion state")
     t.equal(rail.implicitWidth, Style.space(2), "status rails use the shared compact width")
     t.equal(pair.title, "TITLE", "status text pairs expose their title")

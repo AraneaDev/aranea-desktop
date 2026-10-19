@@ -7,6 +7,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 
 Item {
   id: chrome
@@ -29,9 +30,9 @@ Item {
   // Font for every text in the frame; defaults to the menu font.
   property string fontFamily: refined ? Typography.uiFamily : Style.font.menuFamily
   // Main text colour; also the base for the dimmed colour and the search box tints.
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   // Colour of the counts and of the search glyph while a filter is set.
-  property color accent: Color.menu.selectedText
+  property color accent: Commons.Color.menu.selectedText
   // Muted subtitle, hints and idle glyph; refined hosts use the shared role.
   readonly property color dim: Util.alpha(foreground, refined ? DesignTokens.secondaryOpacity : 0.58)
   // Letter spacing of the header, counts and hint texts.

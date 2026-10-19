@@ -62,9 +62,10 @@ marker() {
     project-switcher) echo '"mode":"switcher"' ;;
     project-review) echo '"branch":"agent/navigation-polish"' ;;
     project-actions) echo '"projectSection":"actions"' ;;
+    project-preferences) echo '"projectSection":"preferences"' ;;
   esac
 }
-for surface in projects project-overview project-problem project-switcher project-review project-actions; do
+for surface in projects project-overview project-problem project-switcher project-review project-actions project-preferences; do
   : >"$log"
   "$capture" --surface "$surface" --output "$out" >/dev/null
   [[ "$(cat "$out/$surface.png")" == frame ]]

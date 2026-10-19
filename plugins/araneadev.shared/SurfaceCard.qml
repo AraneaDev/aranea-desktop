@@ -2,7 +2,7 @@
 // BorderSurface implementation while centralizing the common border contract.
 // qmllint disable missing-property
 import QtQuick
-import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 BorderSurface {
@@ -11,13 +11,13 @@ BorderSurface {
   // Host surface family used to resolve the border specification.
   property string surface: "popups"
   // Border colour when no override is supplied.
-  property color borderColor: Color.popups.border
+  property color borderColor: Commons.Color.popups.border
   // Border opacity multiplier.
   property real borderAlpha: 1.0
   // Border width when no override is supplied.
   property int borderWidth: DesignTokens.borderWidth
   // Card fill colour.
-  property color fillColor: Color.popups.background
+  property color fillColor: Commons.Color.popups.background
   // Optional complete border specification.
   property var borderSpecOverride: null
   // Padding applied around card content.

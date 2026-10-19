@@ -21,7 +21,7 @@ expected_surfaces=(
   btop file-manager neovim notifications notifications-empty clipboard emojis polkit
   network vpn audio bluetooth agents
   power monitor tray tray-manage clock weather image-picker apps favorites recent
-  dawn osd workspaces updates projects project-overview project-actions project-problem project-switcher project-review
+  dawn osd workspaces updates projects project-overview project-actions project-problem project-switcher project-review project-preferences
 )
 expected_hero_frames=(
   desktop menu menu-submenu settings settings-scaling settings-schedule menu-search menu-input apps favorites recent

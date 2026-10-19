@@ -3,6 +3,7 @@
 // qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 
@@ -98,7 +99,7 @@ Item {
     anchors.fill: parent
     anchors.margins: Style.space(1)
     color: owner && owner.transparent ? "transparent" : owner ? owner.background : "transparent"
-    borderSpec: Border.flat(owner ? owner.barForeground : Color.bar.text, 1)
+    borderSpec: Border.flat(owner ? owner.barForeground : Commons.Color.bar.text, 1)
     radius: Math.min(Style.cornerRadius, height / 2)
     opacity: owner && owner.transparent ? 0.22 : 0.32
   }
@@ -145,7 +146,7 @@ Item {
 
     visible: opacity > 0
     opacity: (slot.panelOpen || slot.openIndicatorVisible) && !slot.dragSource ? 0.75 : 0
-    color: Color.accent
+    color: Commons.Color.accent
     radius: Math.min(width, height) / 2
     width: owner && owner.vertical ? Style.space(2) : (slot.openIndicatorVisible ? Style.space(12) : slot.panelIndicatorExtent)
     height: owner && owner.vertical ? (slot.openIndicatorVisible ? Style.space(12) : slot.panelIndicatorExtent) : Style.space(2)
