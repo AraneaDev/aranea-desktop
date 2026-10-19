@@ -61,8 +61,8 @@ Panel {
   // The zero-based month on screen.
   property int viewMonth: today.getMonth()
 
-  // The first day of the viewed month, as a Date.
-  readonly property date viewDate: new Date(viewYear, viewMonth, 1)
+  // Local noon keeps the month label correct when DST removes its first midnight.
+  readonly property date viewDate: new Date(viewYear, viewMonth, 1, 12)
   // Whether the grid is showing today's own month (hides "Back to today").
   readonly property bool viewingCurrentMonth: viewYear === today.getFullYear() && viewMonth === today.getMonth()
 

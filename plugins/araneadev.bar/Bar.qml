@@ -191,7 +191,9 @@ Item {
   // Plugin bar API objects keyed by plugin id, created lazily by pluginBarApiFor.
   property var pluginBarApis: ({})
   // Records {target, pluginId, clickTarget, popout} of bar objects claimed by plugins.
-  property var pluginObjectOwners: []
+  readonly property var pluginObjectOwners: new Map()
+  // Coalesces registrations and layout changes into one refresh per event-loop turn.
+  property bool pluginBarApiSyncQueued: false
 
   Component {
     id: pluginBarApiComponent
@@ -247,7 +249,7 @@ Item {
   }
 
   // Refresh a plugin API's view of the popout, its own click targets and the layout; a foreign popout shows as a marker.
-  function syncPluginBarApiObjects(api) {
+  function syncPluginBarApiObjects(api, layoutSnapshot) {
     if (!api)
       return
     api.activePopout = root.pluginOwnsBarObject(api.pluginId, root.activePopout) ? root.activePopout : (root.activePopout ? api.foreignPopoutMarker : null)
@@ -255,19 +257,14 @@ Item {
     // Click registrations also refresh this facade. Preserve an equal
     // layout so tray bucket bindings do not rebuild their own delegates
     // while those delegates are registering or unregistering click targets.
-    var layout = root.publicLayoutConfig()
-    if (JSON.stringify(api.layoutConfig) !== JSON.stringify(layout))
-      api.layoutConfig = layout
+    var snapshot = layoutSnapshot !== undefined ? layoutSnapshot : JSON.stringify(root.layoutConfig || {})
+    if (JSON.stringify(api.layoutConfig) !== snapshot)
+      api.layoutConfig = JSON.parse(snapshot)
   }
 
   // Ownership record for a bar object, or null when no plugin claimed it.
   function pluginObjectRecord(target) {
-    for (var i = 0; i < pluginObjectOwners.length; i++) {
-      var record = pluginObjectOwners[i]
-      if (record && record.target === target)
-        return record
-    }
-    return null
+    return target ? (pluginObjectOwners.get(target) || null) : null
   }
 
   // Claim target for a plugin in a role (clickTarget or popout); false when another plugin owns it.
@@ -278,39 +275,28 @@ Item {
     var record = root.pluginObjectRecord(target)
     if (record && record.pluginId !== key)
       return false
-    var next = []
-    for (var i = 0; i < pluginObjectOwners.length; i++) {
-      var existing = pluginObjectOwners[i]
-      if (!existing || existing.target !== target)
-        next.push(existing)
+    if (!record) {
+      record = {
+        target: target,
+        pluginId: key,
+        clickTarget: false,
+        popout: false
+      }
+      pluginObjectOwners.set(target, record)
     }
-    var updated = record || {
-      target: target,
-      pluginId: key,
-      clickTarget: false,
-      popout: false
-    }
-    updated[role] = true
-    next.push(updated)
-    pluginObjectOwners = next
+    record[role] = true
     return true
   }
 
   // Drop a plugin's role on target, removing the record once no role is left.
   function unmarkPluginObject(pluginId, target, role) {
     var key = String(pluginId || "")
-    var next = []
-    for (var i = 0; i < pluginObjectOwners.length; i++) {
-      var record = pluginObjectOwners[i]
-      if (!record || record.target !== target || record.pluginId !== key) {
-        next.push(record)
-        continue
-      }
-      record[role] = false
-      if (record.clickTarget || record.popout)
-        next.push(record)
-    }
-    pluginObjectOwners = next
+    var record = root.pluginObjectRecord(target)
+    if (!record || record.pluginId !== key)
+      return
+    record[role] = false
+    if (!record.clickTarget && !record.popout)
+      pluginObjectOwners.delete(target)
   }
 
   // Whether target is claimed by the given plugin.
@@ -330,10 +316,23 @@ Item {
     return out
   }
 
-  // Run syncPluginBarApiObjects on every plugin API.
+  // Coalesce API refreshes while a burst of widgets registers its objects.
+  function schedulePluginBarApiSync(): void {
+    if (pluginBarApiSyncQueued)
+      return
+    pluginBarApiSyncQueued = true
+    Qt.callLater(root.syncAllPluginBarApiObjects)
+  }
+
+  // Refresh every API using one serialized layout snapshot.
   function syncAllPluginBarApiObjects(): void {
-    for (var id in pluginBarApis)
-      root.syncPluginBarApiObjects(pluginBarApis[id])
+    pluginBarApiSyncQueued = false
+    var layoutSnapshot = JSON.stringify(root.layoutConfig || {})
+    for (var id in pluginBarApis) {
+      var api = pluginBarApis[id]
+      if (api)
+        root.syncPluginBarApiObjects(api, layoutSnapshot)
+    }
   }
 
   // Register a click target on behalf of a plugin, if it can claim it.
@@ -356,6 +355,7 @@ Item {
     if (!root.markPluginObject(pluginId, owner, "popout"))
       return
     root.requestPopout(owner)
+    root.syncPluginBarApiObjects(pluginBarApis[String(pluginId || "")])
   }
 
   // Release a plugin's popout, only if that plugin owns it.
@@ -364,6 +364,7 @@ Item {
       return
     root.releasePopout(owner)
     root.unmarkPluginObject(pluginId, owner, "popout")
+    root.syncPluginBarApiObjects(pluginBarApis[String(pluginId || "")])
   }
 
   // Get or create the bar API for a plugin id, refreshing its shell facade; null for an empty id.
@@ -451,7 +452,7 @@ Item {
 
   // Unregister and forget every click target and popout a plugin owns.
   function releasePluginObjects(pluginId) {
-    var owned = pluginObjectOwners.slice()
+    var owned = Array.from(pluginObjectOwners.values())
     for (var i = 0; i < owned.length; i++) {
       var record = owned[i]
       if (!record || record.pluginId !== pluginId)
@@ -460,10 +461,8 @@ Item {
         root.unregisterClickTarget(record.target)
       if (record.popout && root.activePopout === record.target)
         root.releasePopout(record.target)
+      pluginObjectOwners.delete(record.target)
     }
-    pluginObjectOwners = pluginObjectOwners.filter(function (record) {
-      return record && record.pluginId !== pluginId
-    })
   }
 
   // Destroy plugin APIs no slot uses any more, releasing their objects.
@@ -482,9 +481,9 @@ Item {
     pluginBarApis = next
   }
 
-  onActivePopoutChanged: syncAllPluginBarApiObjects()
-  onClickTargetsChanged: syncAllPluginBarApiObjects()
-  onLayoutConfigChanged: syncAllPluginBarApiObjects()
+  onActivePopoutChanged: schedulePluginBarApiSync()
+  onClickTargetsChanged: schedulePluginBarApiSync()
+  onLayoutConfigChanged: schedulePluginBarApiSync()
   onModuleSlotsChanged: Qt.callLater(prunePluginBarApis)
 
   Component.onDestruction: {
