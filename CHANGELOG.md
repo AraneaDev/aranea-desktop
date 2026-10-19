@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.32.2](https://github.com/AraneaDev/aranea-desktop/compare/v2.32.1...v2.32.2) (2026-10-19)
+
+
+### Fixes
+
+* align shell plugins with Omarchy 4.0.5 ([#187](https://github.com/AraneaDev/aranea-desktop/issues/187)) ([55bcfcb](https://github.com/AraneaDev/aranea-desktop/commit/55bcfcb8c9c0f80eae23d9608799ba1d9d3100f9))
+
 ## [2.32.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.32.0...v2.32.1) (2026-10-19)
 
 
