@@ -11,9 +11,15 @@ import Quickshell.Io
 import Quickshell.Services.Pam
 import Quickshell.Wayland
 import qs.Commons as Commons
+import "../araneadev.shared" as Aranea
 
 Item {
   id: root
+
+  Aranea.PluginReloadGuard {
+    kind: 'lock'
+    busy: root.locked || !root.passwordPamConfigured
+  }
 
   // Plugin shell API, injected by the host after loading; not used in this file.
   property var shell: null

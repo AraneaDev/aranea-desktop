@@ -85,7 +85,7 @@ jobs:
       - name: Install packages
         run: |
           for attempt in 1 2 3; do
-            pacman -Syyuu --noconfirm --needed --disable-download-timeout git curl jq ripgrep python nodejs npm quickshell qt6-declarative imagemagick librsvg libxml2 lua sway dbus libcap diffutils && exit 0
+            pacman -Syyuu --noconfirm --needed --disable-download-timeout git curl jq ripgrep python nodejs npm quickshell qt6-declarative imagemagick librsvg libxml2 lua sway dbus libcap diffutils inotify-tools && exit 0
             echo "Package install attempt $attempt failed; retrying" >&2
             sleep $((attempt * 20))
           done
@@ -130,4 +130,4 @@ jobs:
       - name: Native project and agent acceptance
         env:
           ARANEA_CHECK_REQUIRE_ALL: "1"
-        run: ARANEA_QML_SHELL_DIR="$RUNNER_TEMP/omarchy/shell" tests/run agent-activity-flow project-actions-flow projects-cli-owner projects-flow showcase
+        run: ARANEA_QML_SHELL_DIR="$RUNNER_TEMP/omarchy/shell" tests/run agent-activity-flow project-actions-flow projects-cli-owner projects-flow plugin-reload plugin-reload-host showcase

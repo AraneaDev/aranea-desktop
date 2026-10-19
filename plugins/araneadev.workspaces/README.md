@@ -1,8 +1,11 @@
 # Aranea workspaces
 
 Horizontal bars show a bounded project-name inspection label for a focused
-workspace with one launched environment or a checkout confirmed by a verified
-tool in the current session. Launched environments retain their context across
+workspace with a launched environment or a checkout confirmed by a verified
+tool in the current session. Verified open tools take precedence over retained
+launches. Otherwise, the newest launch supplies context when a workspace has
+been reused; equally recent conflicting projects keep the ordinary controls.
+Launched environments retain their context across
 shell restarts, with tools not checked noted in the tooltip. A bare saved
 workspace assignment alone does not show a bar label.
 Full context stays in its tooltip, including branch and launch-time context;

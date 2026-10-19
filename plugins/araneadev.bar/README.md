@@ -60,6 +60,23 @@ Use the host commands for user configuration. Do not hard-code module order
 or user paths in QML. Plugin availability and per-section visibility are
 separate concerns.
 
+## Plugin code reloads
+
+The bar's persistent companion service watches the user plugin directory and requests a native
+Quickshell configuration reload when plugin files change. This refreshes QML and
+JavaScript imports while keeping the shell process. It survives stock Omarchy temporarily unmounting the bar during a rescan.
+The adapter ships with Aranea;
+packaged Omarchy files are unchanged.
+
+Reloads wait until Aranea's lock and polkit services are ready and idle. Only
+boolean activity flags are shared. Git metadata and hidden staging files are
+ignored. Separate preview/test shells do not start the watcher.
+
+For an explicit reload, run `omarchy-shell aranea.reload reload`; it returns
+`queued` or `deferred`. `omarchy-shell aranea.reload status` reports pending state.
+The normal installer restarts the shell once when deploying updated plugin files,
+which also activates this adapter on the first install.
+
 ## Validation
 
 Bar behavior is covered by `tests/qml/bar-components.qml`,
@@ -69,4 +86,6 @@ model tests under `tests/js/`. Run:
 ```bash
 tests/qml-behaviour.test.sh bar-components bar-surface-components
 tests/run plugin-state
+tests/plugin-reload.test.sh
+tests/plugin-reload-host.test.sh
 ```

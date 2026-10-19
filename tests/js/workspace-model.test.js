@@ -137,6 +137,79 @@ test("bar context refuses ambiguous workspace ownership and deleted checkouts", 
   assert.equal(model.barContext(7, snapshot), null)
 })
 
+test("newest launch labels a reused workspace despite older retained projects", () => {
+  const snapshot = projectSnapshot()
+  snapshot.projects.push({
+    id: "p-other",
+    name: "Other",
+    checkouts: [{ id: "c-other", path: "/other", branch: "main" }],
+    associations: []
+  })
+  const launch = {
+    id: "e-old",
+    projectId: "p-app",
+    checkoutId: "c-fix",
+    workspaceId: 7,
+    createdAt: 100,
+    profileSnapshot: { name: "Terminal" },
+    checkoutSnapshot: { branch: "old", path: "/projects/app-fix" }
+  }
+  snapshot.environments = [
+    launch,
+    { ...launch, id: "e-new", createdAt: 300, profileSnapshot: { name: "Agent" } },
+    { ...launch, id: "e-other", projectId: "p-other", checkoutId: "c-other", createdAt: 200 }
+  ]
+  const before = JSON.stringify(snapshot)
+  assert.equal(model.barContext(7, snapshot)?.environmentId, "e-new")
+  assert.equal(model.barContext(7, snapshot)?.label, "App")
+  assert.equal(model.overviewContext({ id: 7, occupied: true }, snapshot)?.label, "App · Agent")
+  assert.equal(JSON.stringify(snapshot), before)
+  snapshot.environments.reverse()
+  assert.equal(model.barContext(7, snapshot)?.environmentId, "e-new")
+  snapshot.environments.find((e) => e.id === "e-other").createdAt = 300
+  assert.equal(model.barContext(7, snapshot), null, "equally recent projects remain ambiguous")
+})
+
+test("verified open checkout takes precedence over a newer retained launch", () => {
+  const snapshot = projectSnapshot()
+  snapshot.environments = [
+    {
+      id: "e-retained",
+      projectId: "p-app",
+      checkoutId: "c-main",
+      workspaceId: 7,
+      createdAt: 300,
+      profileSnapshot: { name: "Terminal" },
+      checkoutSnapshot: { branch: "main", path: "/projects/app" }
+    }
+  ]
+  snapshot.bindings = [verifiedBinding({ workspaceId: 7 })]
+  assert.equal(model.barContext(7, snapshot)?.checkoutId, "c-fix")
+})
+
+test("older environment with verified tools survives newer retained launches of its checkout", () => {
+  const snapshot = projectSnapshot()
+  const launch = {
+    id: "e-open",
+    projectId: "p-app",
+    checkoutId: "c-fix",
+    workspaceId: 7,
+    createdAt: 100,
+    profileSnapshot: { name: "Editor" },
+    checkoutSnapshot: { branch: "fix", path: "/projects/app-fix" }
+  }
+  snapshot.environments = [
+    launch,
+    { ...launch, id: "e-closed", createdAt: 200 },
+    { ...launch, id: "e-other", checkoutId: "c-main", createdAt: 300 }
+  ]
+  snapshot.bindings = [verifiedBinding({ workspaceId: 7, environmentId: "e-open" })]
+  assert.equal(model.barContext(7, snapshot)?.environmentId, "e-open")
+  assert.match(model.barContext(7, snapshot)?.detail, /editor open/)
+  delete snapshot.bindings[0].environmentId
+  assert.equal(model.barContext(7, snapshot)?.checkoutId, "c-fix")
+})
+
 test("normalizes workspace rows and marks the focused workspace active", () => {
   const states = model.normalizeWorkspaces(
     [

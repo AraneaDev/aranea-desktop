@@ -16,6 +16,11 @@ import "PolkitLogic.js" as PolkitLogic
 Item {
   id: root
 
+  Aranea.PluginReloadGuard {
+    kind: 'polkit'
+    busy: root.dialogVisible
+  }
+
   // Font for the card's text (the shell's menu font).
   property string fontFamily: Aranea.Typography.uiFamily
   // Bound to the central [polkit] section in shell.toml via Color.qml.
