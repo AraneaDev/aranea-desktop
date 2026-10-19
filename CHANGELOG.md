@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.32.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.32.0...v2.32.1) (2026-10-19)
+
+
+### Fixes
+
+* **workspaces:** preserve project titles and refresh installed plugin sources ([df92530](https://github.com/AraneaDev/aranea-desktop/commit/df92530b73a31944fdfa5ba376a4db6e1a140597))
+
 ## [2.32.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.31.3...v2.32.0) (2026-10-19)
 
 
