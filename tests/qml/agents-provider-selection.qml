@@ -61,6 +61,13 @@ ShellRoot {
         refreshIntervalSec: 60
       }
     })
+    host.panel.nowMs = Date.UTC(2026, 9, 19, 12)
+    var expired = host.panel.limitWindow('5h', 0.95, '2026-10-19T12:00:00Z', '')
+    t.equal(expired.percent, 0, 'a reset usage window no longer reports stale consumption')
+    t.equal(expired.resetAt, '', 'a reset usage window clears its stale countdown')
+    var current = host.panel.limitWindow('5h', 0.6, '2026-10-19T13:00:00Z', '')
+    t.equal(current.percent, 0.6, 'a future usage window retains consumption')
+    t.equal(host.panel.limitWindow('5h', 0.4, '', '').percent, 0.4, 'a missing reset retains consumption')
     host.panel.selectProvider(1)
     t.equal(host.panel.settings.selectedProviderId, 'codex', 'real provider choice is saved in inline settings')
     t.equal(host.panel.settings.refreshIntervalSec, 60, 'saving a provider retains other settings')

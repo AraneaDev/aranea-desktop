@@ -150,8 +150,8 @@ Item {
     radius: Math.min(width, height) / 2
     width: owner && owner.vertical ? Style.space(2) : (slot.openIndicatorVisible ? Style.space(12) : slot.panelIndicatorExtent)
     height: owner && owner.vertical ? (slot.openIndicatorVisible ? Style.space(12) : slot.panelIndicatorExtent) : Style.space(2)
-    x: owner && owner.vertical ? (owner.position === "left" ? parent.width - width - inset : inset) : (slot.openIndicatorVisible ? Math.max(0, Math.min(parent.width - width, parent.width * slot.openIndicatorPosition - width / 2)) : Math.round((parent.width - width) / 2))
-    y: owner && owner.vertical ? (slot.openIndicatorVisible ? Math.max(0, Math.min(parent.height - height, parent.height * slot.openIndicatorPosition - height / 2)) : Math.round((parent.height - height) / 2)) : (owner && owner.position === "top" ? parent.height - height - inset : inset)
+    x: owner && owner.vertical ? (owner.position === "left" ? parent.width - width - inset : inset) : (slot.openIndicatorVisible ? Math.max(0, Math.min(parent.width - width, parent.width * slot.openIndicatorPosition - width / 2)) : Math.floor((parent.width - width) / 2))
+    y: owner && owner.vertical ? (slot.openIndicatorVisible ? Math.max(0, Math.min(parent.height - height, parent.height * slot.openIndicatorPosition - height / 2)) : Math.floor((parent.height - height) / 2)) : (owner && owner.position === "top" ? parent.height - height - inset : inset)
     z: 50
 
     Behavior on opacity {
@@ -176,7 +176,7 @@ Item {
     acceptedButtons: Qt.LeftButton
     enabled: !!owner && slot.visible && slot.width > 0 && slot.height > 0
     propagateComposedEvents: true
-    cursorShape: owner && owner.moduleClickTargetAt(slot, mouseX, mouseY) ? Qt.PointingHandCursor : Qt.ArrowCursor
+    cursorShape: moduleHover.hovered && owner && owner.moduleClickTargetAt(slot, mouseX, mouseY) ? Qt.PointingHandCursor : Qt.ArrowCursor
 
     onPressed: function (mouse) {
       dragging = false
