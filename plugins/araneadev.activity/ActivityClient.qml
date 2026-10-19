@@ -245,7 +245,8 @@ Item {
   }
   // A set of task IDs removed in one store write, observed as one operation.
   function dismissMany(taskIds: var): bool {
-    return Array.isArray(taskIds) && submitDismissal('dismissMany', JSON.stringify(taskIds))
+    // qs expands a leading '[' as an argument list; JSON permits whitespace.
+    return Array.isArray(taskIds) && submitDismissal('dismissMany', ' ' + JSON.stringify(taskIds))
   }
   // Shared submission for one task or a set; the owner validates the argument.
   function submitDismissal(method: string, argument: string): bool {
