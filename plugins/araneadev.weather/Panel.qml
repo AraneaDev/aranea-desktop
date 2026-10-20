@@ -425,8 +425,8 @@ Panel {
     var hosts = root.instancePanels()
     var bundles = []
     var peerFetching = false
-    for (var i = 0; i < hosts.length; i++) {
-      var p = hosts[i]
+    for (let i = 0; i < hosts.length; i++) {
+      let p = hosts[i]
       bundles.push(p.sharedWeather)
       if (p !== root && p.locationQuery === root.locationQuery && typeof p.isFetching === "function" && p.isFetching())
         peerFetching = true
@@ -466,8 +466,8 @@ Panel {
     var hosts = root.bar && typeof root.bar.moduleWidgets === "function" ? root.bar.moduleWidgets(root.entryId) : []
     // qmllint enable missing-property
     var panels = []
-    for (var i = 0; i < hosts.length; i++) {
-      var p = hosts[i] ? hosts[i].weatherPanel : null
+    for (let i = 0; i < hosts.length; i++) {
+      let p = hosts[i] ? hosts[i].weatherPanel : null
       if (p && panels.indexOf(p) < 0)
         panels.push(p)
     }
@@ -498,7 +498,7 @@ Panel {
       label: root.label
     }
     var hosts = root.instancePanels()
-    for (var i = 0; i < hosts.length; i++)
+    for (let i = 0; i < hosts.length; i++)
       if (hosts[i] !== root && typeof hosts[i].offerShared === "function")
         hosts[i].offerShared(root.sharedWeather)
   }
@@ -542,7 +542,7 @@ Panel {
     var lat = parseFloat(String(root.configuredLocationState.latitude))
     var lon = parseFloat(String(root.configuredLocationState.longitude))
     if (isNaN(lat) || isNaN(lon)) {
-      var coords = sourceCoords || root.autoCoords
+      let coords = sourceCoords || root.autoCoords
       if (!coords)
         return
       lat = coords.lat
@@ -844,12 +844,12 @@ Panel {
           return
         }
         try {
-          var parsed = JSON.parse(raw)
+          let parsed = JSON.parse(raw)
           root.report = parsed
           if (!root.hasConfiguredCoordinates)
             root.label = Model.provisionalCurrentIcon(parsed.current_condition && parsed.current_condition[0], root.label)
           root.forecastRetries = 0
-          var coords = WeatherLogic.wttrCoords(raw)
+          let coords = WeatherLogic.wttrCoords(raw)
           if (coords)
             root.autoCoords = coords
           root.publishShared(Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "wttr"))
@@ -911,8 +911,8 @@ Panel {
           return
         }
         try {
-          var parsed = JSON.parse(raw)
-          var parsedCurrent = Model.openMeteoCurrentCondition(parsed)
+          let parsed = JSON.parse(raw)
+          let parsedCurrent = Model.openMeteoCurrentCondition(parsed)
           root.dailyForecastReport = parsed
           root.forecast = WeatherLogic.parseOpenMeteo(raw)
           root.label = Model.currentIcon(parsedCurrent, root.label)

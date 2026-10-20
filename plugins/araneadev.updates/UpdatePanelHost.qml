@@ -43,7 +43,7 @@ Aranea.KeyboardPanelFrame {
   onMoveRequested: function (dx, dy) {
     content.disarmPointer()
     if (dy !== 0) {
-      var next = UpdateLogic.moveCursor(host.cursorIndex, host.keyboardCursor, dy)
+      let next = UpdateLogic.moveCursor(host.cursorIndex, host.keyboardCursor, dy)
       host.cursorIndex = next.index
       host.keyboardCursor = next.keyboardCursor
     }

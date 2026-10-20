@@ -107,7 +107,7 @@ Item {
       command: argv,
       input: input,
       completion: done
-    })
+    }) as CommandProcess
     if (client.captureActive) {
       process.destroy()
       return
@@ -125,43 +125,45 @@ Item {
   signal requestFinished(var response)
 
   // Short-lived observer/transport processes complete once and never own native services.
-  property Component processComponent: Component {
-    Process {
-      id: process
-      property string input: ''
-      property var completion
-      property bool startRequested: false
-      property bool startedSuccessfully: false
-      property bool completed: false
-      stdinEnabled: true
-      function finish(code, text, diagnostics) {
-        if (completed)
-          return
-        completed = true
-        completion(code, text, diagnostics)
-        process.destroy()
-      }
-      onStarted: {
-        startedSuccessfully = true
-        if (input && !client.captureActive)
-          write(input + '\n')
-        stdinEnabled = false
-      }
-      onRunningChanged: if (startRequested && !running && !startedSuccessfully)
-        finish(-1, '', 'The project action backend is not available.')
-      stdout: StdioCollector {
-        id: collected
-      }
-      stderr: StdioCollector {
-        id: diagnostics
-      }
-      // Quickshell metadata omits the unused exit-status enum.
-      // qmllint disable signal-handler-parameters
-      onExited: function (exitCode) {
-        process.finish(exitCode, collected.text, diagnostics.text)
-      }
-      // qmllint enable signal-handler-parameters
+  component CommandProcess: Process {
+    id: process
+    property string input: ''
+    property var completion
+    property bool startRequested: false
+    property bool startedSuccessfully: false
+    property bool completed: false
+    stdinEnabled: true
+    function finish(code, text, diagnostics) {
+      if (completed)
+        return
+      completed = true
+      completion(code, text, diagnostics)
+      process.destroy()
     }
+    onStarted: {
+      startedSuccessfully = true
+      if (input && !client.captureActive)
+        write(input + '\n')
+      stdinEnabled = false
+    }
+    onRunningChanged: if (startRequested && !running && !startedSuccessfully)
+      finish(-1, '', 'The project action backend is not available.')
+    stdout: StdioCollector {
+      id: collected
+    }
+    stderr: StdioCollector {
+      id: diagnostics
+    }
+    // Quickshell metadata omits the unused exit-status enum.
+    // qmllint disable signal-handler-parameters
+    onExited: function (exitCode) {
+      process.finish(exitCode, collected.text, diagnostics.text)
+    }
+    // qmllint enable signal-handler-parameters
+  }
+  // Factory retained for the injectable command process boundary.
+  property Component processComponent: Component {
+    CommandProcess {}
   }
   // How many automatic receipt checks have run for the current uncertainty, 0 to 3.
   property int autoChecksDone: 0
@@ -573,16 +575,16 @@ Item {
         if (!response) {
           client.submissionUncertain = true
         } else if (run) {
-          var matches = validRunIdentity(run) && run.projectId === target.projectId && run.checkoutId === target.checkoutId && run.actionId === target.actionId
-          var receipt = requests.some(function (row) {
+          let matches = validRunIdentity(run) && run.projectId === target.projectId && run.checkoutId === target.checkoutId && run.actionId === target.actionId
+          let receipt = requests.some(function (row) {
             return !!row && row.requestId === client.requestId && validRecordId(row.runId, 'r') && row.runId === run.id
           })
-          var retained = runs.some(function (row) {
+          let retained = runs.some(function (row) {
             return validRunIdentity(row) && row.id === run.id && row.projectId === target.projectId && row.checkoutId === target.checkoutId && row.actionId === target.actionId && row.definitionRevision === run.definitionRevision && row.definitionHash === run.definitionHash
           })
           // An authoritative refused restart returns recovery evidence for its original run,
           // not acceptance of the newly generated request. A coalesced acceptance has a receipt.
-          var originalRefusal = !!response.run && method === 'restart' && !response.ok && matches && retained && !hasRequest && run.id === payload.runId && response.error && typeof response.error.code === 'string' && typeof response.error.message === 'string' && typeof response.error.recovery === 'string'
+          let originalRefusal = !!response.run && method === 'restart' && !response.ok && matches && retained && !hasRequest && run.id === payload.runId && response.error && typeof response.error.code === 'string' && typeof response.error.message === 'string' && typeof response.error.recovery === 'string'
           if (!matches || !retained || (!receipt && !originalRefusal)) {
             client.submissionUncertain = true
             client.error = client.transportError('The returned run does not match the submitted identity.')

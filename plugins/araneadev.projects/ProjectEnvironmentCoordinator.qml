@@ -559,7 +559,7 @@ Item {
       return
     }
     if (op.environmentReturn) {
-      var env = owner.environmentRecords().filter(function (row) {
+      let env = owner.environmentRecords().filter(function (row) {
         return row.id === op.environmentId && row.projectId === op.projectId
       })[0]
       if (!env) {

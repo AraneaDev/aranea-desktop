@@ -11,12 +11,12 @@ Item {
   // Narrow composition boundary for notification and panel integration.
   property alias owner: controller
   ActivityRuntime {
-    id: runtime
+    id: runtimeObject
     captureActive: controller.captureActive
   }
   ActivityController {
     id: controller
-    runtime: runtime
+    runtime: runtimeObject
   }
   // Refresh is read-only and independent of menu visibility.
   function open(payload: string): void {

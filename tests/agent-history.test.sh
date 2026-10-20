@@ -66,7 +66,7 @@ cp "$registry" "$TMPDIR/replay"
 cmp "$TMPDIR/replay" "$registry"
 echo 'PASS dense stale callback ownership and exact replay'
 # Index construction must never hide malformed shapes, duplicates or foreign references.
-for change in '.sessions[0].nativeMetadata.callbackOwners[0].taskId=.tasks[6].taskId' '.sessions[0].nativeMetadata.callbackOwners[0].eventId="missing"' '.sessions[0].nativeMetadata.callbackOwners += [.sessions[0].nativeMetadata.callbackOwners[0]]' '.sessions[0].receipts[1].eventId=.sessions[0].receipts[0].eventId' '.sessions[0].nativeMetadata.turns[0].taskId=.tasks[6].taskId' '.sessions[0].nativeMetadata.inactiveTaskIds[0]=.tasks[6].taskId' '.tasks[0].producerEpoch="foreign"' '.sessions[0].nativeMetadata.callbackOwners={}' '.sessions[0].receipts[0].eventId=12' '.tasks[1].taskId=.tasks[0].taskId' '.sessions[0].nativeMetadata.callbackOwners[0].taskId=("x"*257)' '.sessions[0].nativeMetadata.callbackOwners[0].eventId="\u0001"' '.sessions[0].nativeMetadata.callbackOwners[0].eventId=42' '.sessions[0].nativeMetadata.currentTaskId="\u0001"' '.sessions[0].nativeMetadata.turns[0].taskId=42' '.sessions[0].nativeMetadata.inactiveTaskIds[0]=null' '.sessions[0].receipts[0].extra=true'; do
+for change in '.sessions[0].nativeMetadata.callbackOwners[0].taskId=.tasks[6].taskId' '.sessions[0].nativeMetadata.callbackOwners[0].eventId="missing"' '.sessions[0].nativeMetadata.callbackOwners += [.sessions[0].nativeMetadata.callbackOwners[0]]' '.sessions[0].receipts[1].eventId=.sessions[0].receipts[0].eventId' '.sessions[0].nativeMetadata.turns[0].taskId=.tasks[6].taskId' '.sessions[0].nativeMetadata.inactiveTaskIds[0]=.tasks[6].taskId' '.tasks[0].producerEpoch="foreign"' '.sessions[0].nativeMetadata.callbackOwners={}' '.sessions[0].receipts[0].eventId=12' '.tasks[1].taskId=.tasks[0].taskId' '.sessions[0].nativeMetadata.callbackOwners[0].taskId=("x"*257)' '.sessions[0].nativeMetadata.callbackOwners[0].eventId="\u0001"' '.sessions[0].nativeMetadata.callbackOwners[0].eventId=42' '.sessions[0].nativeMetadata.currentTaskId="\u0001"' '.sessions[0].nativeMetadata.turns[0].taskId=42' '.sessions[0].nativeMetadata.inactiveTaskIds[0]=null' '.sessions[0].receipts[0].extra=true' '.sessions[0].receipts[0].hash=("0"*63) | .sessions[0].receipts[1].hash=("0"*65)' '.sessions[0].receipts[0].hash=("g"*64)' '.sessions[0].receipts[0].hash=42' '.sessions[0].receipts[0].eventId="\u0001"' '.sessions[0].receipts[0].eventId=""' '.sessions[0].nativeMetadata.callbackOwners[0].key=("0"*63) | .sessions[0].nativeMetadata.callbackOwners[1].key=("0"*65)' '.sessions[0].nativeMetadata.callbackOwners[0].key=("G"*64)' '.sessions[0].nativeMetadata.callbackOwners[0].toolUseId="\u0001"' '.sessions[0].nativeMetadata.callbackOwners[0].toolUseId=""' '.sessions[0].nativeMetadata.callbackOwners[0].toolUseId=("t"*181)'; do
   jq "$change" "$TMPDIR/dense" >"$registry"
   cp "$registry" "$TMPDIR/invalid"
   if "$store" snapshot >"$TMPDIR/error"; then
@@ -77,3 +77,20 @@ for change in '.sessions[0].nativeMetadata.callbackOwners[0].taskId=.tasks[6].ta
   cmp "$TMPDIR/invalid" "$registry"
 done
 echo 'PASS dense malformed references and duplicates preserve exact state bytes'
+# Cached validation is valid only for exact unchanged sessions. A changed
+# candidate must still satisfy its schema and every same-session reference.
+jq -n --argjson now "$(date +%s)" --argjson monotonic "$(cut -d. -f1 /proc/uptime)" --arg boot "$(cat /proc/sys/kernel/random/boot_id)" '{receivedAt:$now,monotonic:$monotonic,bootId:$boot,generatedId:"candidate"}' >"$TMPDIR/context"
+printf '{"projects":[]}\n' >"$TMPDIR/projects"
+# shellcheck disable=SC2016
+for change in '.currentTaskId=$s[0].tasks[6].taskId' '.turns[0].taskId=$s[0].tasks[6].taskId' '.callbackOwners[-1].key=("g"*64)'; do
+  jq '. as $s | {action:"native",args:{normalized:{action:"report",args:{schemaVersion:1,eventId:"candidate",provider:"claude",providerSessionId:"dense:session:0",producerEpoch:"dense:epoch",sequence:513,taskId:$s.tasks[5].taskId,kind:"working",payload:{}},nativeMetadata:$s.sessions[0].nativeMetadata}}}' "$TMPDIR/dense" >"$TMPDIR/candidate-base"
+  # Keep the fixture's valid values available while altering only candidate metadata.
+  jq --slurpfile s "$TMPDIR/dense" ".args.normalized.nativeMetadata |= ($change)" "$TMPDIR/candidate-base" >"$TMPDIR/candidate" 2>"$TMPDIR/error" || exit 1
+  if jq -c --arg operation store-transaction --arg hash "$(printf '%064d' 0)" --slurpfile activity_context "$TMPDIR/context" --slurpfile activity_projects "$TMPDIR/projects" --slurpfile activity_request "$TMPDIR/candidate" -f "$repo_root/scripts/lib/agent-activity.jq" "$TMPDIR/dense" >"$TMPDIR/result" 2>"$TMPDIR/error"; then
+    echo "FAIL invalid changed transaction candidate accepted: $change"
+    exit 1
+  fi
+  [[ ! -s "$TMPDIR/result" ]]
+  rg -q ACTIVITY_INVALID "$TMPDIR/error"
+done
+echo 'PASS changed transaction candidates retain full schema and session-reference validation'

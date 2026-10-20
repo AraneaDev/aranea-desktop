@@ -190,7 +190,7 @@ Item {
       return
     }
     if (taskRows.length === 0) {
-      var emptyNext = Logic.step(['setup', 'guide'], cursorId, keyboardCursor, direction)
+      let emptyNext = Logic.step(['setup', 'guide'], cursorId, keyboardCursor, direction)
       cursorId = emptyNext.key
       keyboardCursor = true
       if (emptyNext.activate) {
@@ -199,7 +199,7 @@ Item {
         else
           action('setup', '')
       }
-      var target = cursorId === 'guide' ? setupGuide : setupButton
+      let target = cursorId === 'guide' ? setupGuide : setupButton
       listScroll.contentY = Math.max(0, Math.min(listScroll.contentHeight - listScroll.height, target.y))
       return
     }

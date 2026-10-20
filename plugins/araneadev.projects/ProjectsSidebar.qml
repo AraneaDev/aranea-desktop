@@ -53,10 +53,10 @@ ColumnLayout {
   readonly property var filteredProjects: rows !== null ? rows : Navigation.rows(projects, navigation, query, frozenIds, gitCache)
   // Keep delegates keyed by exact identity so publication cannot destroy focused controls.
   function syncRows() {
-    for (var i = 0; i < filteredProjects.length; i++) {
-      var row = filteredProjects[i]
-      var found = -1
-      for (var j = i; j < projectModel.count; j++) {
+    for (let i = 0; i < filteredProjects.length; i++) {
+      let row = filteredProjects[i]
+      let found = -1
+      for (let j = i; j < projectModel.count; j++) {
         if (projectModel.get(j).row.id === row.id) {
           found = j
           break
@@ -122,8 +122,8 @@ ColumnLayout {
     if (!visible || compact || projectList.height <= 0)
       return []
     var ids = []
-    for (var i = 0; i < projectRows.count && ids.length < 12; i++) {
-      var row = projectRows.itemAt(i)
+    for (let i = 0; i < projectRows.count && ids.length < 12; i++) {
+      let row = projectRows.itemAt(i)
       if (row && row.y + row.height > projectList.contentY && row.y < projectList.contentY + projectList.height)
         ids.push(row.modelData.id)
     }

@@ -463,7 +463,7 @@ Item {
         return row.id === project.lastCheckoutId
       })[0]
       if (!state || !project || !checkout) {
-        var errors = Object.assign({}, selectionErrors)
+        let errors = Object.assign({}, selectionErrors)
         errors[projectId] = response && response.error || failure(!state ? 'REGISTRY_UNAVAILABLE' : !project ? 'PROJECT_NOT_FOUND' : 'CHECKOUT_NOT_FOUND', 'The selected project or checkout is not available. Locate its folder in project details.')
         selectionErrors = errors
         return
@@ -528,8 +528,8 @@ Item {
     var lease = null
     if (!payload.checkoutId) {
       if (selectionErrors[payload.projectId]) {
-        var problem = selectionErrors[payload.projectId]
-        var errors = Object.assign({}, selectionErrors)
+        let problem = selectionErrors[payload.projectId]
+        let errors = Object.assign({}, selectionErrors)
         delete errors[payload.projectId]
         selectionErrors = errors
         return {
@@ -543,7 +543,7 @@ Item {
         prepareSelection(payload.projectId)
         return notReady()
       }
-      var leases = Object.assign({}, defaultSelections)
+      let leases = Object.assign({}, defaultSelections)
       delete leases[payload.projectId]
       defaultSelections = leases
     }
@@ -669,7 +669,7 @@ Item {
       if (!current(id, revision, session))
         return
       if (!response || !response.ok || !response.state) {
-        var problem = response && response.error
+        let problem = response && response.error
         error = problem || failure('REGISTRY_UNAVAILABLE', 'Project registry is not available.')
         failOperation(id, problem && problem.code || 'REGISTRY_UNAVAILABLE', problem && problem.message || 'Project registry is not available.')
         return
@@ -710,7 +710,7 @@ Item {
           return
         }
         if (op.reobserveRole) {
-          var attempt = acceptedAttempt(op, op.reobserveRole)
+          let attempt = acceptedAttempt(op, op.reobserveRole)
           publish(Object.assign({}, operation(id), {
             roles: [op.reobserveRole],
             agentId: op.reobserveRole === 'agent' && attempt ? attempt.spec.agentId : null,
@@ -783,8 +783,8 @@ Item {
       if (!current(id, revision, session))
         return
       if (!response || !response.ok || !response.state) {
-        var problem = response && response.error
-        var code = problem && problem.code || 'REGISTRY_WRITE_FAILED', message = problem && problem.message || 'Project registry write failed.'
+        let problem = response && response.error
+        let code = problem && problem.code || 'REGISTRY_WRITE_FAILED', message = problem && problem.message || 'Project registry write failed.'
         if (typeof failed === 'function')
           failed(failure(code, message))
         else
@@ -845,7 +845,7 @@ Item {
       if (existing && data.workspaces.some(function (row) {
         return row.id === association.workspaceId && (Array.isArray(row.windows) ? row.windows.length > 0 : row.windows > 0)
       })) {
-        var holds = Object.assign({}, ownershipHolds);
+        let holds = Object.assign({}, ownershipHolds);
         (operation(id).roles || ['editor', 'terminal']).forEach(function (role) {
           if (!roleHistory[roleKey(op, role)] && !bindings.some(function (binding) {
             return binding.projectId === op.projectId && binding.checkoutId === op.checkoutId && roleKey(binding, binding.role) === roleKey(op, role) && binding.sessionId === session
@@ -890,8 +890,8 @@ Item {
                 failOperation(id, 'WORKSPACE_BUSY', 'Workspace allocation kept changing. Retry after desktop activity settles.')
                 return
               }
-              var reservations = workspaceReservations()
-              var next = Object.assign({}, association, {
+              let reservations = workspaceReservations()
+              let next = Object.assign({}, association, {
                 workspaceId: Operations.allocateWorkspace(data.workspaces, reservations),
                 placedAt: Date.now()
               })
@@ -1206,7 +1206,7 @@ Item {
     if (timer) {
       timer.stop()
       timer.destroy()
-      var nextTimers = Object.assign({}, deadlines)
+      let nextTimers = Object.assign({}, deadlines)
       delete nextTimers[id + ':' + role]
       deadlines = nextTimers
     }
@@ -1234,7 +1234,7 @@ Item {
       }).concat([response.binding])
     }
     if (!response.preserveHistory && step.status !== 'skipped' && step.code !== 'OWNERSHIP_UNCONFIRMED' && step.code !== 'RETRY_NOT_FAILED') {
-      var history = Object.assign({}, roleHistory)
+      let history = Object.assign({}, roleHistory)
       history[roleKey(op, role)] = step
       roleHistory = history
     }

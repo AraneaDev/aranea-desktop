@@ -23,7 +23,7 @@ PanelWindow {
 
   // Makes the mouse ignore hover until it really moves.
   function disarmPointer(): void {
-    pointerGate.reset()
+    pointerGateObject.reset()
   }
 
   // Preselects "cancel" in the uninstall confirmation.
@@ -62,7 +62,7 @@ PanelWindow {
   }
 
   PointerMoveGate {
-    id: pointerGate
+    id: pointerGateObject
     referenceItem: card
   }
 
@@ -139,7 +139,7 @@ PanelWindow {
     opacity: surfaceMotion.opacity
     enabled: surfaceMotion.opened
     root: panel.root
-    pointerGate: pointerGate
+    pointerGate: pointerGateObject
     width: panel.root.cardWidth
     height: Math.min(panel.root.cardHeight, panel.height - Style.gapsOut - panel.effectiveCardTop)
     anchors.horizontalCenter: parent.horizontalCenter

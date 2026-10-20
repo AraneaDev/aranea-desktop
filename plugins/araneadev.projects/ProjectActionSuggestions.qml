@@ -167,7 +167,7 @@ ColumnLayout {
     color: section.client && section.client.addResult && section.client.addResult.error ? Aranea.DesignTokens.attention : Aranea.DesignTokens.foreground
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  ProjectProblem {
+  Projects.ProjectProblem {
     objectName: 'suggestionsProblem'
     Layout.fillWidth: true
     displayOnly: section.displayOnly

@@ -122,7 +122,7 @@ Item {
   // duration} and shows it; invalid JSON is ignored.
   function open(payloadJson: string): void {
     try {
-      var payload = JSON.parse(payloadJson || "{}")
+      let payload = JSON.parse(payloadJson || "{}")
       root.show(payload.icon || "", payload.message || "", payload.value === undefined ? "" : String(payload.value), payload.max === undefined ? "100" : String(payload.max), payload.progressText || "", payload.duration === undefined ? "1200" : String(payload.duration))
     } catch (error) {}
   }

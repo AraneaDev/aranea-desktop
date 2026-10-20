@@ -40,8 +40,8 @@ ColumnLayout {
   signal actionRequested(string id)
   // Move keyboard focus to the first visible action, if any.
   function focusPrimary() {
-    for (var i = 0; i < actions.count; i++) {
-      var button = actions.itemAt(i)
+    for (let i = 0; i < actions.count; i++) {
+      let button = actions.itemAt(i)
       if (button && button.visible) {
         button.forceActiveFocus()
         return

@@ -35,42 +35,44 @@ Item {
     var process = processComponent.createObject(commands, {
       command: argv,
       completion: done
-    })
+    }) as CommandProcess
     process.startRequested = true
     process.running = true
   }
   // Short-lived helpers finish exactly once, including failed starts.
-  property Component processComponent: Component {
-    Process {
-      id: process
-      // One completion covers both failed starts and normal helper exits.
-      property var completion
-      property bool startRequested: false
-      property bool startedSuccessfully: false
-      property bool completed: false
-      function finish(code, text, diagnostics) {
-        if (completed)
-          return
-        completed = true
-        completion(code, text, diagnostics)
-        process.destroy()
-      }
-      onStarted: startedSuccessfully = true
-      onRunningChanged: if (startRequested && !running && !startedSuccessfully)
-        finish(-1, '', 'The Git helper is not available.')
-      stdout: StdioCollector {
-        id: collected
-      }
-      stderr: StdioCollector {
-        id: diagnostics
-      }
-      // Quickshell metadata omits the unused exit-status enum.
-      // qmllint disable signal-handler-parameters
-      onExited: function (exitCode) {
-        process.finish(exitCode, collected.text, diagnostics.text)
-      }
-      // qmllint enable signal-handler-parameters
+  component CommandProcess: Process {
+    id: process
+    // One completion covers both failed starts and normal helper exits.
+    property var completion
+    property bool startRequested: false
+    property bool startedSuccessfully: false
+    property bool completed: false
+    function finish(code, text, diagnostics) {
+      if (completed)
+        return
+      completed = true
+      completion(code, text, diagnostics)
+      process.destroy()
     }
+    onStarted: startedSuccessfully = true
+    onRunningChanged: if (startRequested && !running && !startedSuccessfully)
+      finish(-1, '', 'The Git helper is not available.')
+    stdout: StdioCollector {
+      id: collected
+    }
+    stderr: StdioCollector {
+      id: diagnostics
+    }
+    // Quickshell metadata omits the unused exit-status enum.
+    // qmllint disable signal-handler-parameters
+    onExited: function (exitCode) {
+      process.finish(exitCode, collected.text, diagnostics.text)
+    }
+    // qmllint enable signal-handler-parameters
+  }
+  // Factory retained for the injectable command process boundary.
+  property Component processComponent: Component {
+    CommandProcess {}
   }
   // One watchdog covers the accepted run so a silent helper cannot hold the slot forever.
   Timer {

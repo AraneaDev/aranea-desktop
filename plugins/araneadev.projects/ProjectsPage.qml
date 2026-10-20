@@ -56,9 +56,9 @@ ColumnLayout {
   // Current position follows exact identity, independent of registry ordering.
   readonly property int setupProjectIndex: setupProjectIds.indexOf(setupProjectId)
   // Registration/action saves, owner work, and scans pause wizard navigation.
-  readonly property bool setupNavigationPending: pending && !metadataPending || !!discoveryClient && discoveryClient.pending || !!projectClient && projectClient.pending || details.actions.pending
+  readonly property bool setupNavigationPending: pending && !metadataPending || !!discoveryClient && discoveryClient.pending || !!projectClient && projectClient.pending || detailsObject.actions.pending
   // Exiting setup must retain every unsaved preference or action draft.
-  readonly property bool setupCanExit: !setupNavigationPending && !details.dirty && !details.actions.editing
+  readonly property bool setupCanExit: !setupNavigationPending && !detailsObject.dirty && !detailsObject.actions.editing
   // Explicit submitted selection matched against successful readback.
   property var setupRegistrationPaths: []
   // A folder confirmation is awaiting canonical registry approval.
@@ -70,10 +70,10 @@ ColumnLayout {
   // Optional folder management stays separate from the guided entry point.
   property bool foldersExpanded: false
   // Only completed saves and resolved tool choices permit forward progress.
-  readonly property bool setupCanContinue: !setupNavigationPending && (setupStep === 0 ? (registryState.roots || []).length > 0 : setupStep === 1 ? !!selectedProject && candidates.selectedPaths.length === 0 : setupStep === 2 ? !!selectedProject && !details.dirty && !details.toolChoiceRequired && !details.actions.editing && !details.actions.pending : false)
+  readonly property bool setupCanContinue: !setupNavigationPending && (setupStep === 0 ? (registryState.roots || []).length > 0 : setupStep === 1 ? !!selectedProject && candidatesObject.selectedPaths.length === 0 : setupStep === 2 ? !!selectedProject && !detailsObject.dirty && !detailsObject.toolChoiceRequired && !detailsObject.actions.editing && !detailsObject.actions.pending : false)
   // Starting the guide never scans, saves, or opens applications.
   function startSetup(): void {
-    if (displayOnly || setupNavigationPending || details.dirty || details.actions.editing)
+    if (displayOnly || setupNavigationPending || detailsObject.dirty || detailsObject.actions.editing)
       return
     setupActive = true
     exactSetup = true
@@ -84,7 +84,7 @@ ColumnLayout {
     setupAwaitingFolder = false
     helpExpanded = false
     foldersExpanded = false
-    candidates.selectedPaths = []
+    candidatesObject.selectedPaths = []
   }
   // Secondary bulk discovery retains the existing optional setup route.
   function startBulkSetup(): void {
@@ -103,7 +103,7 @@ ColumnLayout {
   }
   // Back cannot hide an unsaved configuration behind a new registration.
   function backSetup(): void {
-    if (displayOnly || !setupActive || setupNavigationPending || setupStep === 2 && (details.dirty || details.actions.editing))
+    if (displayOnly || !setupActive || setupNavigationPending || setupStep === 2 && (detailsObject.dirty || detailsObject.actions.editing))
       return
     if (setupStep === 2 && setupProjectIndex > 0)
       setupProjectId = setupProjectIds[setupProjectIndex - 1]
@@ -113,7 +113,7 @@ ColumnLayout {
   // Exit preserves saved registration and the exact configured project destination.
   function finishSetup(): void {
     if (!displayOnly && setupCanExit) {
-      var completedId = setupActive && selectedProject ? selectedProject.id : ''
+      let completedId = setupActive && selectedProject ? selectedProject.id : ''
       setupActive = false
       if (completedId)
         detailsRequested(completedId)
@@ -132,11 +132,11 @@ ColumnLayout {
     if (displayOnly)
       return
     if (action === 'configure' && selectedProject && args.projectId === selectedProject.id)
-      details.acknowledgeDraft((state.projects || []).filter(function (project) {
+      detailsObject.acknowledgeDraft((state.projects || []).filter(function (project) {
         return project.id === args.projectId
       })[0])
     if (action === 'profile-save' && selectedProject && args.projectId === selectedProject.id)
-      details.acknowledgeProfile(args, (state.projects || []).filter(function (project) {
+      detailsObject.acknowledgeProfile(args, (state.projects || []).filter(function (project) {
         return project.id === args.projectId
       })[0])
     if (!setupActive)
@@ -148,9 +148,9 @@ ColumnLayout {
     if (action !== 'register' || !setupRegistrationPaths.length || !args.paths || !SignalValue.same(args.paths.slice().sort(), setupRegistrationPaths.slice().sort()))
       return
     var ids = []
-    for (var i = 0; i < setupRegistrationPaths.length; i++) {
-      var path = setupRegistrationPaths[i]
-      var added = (state.projects || []).filter(function (project) {
+    for (let i = 0; i < setupRegistrationPaths.length; i++) {
+      let path = setupRegistrationPaths[i]
+      let added = (state.projects || []).filter(function (project) {
         return (project.checkouts || []).some(function (checkout) {
           return checkout.path === path
         })
@@ -182,9 +182,9 @@ ColumnLayout {
   // Last persisted default selection distinguishes refreshed records from actual selection changes.
   property string recoverySelectedCheckoutId: ''
   // Public explicit-selection contract for review consumers.
-  property alias candidateList: candidates
+  property alias candidateList: candidatesObject
   // Public detail draft boundary used by capture snapshot restoration.
-  property alias details: details
+  property alias details: detailsObject
   // Durable ignore metadata, including common-directory identity.
   readonly property var ignored: registryState.ignored || []
   // Partial scans keep their candidates available for explicit registration.
@@ -223,10 +223,10 @@ ColumnLayout {
   signal refreshRequested
   // Submission never occurs as a consequence of candidate selection.
   function addSelected(): void {
-    if (!displayOnly && !pending && candidates.selectedPaths.length) {
+    if (!displayOnly && !pending && candidatesObject.selectedPaths.length) {
       if (setupActive)
-        setupRegistrationPaths = candidates.selectedPaths.slice()
-      registerRequested(candidates.selectedPaths.slice())
+        setupRegistrationPaths = candidatesObject.selectedPaths.slice()
+      registerRequested(candidatesObject.selectedPaths.slice())
     }
   }
   // Reconcile owner-wide operation snapshots rather than retaining this client's older result.
@@ -234,7 +234,7 @@ ColumnLayout {
     var project = selectedProject
     var snapshot = projectClient ? projectClient.snapshot : {}
     if (!project || !projectClient || !projectClient.available || !snapshot.sessionId) {
-      details.operation = null
+      detailsObject.operation = null
       return
     }
     if (recoveryProjectId !== project.id || recoverySelectedCheckoutId !== project.lastCheckoutId) {
@@ -249,8 +249,8 @@ ColumnLayout {
       recoveryCheckoutId = reported.checkoutId
     var observations = (snapshot.operations || []).concat(reported ? [reported] : [])
     var latest = null
-    for (var i = 0; i < observations.length; i++) {
-      var operation = observations[i]
+    for (let i = 0; i < observations.length; i++) {
+      let operation = observations[i]
       if (!operation || operation.environmentId || operation.sessionId !== snapshot.sessionId || operation.projectId !== project.id || operation.checkoutId !== recoveryCheckoutId || !checkouts.some(function (c) {
         return c.id === operation.checkoutId
       }))
@@ -258,14 +258,14 @@ ColumnLayout {
       if (!latest || (operation.generation || 0) > (latest.generation || 0) || (operation.generation || 0) === (latest.generation || 0) && (operation.completedAt || 0) >= (latest.completedAt || 0))
         latest = operation
     }
-    details.operation = latest
+    detailsObject.operation = latest
   }
   onProjectClientChanged: reconcileOperation(null)
   onSelectedProjectChanged: reconcileOperation(null)
   // Save all presentation-only drafts and candidate selections for inert capture.
   function captureSnapshot(): var {
     return {
-      selectedPaths: candidates.selectedPaths.slice(),
+      selectedPaths: candidatesObject.selectedPaths.slice(),
       setupActive: setupActive,
       exactSetup: exactSetup,
       exactPath: exactPicker.pathDraft,
@@ -278,22 +278,22 @@ ColumnLayout {
       helpTopic: helpTopic,
       foldersExpanded: foldersExpanded,
       ignoredExpanded: ignoredExpanded,
-      profileEditing: details.profileEditing,
-      profileAdding: details.profileAdding,
-      profileDraft: JSON.parse(JSON.stringify(details.profileEditor.draft)),
-      profileRevision: details.profileEditor.expectedProfileRevision,
-      profileFieldError: details.profileEditor.fieldError,
-      submittedProfileDraft: details.submittedProfileDraft,
-      detailsDraft: Object.assign({}, details.draft),
-      actions: details.actions.captureSnapshot(),
-      relocationDrafts: Object.assign({}, details.relocationDrafts),
-      detailsOperation: details.operation,
+      profileEditing: detailsObject.profileEditing,
+      profileAdding: detailsObject.profileAdding,
+      profileDraft: JSON.parse(JSON.stringify(detailsObject.profileEditor.draft)),
+      profileRevision: detailsObject.profileEditor.expectedProfileRevision,
+      profileFieldError: detailsObject.profileEditor.fieldError,
+      submittedProfileDraft: detailsObject.submittedProfileDraft,
+      detailsDraft: Object.assign({}, detailsObject.draft),
+      actions: detailsObject.actions.captureSnapshot(),
+      relocationDrafts: Object.assign({}, detailsObject.relocationDrafts),
+      detailsOperation: detailsObject.operation,
       recoveryCheckoutId: recoveryCheckoutId,
       recoveryProjectId: recoveryProjectId,
       recoverySelectedCheckoutId: recoverySelectedCheckoutId,
-      detailsDirty: details.dirty,
-      detailsFieldError: details.fieldError,
-      customized: details.customized,
+      detailsDirty: detailsObject.dirty,
+      detailsFieldError: detailsObject.fieldError,
+      customized: detailsObject.customized,
       folderPath: picker.pathDraft
     }
   }
@@ -312,28 +312,28 @@ ColumnLayout {
     helpExpanded = saved.helpExpanded === true
     helpTopic = saved.helpTopic === 'agents' ? 'agents' : 'projects'
     foldersExpanded = saved.foldersExpanded === true
-    candidates.selectedPaths = saved.selectedPaths
+    candidatesObject.selectedPaths = saved.selectedPaths
     ignoredExpanded = saved.ignoredExpanded
-    details.operation = saved.detailsOperation || null
-    recoveryCheckoutId = saved.recoveryCheckoutId || (details.operation ? details.operation.checkoutId : '')
+    detailsObject.operation = saved.detailsOperation || null
+    recoveryCheckoutId = saved.recoveryCheckoutId || (detailsObject.operation ? detailsObject.operation.checkoutId : '')
     recoveryProjectId = saved.recoveryProjectId || (selectedProject ? selectedProject.id : '')
     recoverySelectedCheckoutId = saved.recoverySelectedCheckoutId || (selectedProject ? selectedProject.lastCheckoutId || '' : '')
-    details.relocationDrafts = saved.relocationDrafts || {}
-    details.actions.captureRestore(saved.actions)
-    details.profileAdding = saved.profileAdding === true
-    details.profileEditing = saved.profileEditing === true
+    detailsObject.relocationDrafts = saved.relocationDrafts || {}
+    detailsObject.actions.captureRestore(saved.actions)
+    detailsObject.profileAdding = saved.profileAdding === true
+    detailsObject.profileEditing = saved.profileEditing === true
     if (saved.profileDraft)
-      details.profileEditor.draft = saved.profileDraft
-    details.profileEditor.expectedProfileRevision = saved.profileRevision || 0
-    details.profileEditor.fieldError = saved.profileFieldError || ''
-    details.submittedProfileDraft = saved.submittedProfileDraft || null
+      detailsObject.profileEditor.draft = saved.profileDraft
+    detailsObject.profileEditor.expectedProfileRevision = saved.profileRevision || 0
+    detailsObject.profileEditor.fieldError = saved.profileFieldError || ''
+    detailsObject.submittedProfileDraft = saved.submittedProfileDraft || null
     // A draft saved before Preferences had roles takes the project's.
     details.draft = Object.assign({
-      roles: details.savedRoles(details.project)
+      roles: detailsObject.savedRoles(detailsObject.project)
     }, saved.detailsDraft)
-    details.dirty = saved.detailsDirty
-    details.fieldError = saved.detailsFieldError || ''
-    details.customized = saved.customized
+    detailsObject.dirty = saved.detailsDirty
+    detailsObject.fieldError = saved.detailsFieldError || ''
+    detailsObject.customized = saved.customized
     picker.pathDraft = saved.folderPath
   }
   // Reset local capture presentation using typed fixture data without backend access.
@@ -348,17 +348,17 @@ ColumnLayout {
     setupAwaitingFolder = false
     helpExpanded = false
     foldersExpanded = false
-    candidates.selectedPaths = []
+    candidatesObject.selectedPaths = []
     ignoredExpanded = false
-    details.profileAdding = false
-    details.profileEditing = false
-    details.profileEditor.begin(null)
-    details.submittedProfileDraft = null
-    details.discardDraft()
-    details.actions.captureReset(fixture)
-    details.relocationDrafts = {}
-    details.operation = null
-    details.customized = false
+    detailsObject.profileAdding = false
+    detailsObject.profileEditing = false
+    detailsObject.profileEditor.begin(null)
+    detailsObject.submittedProfileDraft = null
+    detailsObject.discardDraft()
+    detailsObject.actions.captureReset(fixture)
+    detailsObject.relocationDrafts = {}
+    detailsObject.operation = null
+    detailsObject.customized = false
     picker.pathDraft = ''
     if (fixture && fixture.projectsDraft)
       captureRestore(fixture.projectsDraft)
@@ -423,7 +423,7 @@ ColumnLayout {
       objectName: 'projectSetupStart'
       text: 'Add project'
       visible: !page.setupActive && !page.sidebarNavigation
-      enabled: !page.displayOnly && !page.setupNavigationPending && !details.dirty && !details.actions.editing
+      enabled: !page.displayOnly && !page.setupNavigationPending && !detailsObject.dirty && !detailsObject.actions.editing
       pointerGate: page.pointerGate
       onClicked: page.startSetup()
     }
@@ -457,7 +457,7 @@ ColumnLayout {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    visible: !page.setupActive && (details.dirty || details.actions.editing)
+    visible: !page.setupActive && (detailsObject.dirty || detailsObject.actions.editing)
     text: 'Your draft is kept until you save or discard it.'
     color: Aranea.DesignTokens.attention
   }
@@ -517,7 +517,7 @@ ColumnLayout {
     projectName: page.selectedProject ? page.selectedProject.name : ''
     canContinue: page.setupCanContinue
     canExit: page.setupCanExit
-    canBack: page.setupStep !== 2 || !details.dirty && !details.actions.editing
+    canBack: page.setupStep !== 2 || !detailsObject.dirty && !detailsObject.actions.editing
     pending: page.setupNavigationPending
     pointerGate: page.pointerGate
     onBackRequested: page.backSetup()
@@ -539,7 +539,7 @@ ColumnLayout {
   }
   ColumnLayout {
     Layout.fillWidth: true
-    visible: page.setupActive ? !page.exactSetup && page.setupStep < 2 : (!page.sidebarNavigation || page.viewSection === 'preferences') && (page.foldersExpanded || candidates.candidates.length > 0)
+    visible: page.setupActive ? !page.exactSetup && page.setupStep < 2 : (!page.sidebarNavigation || page.viewSection === 'preferences') && (page.foldersExpanded || candidatesObject.candidates.length > 0)
     Aranea.UiLabel {
       Layout.fillWidth: true
       visible: !!page.discoveryClient && page.discoveryClient.pending
@@ -632,17 +632,17 @@ ColumnLayout {
     }
     Aranea.UiLabel {
       Layout.fillWidth: true
-      visible: (!page.setupActive || page.setupStep === 1) && !!page.discoveryClient && !page.discoveryClient.pending && !candidates.candidates.length
+      visible: (!page.setupActive || page.setupStep === 1) && !!page.discoveryClient && !page.discoveryClient.pending && !candidatesObject.candidates.length
       text: 'No repositories to review. Choose another folder or refresh an approved folder.'
     }
     ProjectCandidateList {
-      id: candidates
+      id: candidatesObject
       visible: !page.setupActive || page.setupStep === 1
       Layout.fillWidth: true
       candidates: page.discoveryClient ? page.discoveryClient.candidates.filter(function (c) {
         return !page.ignored.some(function (i) {
           return i.path === c.path || i.commonDir === c.commonDir
-        }) && candidates.paths(c).length > 0
+        }) && candidatesObject.paths(c).length > 0
       }) : []
       registeredPaths: (page.registryState.projects || []).reduce(function (paths, p) {
         return paths.concat((p.checkouts || []).map(function (c) {
@@ -657,9 +657,9 @@ ColumnLayout {
     }
     Aranea.ActionButton {
       objectName: 'setupRegister'
-      text: 'Add selected' + (candidates.selectedPaths.length ? ' (' + candidates.selectedPaths.length + ')' : '')
+      text: 'Add selected' + (candidatesObject.selectedPaths.length ? ' (' + candidatesObject.selectedPaths.length + ')' : '')
       visible: !page.setupActive || page.setupStep === 1
-      enabled: !page.displayOnly && !page.pending && candidates.selectedPaths.length > 0
+      enabled: !page.displayOnly && !page.pending && candidatesObject.selectedPaths.length > 0
       pointerGate: page.pointerGate
       onClicked: page.addSelected()
     }
@@ -733,7 +733,7 @@ ColumnLayout {
     text: 'Project not available. Refresh or choose a registered project.'
   }
   ProjectDetails {
-    id: details
+    id: detailsObject
     Layout.fillWidth: true
     visible: !!page.selectedProject && (page.setupActive ? page.setupStep === 2 : ['all', 'overview', 'actions', 'preferences', 'profiles'].indexOf(page.viewSection) >= 0)
     project: page.selectedProject
@@ -742,7 +742,7 @@ ColumnLayout {
     viewSection: page.viewSection
     windowOpen: page.windowOpen
     projectClient: page.projectClient
-    actionsActive: page.visible && details.visible && !page.displayOnly
+    actionsActive: page.visible && detailsObject.visible && !page.displayOnly
     tools: page.tools
     agentChoice: page.agentChoice
     displayOnly: page.displayOnly
@@ -790,7 +790,7 @@ ColumnLayout {
     projectName: page.selectedProject ? page.selectedProject.name : ''
     canContinue: page.setupCanContinue
     canExit: page.setupCanExit
-    canBack: page.setupStep !== 2 || !details.dirty && !details.actions.editing
+    canBack: page.setupStep !== 2 || !detailsObject.dirty && !detailsObject.actions.editing
     pending: page.setupNavigationPending
     pointerGate: page.pointerGate
     onBackRequested: page.backSetup()
@@ -800,7 +800,7 @@ ColumnLayout {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    visible: !page.sidebarNavigation && !page.setupActive && !(page.registryState.projects || []).length && !candidates.candidates.length
+    visible: !page.sidebarNavigation && !page.setupActive && !(page.registryState.projects || []).length && !candidatesObject.candidates.length
     text: 'No projects yet. Add a Git repository to view its state. Tools, actions and agents can be configured later.'
   }
   Connections {

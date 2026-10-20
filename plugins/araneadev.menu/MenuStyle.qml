@@ -126,12 +126,12 @@ QtObject {
 
   // Minute clock for clockContext; runs only while the menu is open.
   property SystemClock menuClock: SystemClock {
-    id: menuClock
+    id: menuClockObject
     precision: SystemClock.Minutes
     enabled: style.opened
   }
   // HH:mm time shown in the root context band; ticks every minute.
-  readonly property string clockContext: Qt.formatDateTime(menuClock.date, "HH:mm")
+  readonly property string clockContext: Qt.formatDateTime(menuClockObject.date, "HH:mm")
 
   // Fixed tiles (Files, Terminal, Projects) shown on the root menu.
   readonly property var rootTiles: [({

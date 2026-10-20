@@ -51,15 +51,15 @@ Item {
   function rowsFor(filter: string): var {
     var query = String(filter || "").trim().toLowerCase()
     var rows = []
-    for (var i = 0; i < dmenu.options.length; i++) {
+    for (let i = 0; i < dmenu.options.length; i++) {
       // An option is "<label>", "<glyph>\t<label>", or
       // "<glyph>\t<label>\t<subtext>". The glyph never comes back with the
       // selection; the subtext renders under the label, filters alongside it,
       // and returns with the selection as a stable key for same-named rows.
-      var parts = String(dmenu.options[i] || "").split("\t")
-      var icon = parts.length > 1 ? parts.shift() : ""
-      var label = parts.shift() || ""
-      var detail = parts.join("\t")
+      let parts = String(dmenu.options[i] || "").split("\t")
+      let icon = parts.length > 1 ? parts.shift() : ""
+      let label = parts.shift() || ""
+      let detail = parts.join("\t")
       if (query && label.toLowerCase().indexOf(query) < 0 && detail.toLowerCase().indexOf(query) < 0)
         continue
       rows.push({

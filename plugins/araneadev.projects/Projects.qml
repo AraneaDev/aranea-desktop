@@ -46,12 +46,12 @@ Item {
     onRecordChanged: root.syncUsage()
   }
   ProjectRuntime {
-    id: runtime
+    id: runtimeObject
     captureActive: controller.captureActive
   }
   ProjectsController {
     id: controller
-    runtime: runtime
+    runtime: runtimeObject
   }
   ProjectsPresentation {
     id: presentation

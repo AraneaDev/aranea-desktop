@@ -1,9 +1,14 @@
-$activity_context[0] as $context | $activity_projects[0] as $projects | $activity_request[0] as $request |
+$ARGS.named.activity_provider as $activity_provider | $activity_context[0] as $context | $activity_projects[0] as $projects | $activity_request[0] as $request |
 # Pure validation, ordering, reduction and read-only freshness projection.
 def fields($r;$o): type == "object" and (keys as $keys | (($r - $keys)|length == 0) and (($keys - ($r+$o))|length == 0));
 def uint: type == "number" and . == floor and . >= 0 and . <= 9007199254740991;
 def text($n): type == "string" and length <= $n and (test("[\\x00-\\x1f\\x7f]")|not);
 def id: text(256) and length > 0;
+# Check individual bounds before joining for one character-class scan. Histories
+# can hold thousands of IDs/digests; compiling a regex for each entry delays
+# durable native delivery beyond its deadline without adding validation.
+def ids: all(.[];type == "string" and length > 0 and length <= 256) and (join("")|test("[\\x00-\\x1f\\x7f]")|not);
+def digests: all(.[];type == "string" and length == 64) and (join("")|test("[^a-f0-9]")|not);
 def path: text(4096) and startswith("/");
 def unique_values: length == (unique|length);
 def provider: . == "claude" or . == "codex";
@@ -17,8 +22,8 @@ def provenance: . == null or (fields(["pid","startTime","bootId","ancestors","wi
 # task/receipt ID indexes proves the complete ID constraint. Standalone metadata
 # has no such indexes and retains the original full ID validation.
 def reference_id($indexed): if $indexed then type == "string" else id end;
-def callback_owner($indexed): type == "object" and has("key") and has("eventId") and has("taskId") and (length == 3 or (length == 4 and has("toolUseId"))) and (.key|type == "string" and test("^[a-f0-9]{64}$")) and (.eventId|reference_id($indexed)) and (.taskId|reference_id($indexed)) and ((has("toolUseId")|not) or (.toolUseId|id and length <= 180));
-def metadata($indexed): fields(["currentTaskId","turns"];["inactiveTaskIds","observedHooks","callbackOwners"]) and (.currentTaskId == null or (.currentTaskId|reference_id($indexed))) and (.turns|type == "array" and length <= 512 and all(.[];fields(["nativeId","taskId"];[]) and (.nativeId|id) and (.taskId|reference_id($indexed))) and (map(.nativeId)|unique_values)) and ((has("inactiveTaskIds")|not) or (.inactiveTaskIds|type == "array" and length <= 512 and all(.[];reference_id($indexed)) and unique_values)) and (. as $m | all((.inactiveTaskIds//[])[];. != $m.currentTaskId)) and ((has("observedHooks")|not) or (.observedHooks|type == "array" and length <= 32 and all(.[];type == "string" and length <= 64 and test("^[A-Za-z][A-Za-z0-9]*$")) and unique_values)) and ((has("callbackOwners")|not) or (.callbackOwners|type == "array" and length <= 512 and all(.[];callback_owner($indexed)) and (map(.key)|unique_values) and (map(.eventId)|unique_values)));
+def callback_owner($indexed): type == "object" and has("key") and has("eventId") and has("taskId") and (length == 3 or (length == 4 and has("toolUseId"))) and (.key|type == "string" and length == 64) and (.eventId|reference_id($indexed)) and (.taskId|reference_id($indexed)) and ((has("toolUseId")|not) or (.toolUseId|type == "string" and length > 0 and length <= 180));
+def metadata($indexed): fields(["currentTaskId","turns"];["inactiveTaskIds","observedHooks","callbackOwners"]) and (.currentTaskId == null or (.currentTaskId|reference_id($indexed))) and (.turns|type == "array" and length <= 512 and all(.[];fields(["nativeId","taskId"];[]) and (.nativeId|id) and (.taskId|reference_id($indexed))) and (map(.nativeId)|unique_values)) and ((has("inactiveTaskIds")|not) or (.inactiveTaskIds|type == "array" and length <= 512 and all(.[];reference_id($indexed)) and unique_values)) and (. as $m | all((.inactiveTaskIds//[])[];. != $m.currentTaskId)) and ((has("observedHooks")|not) or (.observedHooks|type == "array" and length <= 32 and all(.[];type == "string" and length <= 64 and test("^[A-Za-z][A-Za-z0-9]*$")) and unique_values)) and ((has("callbackOwners")|not) or (.callbackOwners|type == "array" and length <= 512 and all(.[];callback_owner(true)) and (if $indexed then true else (map(.eventId)|ids) and (map(.taskId)|ids) end) and ([.[]|select(has("toolUseId"))|.toolUseId]|ids) and (map(.key)|digests and unique_values) and (map(.eventId)|unique_values)));
 def metadata: metadata(false);
 def task_snapshot: fields(["cwd","reportedState"];["taskId","projectId","checkoutId","description","result","question","blockers","verification"])
   and (.cwd|path) and (.reportedState|lifecycle)
@@ -57,7 +62,7 @@ def session: fields(["provider","providerSessionId","producerEpoch","highWaterSe
   and (.provider|provider) and (.providerSessionId|id) and (.producerEpoch|id) and (.highWaterSequence|uint)
   and (.registrationHash|test("^[a-f0-9]{64}$"))
   and (.retiredEpochs|type == "array" and length <= 512 and all(.[];id) and unique_values)
-  and (.receipts|type == "array" and length <= 512 and all(.[];type == "object" and length == 3 and has("eventId") and has("hash") and has("sequence") and (.eventId|id) and (.hash|test("^[a-f0-9]{64}$")) and (.sequence|uint and . > 0)) and (map(.eventId)|unique_values))
+  and (.receipts|type == "array" and length <= 512 and all(.[];type == "object" and length == 3 and has("eventId") and has("hash") and has("sequence") and (.sequence|uint and . > 0)) and (map(.eventId)|ids and unique_values) and (map(.hash)|digests))
   and (.highWaterSequence as $max | all(.receipts[];.sequence <= $max))
   and (.connection|connection) and (.provenance|provenance) and (.nativeMetadata|metadata(true));
 def association: fields(["status","projectId","checkoutId","cwd"];[]) and (.status|IN("registered","unassigned")) and (.cwd|path)
@@ -71,8 +76,8 @@ def same_session($a): .provider == $a.provider and .providerSessionId == $a.prov
 # Serialize tuple identities; delimiter-containing IDs must never share a key.
 def session_key: [.provider,.providerSessionId]|tojson;
 def session_index: INDEX(.[];session_key) | map_values({session:.,inactive:INDEX((.nativeMetadata.inactiveTaskIds//[])[];.)});
-def state_valid: fields(["schemaVersion","revision","sessions","tasks"];[]) and .schemaVersion == 1 and (.revision|uint)
-  and (.sessions|type == "array" and length <= 1200 and all(.[];session) and (map([.provider,.providerSessionId])|unique_values))
+def state_valid($validated_sessions): fields(["schemaVersion","revision","sessions","tasks"];[]) and .schemaVersion == 1 and (.revision|uint)
+  and (.sessions|type == "array" and length <= 1200 and all(.[]; . as $s | ($validated_sessions[session_key] != null and $validated_sessions[session_key] == $s) or session) and (map([.provider,.providerSessionId])|unique_values))
   and (.tasks|type == "array" and length <= 700 and all(.[];task) and (map(.taskId)|unique_values))
   # Build membership indexes only after every indexed shape and identity validates.
   and (INDEX(.sessions[];session_key) as $sessions
@@ -83,6 +88,7 @@ def state_valid: fields(["schemaVersion","revision","sessions","tasks"];[]) and 
           and all(.nativeMetadata.turns[]; $sessionTasks[.taskId] != null)
           and all((.nativeMetadata.inactiveTaskIds//[])[]; $sessionTasks[.] != null)
           and all((.nativeMetadata.callbackOwners//[])[]; $sessionTasks[.taskId] != null and $receipts[.eventId] != null)));
+def state_valid: state_valid({});
 def fresh($s): $s.connection.connected and $s.connection.bootId == $context.bootId and $context.monotonic >= $s.connection.monotonic and ($context.monotonic - $s.connection.monotonic) < 60 and $context.receivedAt >= $s.connection.receivedAt and ($context.receivedAt - $s.connection.receivedAt) < 60;
 def live($sessions): . as $t | $sessions[session_key] as $entry
   | .reportedState != "finished" and $entry != null and fresh($entry.session) and $entry.inactive[$t.taskId] == null;
@@ -175,7 +181,7 @@ def mutation($r;$source;$prepared_metadata):
   else error("INVALID_REQUEST") end;
 # Store transactions reuse the already fully validated, unchanged native metadata.
 # All event/registration fields are checked again after canonical path preparation.
-# Pure mutate also rechecks metadata; full final state validation is unconditional.
+# Pure mutate also rechecks metadata; final state constraints remain unconditional.
 def mutation($r;$source): mutation($r;$source;false);
 # Per-ID outcome of a dismiss-many: removed, not present before, or still kept.
 def dismiss_result($before;$after;$r):
@@ -196,12 +202,19 @@ elif $operation == "read-request" then
   else (try fromjson catch error("INVALID_REQUEST_JSON"))
     | if (try request_valid catch false) then . else error("INVALID_REQUEST_SCHEMA") end end
 elif $operation == "request" then try request_valid catch false
-elif $operation == "normalized" then try (fields(["action","args"];["nativeMetadata"]) and (.action|IN("register","report")) and (del(.nativeMetadata)|request_valid) and ((has("nativeMetadata")|not) or (.nativeMetadata|metadata))) catch false
+elif $operation == "normalized" or $operation == "normalized-fingerprint" then
+  (try (fields(["action","args"];["nativeMetadata"]) and (.action|IN("register","report")) and (del(.nativeMetadata)|request_valid) and ((has("nativeMetadata")|not) or (.nativeMetadata|metadata))) catch false) as $valid
+  | if $operation == "normalized" then $valid
+    elif $valid and .args.provider == $activity_provider then del(.nativeMetadata)
+    else error("INVALID_REQUEST") end
 elif $operation == "mutate" then . as $before | mutation($request;"report") | if . == $before then . else retain end
 elif $operation == "project" then project_state
 elif $operation == "response" then project_state | {ok:true,state:.,error:null}
-elif $operation == "transaction" then
+elif $operation == "transaction" or $operation == "store-transaction" then
   . as $before | (mutation($request;"report";true) | if . == $before then . else retain end) as $after
-  # Final validation uses the same in-memory result before emitting either line.
-  | if $after|state_valid then $after,($after|project_state|{ok:true,state:.,error:null} + dismiss_result($before;$after;$request)) else error("ACTIVITY_INVALID") end
+  # The store has fully validated $before under the same held lock. Reuse only
+  # exact unchanged session values; changed sessions and every global reference
+  # still validate. Standalone transactions retain full independent validation.
+  | (if $operation == "store-transaction" then INDEX($before.sessions[];session_key) else {} end) as $validated_sessions
+  | if $after|state_valid($validated_sessions) then $after,($after|project_state|{ok:true,state:.,error:null} + dismiss_result($before;$after;$request)) else error("ACTIVITY_INVALID") end
 else error("INVALID_OPERATION") end

@@ -97,8 +97,10 @@ mkdir -p "$work/cfg/plugins" "$work/run"
 chmod 700 "$work/run"
 ln -s "$qml_shell_dir/Commons" "$work/cfg/Commons"
 ln -s "$qml_shell_dir/Ui" "$work/cfg/Ui"
-ln -s "$repo_root/tests/qml/lib" "$work/cfg/lib"
-for plugin in "$repo_root"/plugins/araneadev.*; do ln -s "$plugin" "$work/cfg/plugins/${plugin##*/}"; done
+cp -a "$repo_root/tests/qml/lib" "$work/cfg/lib"
+# Quickshell watches imported source directories. Freeze this fixture's inputs
+# so concurrent checkout edits cannot hot reload an owner during an IPC request.
+for plugin in "$repo_root"/plugins/araneadev.*; do cp -a "$plugin" "$work/cfg/plugins/${plugin##*/}"; done
 cp "$repo_root/tests/qml/fixtures/agent-activity-flow.qml" "$work/cfg/shell.qml"
 export FLOW_BIN="$quickshell_bin" FLOW_CONFIG="$work/cfg" FLOW_RUNTIME="$work/run"
 cat >"$ARANEA_TEST_SANDBOX/bin/omarchy-shell" <<'BRIDGE'

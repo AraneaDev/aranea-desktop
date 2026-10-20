@@ -54,8 +54,8 @@ Item {
   function applyAgentListing(output) {
     var ids = []
     var lines = String(output || "").split("\n")
-    for (var i = 0; i < lines.length; i++) {
-      var name = lines[i].trim()
+    for (let i = 0; i < lines.length; i++) {
+      let name = lines[i].trim()
       if (name.slice(-5) === ".json")
         ids.push(name.slice(0, -5))
     }
@@ -85,8 +85,8 @@ Item {
   // Rebuilds agents from the live Instantiator objects, keyed by agentIds.
   function rebuildAgents() {
     var result = []
-    for (var i = 0; i < agentInstantiator.count; i++) {
-      var agent = agentInstantiator.objectAt(i)
+    for (let i = 0; i < agentInstantiator.count; i++) {
+      let agent = agentInstantiator.objectAt(i)
       if (agent)
         result.push(agent)
     }
@@ -121,8 +121,8 @@ Item {
   // (or stops) the retry timer for them.
   function scheduleLimitsRetry() {
     var advising = []
-    for (var i = 0; i < agents.length; i++) {
-      var record = agents[i] ? agents[i].record : null
+    for (let i = 0; i < agents.length; i++) {
+      let record = agents[i] ? agents[i].record : null
       if (record && record.retryAdvised === true && providerEnabled(String(record.id || "")))
         advising.push(String(record.id))
     }
@@ -162,7 +162,7 @@ Item {
     onExited: {
       root.rescanAgents()
       if (root.pendingUpdateKind !== "") {
-        var kind = root.pendingUpdateKind
+        let kind = root.pendingUpdateKind
         root.pendingUpdateKind = ""
         root.runUpdate(kind)
       }
@@ -185,12 +185,12 @@ Item {
     if (kind === "limits")
       command.push("--limits-only")
     var providers = settings && settings.providers ? settings.providers : {}
-    for (var id in providers) {
+    for (let id in providers) {
       if (providers[id] && providers[id].enabled === false)
         command.push("--except", id)
     }
     if (agentIds) {
-      for (var i = 0; i < agentIds.length; i++)
+      for (let i = 0; i < agentIds.length; i++)
         command.push(agentIds[i])
     }
     return command
@@ -236,15 +236,15 @@ Item {
     var syncRev = syncRevision
     var result = []
     var localIds = {}
-    for (var i = 0; i < agents.length; i++) {
-      var record = agents[i] ? agents[i].record : null
+    for (let i = 0; i < agents.length; i++) {
+      let record = agents[i] ? agents[i].record : null
       if (!record || !record.id)
         continue
-      var id = String(record.id)
+      let id = String(record.id)
       localIds[id] = true
       if (!providerEnabled(id))
         continue
-      var display = displayProvider(record)
+      let display = displayProvider(record)
       if (providerHasData(display))
         result.push(display)
     }
@@ -252,11 +252,11 @@ Item {
     // its synced numbers still deserve a tab. Rate limits stay blank; they
     // are per-account and never travel.
     var syncedProviders = syncConfigured() && aggregateData && aggregateData.providers ? aggregateData.providers : {}
-    for (var syncedId in syncedProviders) {
+    for (let syncedId in syncedProviders) {
       if (localIds[syncedId] || !providerEnabled(syncedId))
         continue
-      var stats = syncedProviders[syncedId] || {}
-      var syncedDisplay = displayProvider({
+      let stats = syncedProviders[syncedId] || {}
+      let syncedDisplay = displayProvider({
         id: syncedId,
         name: stats.providerName || syncedId
       })
@@ -588,7 +588,7 @@ Item {
         return
       var raw = currentJson.join("\n").trim()
       try {
-        var parsed = JSON.parse(raw)
+        let parsed = JSON.parse(raw)
         if (parsed && parsed.providers)
           snapshots.push(parsed)
       } catch (e) {
@@ -598,9 +598,9 @@ Item {
       currentJson = []
     }
 
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i]
-      var start = line.match(/^===(.+)===$/)
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i]
+      let start = line.match(/^===(.+)===$/)
       if (start && line !== "=== EOM ===") {
         flush()
         currentPath = start[1]
@@ -650,8 +650,8 @@ Item {
   // The last 7 calendar dates (today last), as "YYYY-MM-DD" strings.
   function recentDateStrings() {
     var result = []
-    for (var offset = 6; offset >= 0; offset--) {
-      var date = new Date()
+    for (let offset = 6; offset >= 0; offset--) {
+      let date = new Date()
       date.setDate(date.getDate() - offset)
       result.push(dateString(date))
     }
@@ -680,7 +680,7 @@ Item {
   function combineObjectNumbers(additive, target, source) {
     if (!source)
       return
-    for (var key in source)
+    for (let key in source)
       target[key] = combineNumber(additive, target[key], source[key])
   }
 
@@ -694,7 +694,7 @@ Item {
       if (providers[id])
         return providers[id]
       var recentByDay = {}
-      for (var d = 0; d < dates.length; d++)
+      for (let d = 0; d < dates.length; d++)
         recentByDay[dates[d]] = 0
       providers[id] = {
         providerId: id,
@@ -717,14 +717,14 @@ Item {
       return providers[id]
     }
 
-    for (var i = 0; i < snapshots.length; i++) {
-      var snapshot = snapshots[i]
-      var device = safeDeviceId(snapshot.deviceId || "device")
+    for (let i = 0; i < snapshots.length; i++) {
+      let snapshot = snapshots[i]
+      let device = safeDeviceId(snapshot.deviceId || "device")
       devices[device] = true
-      var snapshotProviders = snapshot.providers || {}
-      for (var providerId in snapshotProviders) {
-        var stats = snapshotProviders[providerId] || {}
-        var acc = providerAcc(String(providerId))
+      let snapshotProviders = snapshot.providers || {}
+      for (let providerId in snapshotProviders) {
+        let stats = snapshotProviders[providerId] || {}
+        let acc = providerAcc(String(providerId))
         acc.devices[device] = true
         if (stats.providerName && acc.providerName === "")
           acc.providerName = String(stats.providerName)
@@ -733,7 +733,7 @@ Item {
         // Snapshots from before the field existed only came from agents that
         // count prompts, so a missing value reads as true.
         acc.hasPromptStats = acc.hasPromptStats || stats.hasPromptStats !== false
-        var additive = String(stats.scope || "device") !== "account"
+        let additive = String(stats.scope || "device") !== "account"
         acc.todayPrompts = combineNumber(additive, acc.todayPrompts, stats.todayPrompts)
         acc.todaySessions = combineNumber(additive, acc.todaySessions, stats.todaySessions)
         acc.todayTotalTokens = combineNumber(additive, acc.todayTotalTokens, stats.todayTotalTokens)
@@ -742,23 +742,23 @@ Item {
         // Active days overlap between machines, so union the dates rather than
         // summing counts. Snapshots written before activeDates existed only
         // carry a count; the widest one stands in for them.
-        var activeDates = Array.isArray(stats.activeDates) ? stats.activeDates : []
-        for (var ad = 0; ad < activeDates.length; ad++)
+        let activeDates = Array.isArray(stats.activeDates) ? stats.activeDates : []
+        for (let ad = 0; ad < activeDates.length; ad++)
           acc.activeDates[String(activeDates[ad])] = true
         acc.activeDays = Math.max(acc.activeDays, numberValue(stats.activeDays))
         combineObjectNumbers(additive, acc.todayTokensByModel, stats.todayTokensByModel || {})
 
-        var recent = Array.isArray(stats.recentDays) ? stats.recentDays : []
-        for (var r = 0; r < recent.length; r++) {
-          var day = recent[r] || {}
-          var date = String(day.date || "")
+        let recent = Array.isArray(stats.recentDays) ? stats.recentDays : []
+        for (let r = 0; r < recent.length; r++) {
+          let day = recent[r] || {}
+          let date = String(day.date || "")
           if (acc.recentByDay[date] !== undefined)
             acc.recentByDay[date] = combineNumber(additive, acc.recentByDay[date], day.messageCount)
         }
 
-        var usage = stats.modelUsage || {}
-        for (var modelId in usage) {
-          var bucket = acc.modelUsage[modelId]
+        let usage = stats.modelUsage || {}
+        for (let modelId in usage) {
+          let bucket = acc.modelUsage[modelId]
           if (!bucket)
             bucket = acc.modelUsage[modelId] = emptyTokenBucket()
           combineObjectNumbers(additive, bucket, usage[modelId] || {})
@@ -767,15 +767,15 @@ Item {
     }
 
     var outProviders = {}
-    for (var id in providers) {
-      var acc = providers[id]
-      var recentDays = []
-      for (var di = 0; di < dates.length; di++)
+    for (let id in providers) {
+      let acc = providers[id]
+      let recentDays = []
+      for (let di = 0; di < dates.length; di++)
         recentDays.push({
           date: dates[di],
           messageCount: acc.recentByDay[dates[di]] || 0
         })
-      var providerDevices = Object.keys(acc.devices).sort()
+      let providerDevices = Object.keys(acc.devices).sort()
       outProviders[id] = {
         providerId: acc.providerId,
         providerName: acc.providerName,
@@ -833,8 +833,8 @@ Item {
   // record.
   function localSnapshot() {
     var providerMap = {}
-    for (var i = 0; i < agents.length; i++) {
-      var record = agents[i] ? agents[i].record : null
+    for (let i = 0; i < agents.length; i++) {
+      let record = agents[i] ? agents[i].record : null
       if (!record || !record.id)
         continue
       if (!providerEnabled(String(record.id)))
@@ -892,8 +892,8 @@ Item {
     var parts = name.split("-")
     var words = []
     var version = []
-    for (var i = 0; i < parts.length; i++) {
-      var part = parts[i]
+    for (let i = 0; i < parts.length; i++) {
+      let part = parts[i]
       if (part === "")
         continue
       if (/^\d/.test(part)) {

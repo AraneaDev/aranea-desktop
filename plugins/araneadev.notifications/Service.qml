@@ -155,9 +155,9 @@ Item {
   //
   // Aliased as a property so consumers outside this Item's id scope can bind
   // to it. QML ids aren't visible to external consumers without the alias.
-  property alias popupModel: popupModel
+  property alias popupModel: popupModelObject
   ListModel {
-    id: popupModel
+    id: popupModelObject
   }
 
   // Aranea motion preference (shared Aranea.MotionState); off removes the
@@ -265,7 +265,7 @@ Item {
     // Repeater is mid-incubation while we mutate its model.
     Qt.callLater(function () {
       removePopupsByOriginalId(snapshot.originalId)
-      popupModel.insert(0, snapshot)
+      popupModelObject.insert(0, snapshot)
       // An update that arrived while the insert was deferred found no row to
       // write to, and a property that already changed will not change again.
       // Reading the object once the row exists catches up on it.
@@ -291,8 +291,8 @@ Item {
     var refresh = function () {
       service.refreshInbox(notification, fileName, snapshot.originalId, snapshot.timestamp)
     }
-    for (var i = 0; i < updateSignals.length; i++) {
-      var signal = notification[updateSignals[i]]
+    for (let i = 0; i < updateSignals.length; i++) {
+      let signal = notification[updateSignals[i]]
       if (signal && typeof signal.connect === "function")
         signal.connect(refresh)
     }
@@ -334,8 +334,8 @@ Item {
       service.refreshPopup(notification, snapshot.originalId, snapshot.timestamp)
     }
 
-    for (var i = 0; i < updateSignals.length; i++) {
-      var signal = notification[updateSignals[i]]
+    for (let i = 0; i < updateSignals.length; i++) {
+      let signal = notification[updateSignals[i]]
       if (signal && typeof signal.connect === "function")
         signal.connect(refresh)
     }
@@ -357,14 +357,14 @@ Item {
     }
 
     var roles = NotificationLogic.popupRoles()
-    for (var i = 0; i < popupModel.count; i++) {
-      var row = popupModel.get(i)
+    for (let i = 0; i < popupModelObject.count; i++) {
+      let row = popupModelObject.get(i)
       if (!row || row.originalId !== originalId || row.timestamp !== timestamp)
         continue
       if (!NotificationLogic.popupRowChanged(row, updated))
         return
-      for (var r = 0; r < roles.length; r++)
-        popupModel.setProperty(i, roles[r], updated[roles[r]])
+      for (let r = 0; r < roles.length; r++)
+        popupModelObject.setProperty(i, roles[r], updated[roles[r]])
       return
     }
   }
@@ -372,11 +372,11 @@ Item {
   // A notification arriving under an originalId a toast on screen already
   // holds supersedes it, so that toast leaves the screen.
   function removePopupsByOriginalId(originalId) {
-    for (var i = popupModel.count - 1; i >= 0; i--) {
-      var row = popupModel.get(i)
+    for (let i = popupModelObject.count - 1; i >= 0; i--) {
+      let row = popupModelObject.get(i)
       if (!row || row.originalId !== originalId)
         continue
-      popupModel.remove(i)
+      popupModelObject.remove(i)
     }
   }
 
@@ -393,12 +393,12 @@ Item {
   // Removes the toast at index; a live notification is expired or dismissed at
   // the server depending on reason ("expire", "dismiss", "invoke").
   function removePopup(index: int, reason: string): void {
-    if (index < 0 || index >= popupModel.count)
+    if (index < 0 || index >= popupModelObject.count)
       return
-    var entry = popupModel.get(index)
+    var entry = popupModelObject.get(index)
     var originalId = entry ? entry.originalId : -1
     var ref = originalId >= 0 ? liveRefs[originalId] : null
-    popupModel.remove(index)
+    popupModelObject.remove(index)
     if (ref) {
       try {
         if (ref.tracked) {
@@ -415,7 +415,7 @@ Item {
 
   // Dismisses every toast on screen.
   function clearPopups(): void {
-    while (popupModel.count > 0)
+    while (popupModelObject.count > 0)
       dismissPopup(0)
   }
 
@@ -448,7 +448,7 @@ Item {
 
   // Empties the inbox, dismissing every entry still live at its sender.
   function clearInbox(): void {
-    for (var i = 0; i < inbox.model.count; i++)
+    for (let i = 0; i < inbox.model.count; i++)
       releaseInboxRef(inbox.model.get(i).fileName)
     inbox.clear()
   }
@@ -462,12 +462,12 @@ Item {
   // Removes every inbox entry from one app ("unknown" for an empty app name).
   function dismissGroup(app: string): void {
     var names = []
-    for (var i = 0; i < inbox.model.count; i++) {
-      var row = inbox.model.get(i)
+    for (let i = 0; i < inbox.model.count; i++) {
+      let row = inbox.model.get(i)
       if (String(row.app || "unknown") === app)
         names.push(row.fileName)
     }
-    for (var j = 0; j < names.length; j++)
+    for (let j = 0; j < names.length; j++)
       dismissInbox(names[j])
   }
 
@@ -495,8 +495,8 @@ Item {
   function invokeDefaultAction(ref): bool {
     try {
       if (ref && ref.actions) {
-        for (var i = 0; i < ref.actions.length; i++) {
-          var action = ref.actions[i]
+        for (let i = 0; i < ref.actions.length; i++) {
+          let action = ref.actions[i]
           if (action && action.identifier === "default") {
             action.invoke()
             return true
@@ -515,9 +515,9 @@ Item {
   // Third-party clients register a libnotify action under the canonical
   // identifier "default" instead; that one only works while the sender is live.
   function invokePopupDefault(index) {
-    if (index < 0 || index >= popupModel.count)
+    if (index < 0 || index >= popupModelObject.count)
       return
-    var entry = popupModel.get(index)
+    var entry = popupModelObject.get(index)
 
     // Run the argv (via Util.execArgv, no shell interpretation). Detached so it
     // outlives the shell, which installer toasts depend on: they restart it.
@@ -722,7 +722,7 @@ Item {
 
     // Dismiss the feedback toast on screen, else the newest inbox entry.
     function dismissOne(): string {
-      if (popupModel.count > 0) {
+      if (popupModelObject.count > 0) {
         service.dismissPopup(0)
         return "ok"
       }
@@ -749,8 +749,8 @@ Item {
       if (!needle)
         return "none"
       var hit = false
-      for (var i = popupModel.count - 1; i >= 0; i--) {
-        var row = popupModel.get(i)
+      for (let i = popupModelObject.count - 1; i >= 0; i--) {
+        let row = popupModelObject.get(i)
         if (row && String(row.summary || "").indexOf(needle) !== -1) {
           service.dismissPopup(i)
           hit = true

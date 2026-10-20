@@ -240,7 +240,7 @@ Item {
     saveWatchdog.stop()
     var actions = root.pendingActions
     root.pendingActions = []
-    for (var i = 0; i < actions.length; i++)
+    for (let i = 0; i < actions.length; i++)
       actions[i]()
   }
 
@@ -322,11 +322,11 @@ Item {
   // delegates (set), so a rebuild never recreates rows under the pointer.
   function syncRows(rows: var): void {
     var keep = Math.min(displayModel.count, rows.length)
-    for (var i = 0; i < keep; i++)
+    for (let i = 0; i < keep; i++)
       displayModel.set(i, rows[i])
     if (displayModel.count > rows.length)
       displayModel.remove(rows.length, displayModel.count - rows.length)
-    for (var j = keep; j < rows.length; j++)
+    for (let j = keep; j < rows.length; j++)
       displayModel.append(rows[j])
   }
 
@@ -340,8 +340,8 @@ Item {
 
     var items = []
     var keys = []
-    for (var i = 0; i < rows.length; i++) {
-      var row = rows[i]
+    for (let i = 0; i < rows.length; i++) {
+      let row = rows[i]
       keys.push(row.entryId)
       items.push({
         entryId: row.entryId,
@@ -584,7 +584,7 @@ Item {
 
   Component.onCompleted: {
     if (root.windowEnabled) {
-      var windowComponent = Qt.createComponent(Qt.resolvedUrl("ClipboardWindow.qml"))
+      let windowComponent = Qt.createComponent(Qt.resolvedUrl("ClipboardWindow.qml"))
       if (windowComponent.status === Component.Ready)
         root.view = windowComponent.createObject(root, {
           root: root

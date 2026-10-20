@@ -195,7 +195,7 @@ Item {
     else
       inputPending = result.state
     if (result.send !== null) {
-      var node = AudioLogic.nodeByKey(output ? candidateSinks : candidateSources, result.send, true)
+      let node = AudioLogic.nodeByKey(output ? candidateSinks : candidateSources, result.send, true)
       if (!node || output && !sinkAvailable(node)) {
         expire(channel, "Audio output is no longer available")
       } else {

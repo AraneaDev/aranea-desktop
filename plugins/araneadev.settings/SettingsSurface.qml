@@ -99,7 +99,7 @@ Item {
       if (item instanceof Image && item.visible && item.source.toString() && item.status !== Image.Ready)
         return false
       var children = item.children || []
-      for (var i = 0; i < children.length; i++)
+      for (let i = 0; i < children.length; i++)
         if (!ready(children[i]))
           return false
       return true
@@ -150,7 +150,7 @@ Item {
   // Disarm pointer activation after moving or changing content.
   function stampLayout() {
     layoutChangedAt = Date.now()
-    pointerGate.reset()
+    pointerGateObject.reset()
   }
   onWidthChanged: stampLayout()
   onHeightChanged: stampLayout()
@@ -187,7 +187,7 @@ Item {
     }
   }
   PointerMoveGate {
-    id: pointerGate
+    id: pointerGateObject
     referenceItem: card
     property real layoutChangedAt: panel.layoutChangedAt
   }
@@ -240,7 +240,7 @@ Item {
             id: closeButton
             text: 'Close'
             variant: 'quiet'
-            pointerGate: pointerGate
+            pointerGate: pointerGateObject
             onClicked: panel.root.close()
           }
         }
@@ -257,7 +257,7 @@ Item {
             Layout.alignment: Qt.AlignTop
             compact: panel.compact
             selectedSection: panel.root.section
-            pointerGate: pointerGate
+            pointerGate: pointerGateObject
             onSectionRequested: function (section) {
               panel.root.section = section
             }
@@ -302,7 +302,7 @@ Item {
                   objectName: 'settingsRetry'
                   text: 'Retry'
                   enabled: !panel.controller.pending && !panel.controller.showcaseActive
-                  pointerGate: pointerGate
+                  pointerGate: pointerGateObject
                   onClicked: panel.controller.refresh()
                 }
               }
@@ -320,7 +320,7 @@ Item {
                   pendingKey: panel.controller.pendingKey
                   results: panel.controller.results
                   errors: panel.controller.itemErrors
-                  pointerGate: pointerGate
+                  pointerGate: pointerGateObject
                   onRequest: function (operation, args) {
                     panel.controller.request(operation, args)
                   }
@@ -335,7 +335,7 @@ Item {
                   pendingKey: panel.controller.pendingKey
                   results: panel.controller.results
                   errors: panel.controller.itemErrors
-                  pointerGate: pointerGate
+                  pointerGate: pointerGateObject
                   onRequest: function (operation, args) {
                     panel.controller.request(operation, args)
                   }
@@ -350,7 +350,7 @@ Item {
                   pendingKey: panel.controller.pendingKey
                   result: panel.controller.resultFor('schedule')
                   error: panel.controller.errorFor('schedule')
-                  pointerGate: pointerGate
+                  pointerGate: pointerGateObject
                   onRequest: function (operation, args) {
                     panel.controller.request(operation, args)
                   }
@@ -368,7 +368,7 @@ Item {
                   errors: Object.assign({}, panel.controller.itemErrors, {
                     keybind: panel.controller.keybindError
                   })
-                  pointerGate: pointerGate
+                  pointerGate: pointerGateObject
                   onRequest: function (operation, args) {
                     panel.controller.request(operation, args)
                   }
@@ -384,7 +384,7 @@ Item {
                   result: panel.controller.resultFor('dnd')
                   error: panel.controller.errorFor('dnd')
                   readErrors: panel.controller.notificationErrors
-                  pointerGate: pointerGate
+                  pointerGate: pointerGateObject
                   onRequest: function (operation, args) {
                     panel.controller.request(operation, args)
                   }

@@ -31,7 +31,7 @@ ColumnLayout {
       }
     ]
     var checkouts = candidate.checkouts || []
-    for (var i = 0; i < checkouts.length; i++) {
+    for (let i = 0; i < checkouts.length; i++) {
       if (checkouts[i].path === candidate.path)
         result[0] = checkouts[i]
       else if (!result.some(function (c) {
