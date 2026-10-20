@@ -225,15 +225,16 @@ Item {
   Loader {
     id: panelLoader
     sourceComponent: root.testStatus !== null ? testPanelHost : null
+    // Production and offscreen hosts implement the same reactive panel interface.
+    readonly property var loadedPanel: item
     onLoaded: {
-      var loaded = item as TestPanelHost
-      loaded.status = Qt.binding(function () {
+      loadedPanel.status = Qt.binding(function () {
         return root.status
       })
-      loaded.open = Qt.binding(function () {
+      loadedPanel.open = Qt.binding(function () {
         return root.panelOpen
       })
-      loaded.checking = Qt.binding(function () {
+      loadedPanel.checking = Qt.binding(function () {
         return root.checking
       })
     }
