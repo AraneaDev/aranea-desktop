@@ -105,20 +105,21 @@ for file in "$logo" "$colors" "$dialog_dir/omarchy.script" "$dialog_dir/entry.pn
   [[ -f "$file" ]] || die "missing input: $file"
 done
 
-# The omarchy.script lines whose geometry this renderer reproduces.
+# The omarchy.script lines whose geometry this renderer reproduces (Omarchy
+# 4.5 lays them out in layout(), re-run when the window size changes).
 script_geometry=(
-  'logo.sprite.SetX(Window.GetWidth() / 2 - logo.image.GetWidth() / 2);'
-  'logo.sprite.SetY(Window.GetHeight() / 2 - logo.image.GetHeight() / 2);'
-  'entry.x = Window.GetWidth() / 2 - entry.image.GetWidth() / 2;'
+  'global.layout_width = Window.GetWidth();'
+  'global.layout_height = Window.GetHeight();'
+  'logo.sprite.SetX(global.layout_width / 2 - logo.image.GetWidth() / 2);'
+  'logo.sprite.SetY(global.layout_height / 2 - logo.image.GetHeight() / 2);'
+  'entry.x = global.layout_width / 2 - entry.image.GetWidth() / 2;'
   'entry.y = logo.sprite.GetY() + logo.image.GetHeight() + 40;'
-  'lock_height = entry.image.GetHeight() * 0.8;'
-  'lock_scale = lock_height / 96;'
-  'lock_width = 84 * lock_scale;'
-  'lock.x = entry.x - lock_width - 15;'
-  'lock.y = entry.y + entry.image.GetHeight() / 2 - lock_height / 2;'
-  'scaled_bullet = bullet.image.Scale(7, 7);'
-  'bullet.x = entry.x + 20 + index * (7 + 5);'
-  'bullet.y = entry.y + entry.image.GetHeight() / 2 - 3.5;'
+  'lock.height = entry.image.GetHeight() * 0.8;'
+  'lock.width = 84 * (lock.height / 96);'
+  'lock.x = entry.x - lock.width - 15;'
+  'lock.y = entry.y + entry.image.GetHeight() / 2 - lock.height / 2;'
+  'bullet.sprites[index] = Sprite(bullet.image.Scale(7, 7));'
+  'bullet.sprites[index].SetPosition(entry.x + 20 + index * (7 + 5), entry.y + entry.image.GetHeight() / 2 - 3.5, 10002);'
 )
 for line in "${script_geometry[@]}"; do
   grep -Fq -- "$line" "$dialog_dir/omarchy.script" ||
