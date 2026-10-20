@@ -117,6 +117,7 @@ EOF
   # Prevent file capabilities enabling realtime scheduling under a zero RLIMIT_RTTIME.
   # This headless compositor needs no additional privilege or background helper.
   env -u WAYLAND_DISPLAY -u HYPRLAND_INSTANCE_SIGNATURE -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS \
+    OMARCHY_PATH="${shell_dir%/shell}" \
     XDG_RUNTIME_DIR="$run" HOME="$run/home" XDG_CACHE_HOME="$run/cache" \
     XDG_STATE_HOME="$run/home/.local/state" XDG_CONFIG_HOME="$run/home/.config" \
     WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 WLR_RENDERER=pixman \

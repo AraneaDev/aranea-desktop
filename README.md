@@ -118,6 +118,10 @@ The update center checks repository and AUR packages, including the installed Om
 [Troubleshooting](docs/troubleshooting.md) when a check or recovery action needs
 attention.
 
+The passwordless sudo control stays visible: white while enabled and dimmed
+while disabled. Click to turn it off, or choose a duration and authenticate
+to turn it on. See [Passwordless sudo](docs/features.md#passwordless-sudo).
+
 ### World clock
 
 The globe button opens a separate world clock with live daylight, a sun-lit Earth,

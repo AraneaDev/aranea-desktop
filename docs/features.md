@@ -129,6 +129,18 @@ account, action details, and authentication state.
 
 ![Aranea authentication prompt](../screenshots/polkit.png)
 
+## Passwordless sudo
+
+The sudo control stays visible in the bar. White means passwordless sudo is
+enabled; a dimmed icon means it is disabled. Its tooltip describes the current
+state and click action.
+
+Click while enabled to disable it. Click while disabled to open Omarchy's
+duration picker: **15 minutes**, **1 Hour**, **1 Day**, or **Permanently**.
+Enabling uses Omarchy's confirmation and password authentication. Cancelling or
+failing authentication leaves it disabled. Temporary grants expire through
+Omarchy's existing timers, and the bar follows those changes.
+
 ## Wallpapers and motion
 
 Choose from thirteen scenes, with **Signal Shrine** as the default. The

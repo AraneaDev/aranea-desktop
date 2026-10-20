@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.sudo",
+  "name": "Passwordless sudo",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "Always-visible native passwordless sudo toggle",
+  "kinds": ["bar-widget"],
+  "entryPoints": { "barWidget": "BarWidget.qml" },
+  "barWidget": {
+    "displayName": "Passwordless sudo",
+    "description": "Native authenticated duration picker and one-click revoke",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "center"
+  }
+}

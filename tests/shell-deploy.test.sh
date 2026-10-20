@@ -123,3 +123,18 @@ printf '{}' >"$ARANEA_STATE_ROOT/agent-activity.json"
 [[ -f "$ARANEA_STATE_ROOT/agent-activity.json" ]]
 "$repo_root/scripts/deploy-plugins-safely" "$repo_root" "$plugins_dir" >/dev/null
 jq -e '([.plugins[].id|select(.=="araneadev.activity")]|length)==1' "$config_dir/shell.json" >/dev/null
+
+# The sudo wrapper is really deployed before repair splits the stock native
+# indicator; a second no-op deploy keeps the exact layout/settings projection.
+printf '{"bar":{"layout":{"center":[{"id":"omarchy.indicators","items":["Dnd",{"id":"PasswordlessSudo","duration":30}]}]}},"userSettings":{"keep":true}}\n' >"$config_dir/shell.json"
+"$repo_root/scripts/deploy-plugins-safely" "$repo_root" "$plugins_dir" >/dev/null
+diff -qr "$repo_root/plugins/araneadev.sudo" "$plugins_dir/araneadev.sudo"
+jq -e '.bar.layout.center[0].items==["Dnd"]
+  and .bar.layout.center[1]=={id:"araneadev.sudo",nativeSettings:{duration:30}}
+  and ([.plugins[].id]|index("araneadev.sudo"))!=null and .userSettings.keep' "$config_dir/shell.json" >/dev/null
+cp "$config_dir/shell.json" "$work_dir/sudo-repaired.json"
+"$repo_root/scripts/deploy-plugins-safely" "$repo_root" "$plugins_dir" >/dev/null
+cmp "$config_dir/shell.json" "$work_dir/sudo-repaired.json"
+"$repo_root/scripts/release-shell-config" "$config_dir/shell.json" >/dev/null
+jq -e '.bar.layout.center==[{id:"omarchy.indicators",items:["Dnd",{id:"PasswordlessSudo",duration:30}]}]
+  and ([.plugins[].id]|index("araneadev.sudo"))==null and .userSettings.keep' "$config_dir/shell.json" >/dev/null
