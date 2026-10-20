@@ -63,7 +63,7 @@ run_test() {
   ln -s "$repo_root/tests/qml/fixtures" "$run_dir/cfg/fixtures"
   for plugin in "$repo_root"/plugins/araneadev.*; do
     [[ -d "$plugin" ]] || continue
-    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == health-alerts || "$name" == clock-civil-dates || "$name" == worldclock-panel || ("$name" == clock-embedded-controllers || "$name" == unified-clock) || "$name" == updates-production-host || "$name" == production-widget-panels) ]]; then
+    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == health-alerts || "$name" == clock-civil-dates || "$name" == worldclock-panel || ("$name" == clock-embedded-controllers || "$name" == unified-clock || "$name" == clock-production-loader) || "$name" == updates-production-host || "$name" == production-widget-panels) ]]; then
       # Adapt only native windows/attached layer-shell state. Placement, mask,
       # motion, coordinator, focus timer and production panel content stay real.
       mkdir -p "$run_dir/cfg/plugins/araneadev.shared"
@@ -81,7 +81,7 @@ source = source.replace('WlrLayershell.', 'nativeLayer.')
 source = re.sub(r'(?m)^(  |        )anchors \{', r'\1nativeAnchors {', source)
 pathlib.Path(sys.argv[2]).write_text(source)
 PYBOUNDARY
-    elif [[ "$plugin" == */araneadev.clock && "$name" == unified-clock ]]; then
+    elif [[ "$plugin" == */araneadev.clock && ("$name" == unified-clock || "$name" == clock-production-loader) ]]; then
       # Native windows ignore ancestor Item visibility; the Item boundary must too.
       mkdir -p "$run_dir/cfg/plugins/araneadev.clock"
       for source in "$plugin"/*; do
@@ -139,10 +139,19 @@ PYBARWINDOW
       ln -s "$plugin" "$run_dir/cfg/plugins/${plugin##*/}"
     fi
   done
-  if [[ ("$name" == clock-embedded-controllers || "$name" == unified-clock) ]]; then
+  if [[ ("$name" == clock-embedded-controllers || "$name" == unified-clock || "$name" == clock-production-loader) ]]; then
     # Count every main frame, including transient standalone construction.
     # SpringPanel also creates legitimate per-output dismissal surfaces on open.
     sed -i '/^  id: root$/a\  Component.onCompleted: console.log("QMLTEST CLOCK NATIVE FRAME")' "$run_dir/cfg/plugins/araneadev.shared/SpringPanel.qml"
+  fi
+  if [[ "$name" == clock-production-loader ]]; then
+    # Registry entry points live outside the scanned shell, just as installed
+    # plugins do. Never import their directories from the test shell.
+    mkdir -p "$run_dir/external/calendar-plugins"
+    mv "$run_dir/cfg/plugins" "$run_dir/external/plugins"
+    cp -a "$run_dir/external/plugins/araneadev.clock" "$run_dir/external/plugins/araneadev.shared" "$run_dir/external/calendar-plugins/"
+    ln -s "$repo_root/tests/qml/fixtures" "$run_dir/external/fixtures"
+    ln -s "$shell_dir/services" "$run_dir/cfg/services"
   fi
   ln -s "$repo_root/shell.toml" "$run_dir/cfg/theme-shell.toml"
   cp "$test_file" "$run_dir/cfg/shell.qml"
@@ -153,7 +162,7 @@ PYBARWINDOW
   for display_command in display-fixture omarchy-display-text-size omarchy-toggle-nightlight brightnessctl omarchy-brightness-keyboard omarchy-monitor-state omarchy-battery-status omarchy-powerprofiles-list upower ls; do
     ln -s "$repo_root/tests/qml/fixtures/display-command.py" "$run_dir/display-bin/$display_command"
   done
-  if [[ ("$name" == clock-embedded-controllers || "$name" == unified-clock) ]]; then
+  if [[ ("$name" == clock-embedded-controllers || "$name" == unified-clock || "$name" == clock-production-loader) ]]; then
     # Record only controller commands; Commons Style has unrelated startup probes.
     : >"${ARANEA_TEST_SANDBOX:?}/clock-calls.log"
     cat >"$run_dir/display-bin/clock-command" <<'CLOCKCOMMAND'
@@ -180,7 +189,7 @@ CLOCKCOMMAND
   (cd "$run_dir" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
     -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE QT_QPA_PLATFORM=offscreen \
     PATH="$run_dir/sudo-bin:$run_dir/display-bin:$PATH" OMARCHY_PATH="${shell_dir%/shell}" ARANEA_SUDO_FIXTURE_ROOT="$run_dir/sudo-state" ARANEA_DISPLAY_FIXTURE_ROOT="$run_dir/display-state" \
-    XDG_RUNTIME_DIR="$run_dir/run" XDG_CACHE_HOME="$run_dir/cache" \
+    ARANEA_CLOCK_TEST_PLUGIN_ROOT="$run_dir/external/plugins" XDG_RUNTIME_DIR="$run_dir/run" XDG_CACHE_HOME="$run_dir/cache" \
     "$quickshell_bin" -p "$run_dir/cfg") >"$run_dir/log" 2>&1 &
   qs_pid=$!
   while ((waited < timeout_s * 5)); do
@@ -197,7 +206,7 @@ CLOCKCOMMAND
     echo "  QMLTEST FAIL embedded construction created a native frame"
     status=1
   fi
-  if [[ "$name" == unified-clock ]] && [[ "$(grep -c 'QMLTEST CLOCK NATIVE FRAME' <<<"$log")" != 2 ]]; then
+  if [[ ("$name" == unified-clock || "$name" == clock-production-loader) ]] && [[ "$(grep -c 'QMLTEST CLOCK NATIVE FRAME' <<<"$log")" != 2 ]]; then
     echo "  QMLTEST FAIL unified clock must construct exactly two cumulative native frames for two clocks"
     status=1
   fi

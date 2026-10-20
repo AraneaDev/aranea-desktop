@@ -44,6 +44,7 @@ cat >"$bin/fake-surface" <<'SH'
 #!/usr/bin/env bash
 [[ " ${CAPTURE_FAILS:-} " == *" $1 "* ]] && exit 1
 printf 'new %s\n' "$1" >"$2/$1.png"
+[[ " ${CAPTURE_FAIL_AFTER_WRITE:-} " == *" $1 "* ]] && exit 1
 if [[ "$1" == notifications ]]; then
   dir="$HOME/.local/state/omarchy/notifications"
   mkdir -p "$dir/inbox" "$dir/images"
@@ -219,6 +220,22 @@ fi
 assert_no_backup 'failed surfaces'
 grep -Fq 'omarchy restart shell' "$ARANEA_TEST_SANDBOX/guard.log"
 grep -Fq 'hl.dsp.focus({ workspace = "1" })' "$ARANEA_TEST_SANDBOX/guard.log"
+
+# --- a PNG written before a failed child cleanup is not a successful capture
+seed_real
+printf 'old workspaces\n' >"$out/workspaces.png"
+printf 'old gif\n' >"$out/hero-showcase.gif"
+status=0
+errors="$(CAPTURE_FAIL_AFTER_WRITE=workspaces run_batch)" || status=$?
+[[ "$status" -eq 1 ]] || {
+  printf 'a child failing after writing must fail the batch (got %s)\n' "$status" >&2
+  exit 1
+}
+grep -Fxq 'capture failed: workspaces' <<<"$errors"
+[[ "$(cat "$out/workspaces.png")" == "old workspaces" ]]
+[[ "$(cat "$out/hero-showcase.gif")" == "old gif" ]]
+assert_real_back 'child failed after writing'
+assert_no_backup 'child failed after writing'
 
 # --- every surface works: entries and images come back byte for byte, the
 # capture entry is dropped, and a late inbox clear can never delete them

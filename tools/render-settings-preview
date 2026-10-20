@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # Renders real SettingsSurface content in an inert offscreen host. No live
 # desktop owner is contacted; fixture mode rejects reads and mutations.
-# Usage: tools/render-settings-preview --output FILE [--fixture wide|narrow|dirty|unavailable|integration-failed|notifications|scaling]
+# Usage: tools/render-settings-preview --output FILE [--fixture NAME] [--background FILE]
+# Workspaces use repository Signal Shrine art unless --background selects a file.
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=tools/lib/render-capture.sh
 source "$repo_root/tools/lib/render-capture.sh"
-output=""
+output="" background="$repo_root/backgrounds/variants/signal-shrine.png"
 fixture=wide
 requested_width="" requested_height="" project_count=""
 while (($#)); do
   case "$1" in
-    --output | --fixture | --width | --height | --project-count)
+    --output | --fixture | --width | --height | --project-count | --background)
       (($# >= 2)) || exit 2
       case "$1" in
         --output) output="$2" ;;
@@ -19,11 +20,12 @@ while (($#)); do
         --width) requested_width="$2" ;;
         --height) requested_height="$2" ;;
         --project-count) project_count="$2" ;;
+        --background) background="$2" ;;
       esac
       shift 2
       ;;
     *)
-      echo 'Usage: tools/render-settings-preview --output FILE [--fixture NAME]' >&2
+      echo 'Usage: tools/render-settings-preview --output FILE [--fixture NAME] [--background FILE]' >&2
       exit 2
       ;;
   esac
@@ -53,6 +55,13 @@ case "$fixture" in
     exit 2
     ;;
 esac
+if [[ "$fixture" == workspaces ]]; then
+  [[ -f "$background" && -r "$background" ]] || {
+    echo "Settings preview needs a readable background: $background" >&2
+    exit 1
+  }
+  background="$(readlink -f -- "$background")"
+fi
 width="${requested_width:-${ARANEA_SETTINGS_RENDER_WIDTH:-$width}}"
 height="${requested_height:-${ARANEA_SETTINGS_RENDER_HEIGHT:-$height}}"
 shell_dir="${ARANEA_QML_SHELL_DIR:-/usr/share/omarchy/shell}"
@@ -91,7 +100,11 @@ done
 cp "$repo_root/tests/qml/fixtures/settings-preview.qml" "$work/cfg/shell.qml"
 cp "$repo_root/tests/qml/fixtures/ProjectPreview.js" "$work/cfg/ProjectPreview.js"
 [[ "${ARANEA_SETTINGS_RENDER_CONTROLS:-0}" != 1 ]] || cp "$repo_root/tests/qml/fixtures/projects-controls.qml" "$work/cfg/shell.qml"
-[[ "$fixture" != workspaces ]] || cp "$repo_root/tests/qml/fixtures/workspaces-preview.qml" "$work/cfg/shell.qml"
+if [[ "$fixture" == workspaces ]]; then
+  cp "$repo_root/tests/qml/fixtures/workspaces-preview.qml" "$work/cfg/shell.qml"
+  # A fixed local URL avoids interpreting spaces, quotes, # or ? in input paths.
+  cp -- "$background" "$work/cfg/background.png"
+fi
 (cd "$work" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
   -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE -u QT_SCREEN_SCALE_FACTORS -u QT_AUTO_SCREEN_SCALE_FACTOR \
   PATH="$work/traps:$PATH" ARANEA_CAPTURE_EXECUTION_LOG="$work/execution.log" \

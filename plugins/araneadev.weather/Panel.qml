@@ -1243,7 +1243,7 @@ Panel {
       Aranea.KeyboardPanelFrame {
         id: panel
         // Exposes the standalone view through the same interface as hosted views.
-        property var dropdownView: dropdown
+        property var dropdownView: dropdownLoader.item
         refined: true
         anchorItem: root.anchorItem
         owner: root.barIdentity
@@ -1255,7 +1255,7 @@ Panel {
         // frame has the keys again.
         blocked: root.editingLocation && !root.savingLocation
         contentWidth: panel.fittedContentWidth(Style.space(380))
-        contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
+        contentHeight: panel.fittedContentHeight(dropdownLoader.implicitHeight)
         onCloseRequested: root.close()
         onTabRequested: function (direction) {
           root.disarmPointer()
@@ -1274,13 +1274,29 @@ Panel {
           anchors.fill: parent
           clip: true
 
-          WeatherDropdown {
-            id: dropdown
+          // Embedded controllers must not compile a second copy of the hosted
+          // view through Quickshell's qs URL interceptor.
+          Loader {
+            id: dropdownLoader
             width: parent.width
-            view: root.weatherView
-            hourlyPoints: root.hourlyPoints
-            editText: root.editText
-            onAction: function (name, arg) {
+            Component.onCompleted: setSource(Qt.resolvedUrl("WeatherDropdown.qml"), {
+              width: Qt.binding(function () {
+                return dropdownLoader.width
+              }),
+              view: Qt.binding(function () {
+                return root.weatherView
+              }),
+              hourlyPoints: Qt.binding(function () {
+                return root.hourlyPoints
+              }),
+              editText: Qt.binding(function () {
+                return root.editText
+              })
+            })
+          }
+          Connections {
+            target: dropdownLoader.item
+            function onAction(name, arg) {
               root.handleAction(name, arg)
             }
           }

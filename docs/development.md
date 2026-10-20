@@ -94,7 +94,7 @@ persistence, launch queues, and service ownership. For example, `EmojiCell` and
 
 ## Showcase captures
 
-The public batch produces 38 surface PNGs and a 32-frame hero GIF. It mixes live
+The public batch produces 46 surface PNGs and a 38-frame hero GIF. It mixes live
 shell captures with production QML rendered in isolated hosts; lock and boot
 previews never lock or reboot the active machine.
 
@@ -115,7 +115,11 @@ before capturing, use `omarchy-shell omarchy.agents select codex`; that choice
 persists across restarts.
 
 Network hosts VPN and Bluetooth captures; System hosts Display and Health.
-Health waits for live CPU history. Settings previews use Signal Shrine, and
+Health waits for live CPU history. Calendar, World Clock and Weather are captured
+as separate pages of the popup below the time. Workspaces uses the current
+background; `ARANEA_CAPTURE_BACKGROUND` selects another image explicitly. Its
+isolated renderer defaults to Signal Shrine when no current background exists.
+Settings previews use Signal Shrine, and
 `settings-schedule` shows the daily time/image editor. Nearby device names,
 audio labels, provider details, and notification contents are staged for the
 showcase. Audio transport and agent refresh/selection are refused while their
@@ -131,6 +135,8 @@ fixtures; registry reads, Git, launches and writes are refused while shown, and
 everything is restored afterwards. Without a running shell or that capture IPC
 the surface fails with no screenshot.
 
+The Apps capture closes the native app grid before the next view. Favorites,
+Recent and OSD captures also verify that grid is absent before grabbing a frame.
 A failed surface restores its previous PNG, fails the batch, and prevents a new
 GIF. Rebuild only the GIF from existing stills with:
 
