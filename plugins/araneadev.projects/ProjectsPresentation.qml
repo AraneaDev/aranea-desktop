@@ -23,8 +23,8 @@ Item {
   property string mode: ''
   // Closing the window ends every automatic check; they only ever read.
   onOpenedChanged: if (!opened) {
-    projectClient.stopAutoCheck()
-    actionClient.stopAutoCheck()
+    projectClientObject.stopAutoCheck()
+    actionClientObject.stopAutoCheck()
   }
   // Current Projects destination retained for typed capture fixtures.
   property string section: 'projects'
@@ -39,8 +39,8 @@ Item {
   // Explicit profile Start may first select its inspected checkout in the registry.
   property var inspectionLaunchIntent: null
   // Presentation-only checkout selection is shared by header, actions, Git and agents.
-  readonly property var presentationState: Object.assign({}, projectController.state, {
-    projects: (projectController.state.projects || []).map(function (project) {
+  readonly property var presentationState: Object.assign({}, projectControllerObject.state, {
+    projects: (projectControllerObject.state.projects || []).map(function (project) {
       return project.id === root.projectId && root.inspectionCheckoutId ? Object.assign({}, project, {
         lastCheckoutId: root.inspectionCheckoutId
       }) : project
@@ -57,9 +57,9 @@ Item {
   property bool restoreNavigationPending: false
   // Restoration is presentation-only and never asks the live owner to Open.
   function restoreNavigation() {
-    if (!restoreNavigationPending || inert || projectController.reading)
+    if (!restoreNavigationPending || inert || projectControllerObject.reading)
       return
-    var state = projectController.state
+    var state = projectControllerObject.state
     projectId = Navigation.restoreSelection(state.projects || [], projectId || null, (state.navigation || {}).lastProjectId || null)
     restoreNavigationPending = false
   }
@@ -86,28 +86,28 @@ Item {
   }
   // Drain metadata only when existing registry work has completed; failures are final.
   function flushNavigation() {
-    if (inert || projectController.pending || projectController.reading || !navigationQueue.length)
+    if (inert || projectControllerObject.pending || projectControllerObject.reading || !navigationQueue.length)
       return
     var args = navigationQueue[0]
     navigationQueue = navigationQueue.slice(1)
-    if (!(projectController.state.projects || []).some(function (project) {
+    if (!(projectControllerObject.state.projects || []).some(function (project) {
       return project.id === args.projectId
     })) {
       Qt.callLater(flushNavigation)
       return
     }
     navigationSaving = true
-    if (!projectController.request('navigation-set', args))
+    if (!projectControllerObject.request('navigation-set', args))
       navigationSaving = false
   }
   // Registry/tool operation client works independently of the live owner.
-  property alias projectController: projectController
+  property alias projectController: projectControllerObject
   // Sole-owner submission/observation client, without launch authority.
-  property alias projectClient: projectClient
+  property alias projectClient: projectClientObject
   // Keep-loaded cancellable scan observer survives window visibility changes.
-  property alias discoveryClient: discoveryClient
+  property alias discoveryClient: discoveryClientObject
   // Read-only Git cache survives visibility while launch ownership stays separate.
-  property alias gitClient: gitClient
+  property alias gitClient: gitClientObject
   // Explicit fetch, pull and task-checkout commands share one slot.
   property alias gitCommands: gitCommands
   // Invalid or missing selected checkouts never fall back to another worktree.
@@ -132,17 +132,17 @@ Item {
   }
   // A UUID may arrive after submit returns; bind only this request generation and target.
   function bindLaunchIdentity() {
-    var intent = launchIntent, target = projectClient.environmentTarget
-    if (!intent || projectClient.generation !== intent.generation || !target || projectClient.submissionMethod !== 'startEnvironment')
+    var intent = launchIntent, target = projectClientObject.environmentTarget
+    if (!intent || projectClientObject.generation !== intent.generation || !target || projectClientObject.submissionMethod !== 'startEnvironment')
       return
     if (['projectId', 'checkoutId', 'profileId', 'profileRevision'].every(function (key) {
       return target[key] === intent.target[key]
     }))
-      awaitedLaunchId = projectClient.activationId
+      awaitedLaunchId = projectClientObject.activationId
   }
   // Start the exact displayed profile on the currently selected checkout.
   function startProfile(profileId, profileRevision, another) {
-    if (inert || !opened || !selectedProject || projectClient.submitting || inspectionLaunchIntent)
+    if (inert || !opened || !selectedProject || projectClientObject.submitting || inspectionLaunchIntent)
       return false
     var profile = (selectedProject.profiles || []).find(function (p) {
       return p.id === profileId && p.revision === profileRevision
@@ -156,16 +156,16 @@ Item {
       profileRevision: profileRevision
     }
     clearDismissalIntent()
-    var saved = (projectController.state.projects || []).find(function (project) {
+    var saved = (projectControllerObject.state.projects || []).find(function (project) {
       return project.id === root.projectId
     })
     if (inspectionCheckoutId && saved && saved.lastCheckoutId !== target.checkoutId) {
-      if (projectController.pending || projectController.reading)
+      if (projectControllerObject.pending || projectControllerObject.reading)
         return false
       inspectionLaunchIntent = Object.assign({}, target, {
         another: another === true
       })
-      if (!projectController.request('select-checkout', {
+      if (!projectControllerObject.request('select-checkout', {
         projectId: target.projectId,
         checkoutId: target.checkoutId
       })) {
@@ -178,7 +178,7 @@ Item {
       target: target,
       generation: null
     }
-    var accepted = another ? projectClient.startAnotherEnvironment(target) : projectClient.startEnvironment(target)
+    var accepted = another ? projectClientObject.startAnotherEnvironment(target) : projectClientObject.startEnvironment(target)
     if (!accepted)
       clearDismissalIntent()
     else
@@ -188,7 +188,7 @@ Item {
   // Dismissal intent clears before stopping a known-unaccepted local retry.
   function cancelPreparation() {
     clearDismissalIntent()
-    return projectClient.cancelPreparation()
+    return projectClientObject.cancelPreparation()
   }
   // Return is focus-only and closes only on the matching observed signal.
   function returnEnvironment(target) {
@@ -196,14 +196,14 @@ Item {
       return false
     clearDismissalIntent()
     awaitedReturnId = target.environmentId
-    if (!projectClient.returnEnvironment(target)) {
+    if (!projectClientObject.returnEnvironment(target)) {
       clearDismissalIntent()
       return false
     }
     return true
   }
   Connections {
-    target: projectClient
+    target: projectClientObject
     function onEnvironmentRequestStarted(requestGeneration, method, target) {
       var intent = root.launchIntent
       if (!intent || intent.generation !== null || method !== 'startEnvironment' || !root.opened)
@@ -225,7 +225,7 @@ Item {
       root.bindLaunchIdentity()
     }
     function onSubmissionAccepted(operationId, environmentId) {
-      if (root.opened && root.launchIntent && root.awaitedLaunchId && root.awaitedLaunchId === projectClient.activationId && operationId === projectClient.operationId && environmentId === projectClient.environmentId)
+      if (root.opened && root.launchIntent && root.awaitedLaunchId && root.awaitedLaunchId === projectClientObject.activationId && operationId === projectClientObject.operationId && environmentId === projectClientObject.environmentId)
         root.close()
     }
     function onReturnObserved(environmentId) {
@@ -234,7 +234,7 @@ Item {
     }
   }
   ProjectGitClient {
-    id: gitClient
+    id: gitClientObject
     active: root.opened
     captureActive: root.inert
     projectId: root.selectedProject ? root.selectedProject.id : ''
@@ -247,39 +247,39 @@ Item {
     captureActive: root.inert
   }
   // Reads of how task checkouts differ from their base, and the Open diff launch.
-  property alias reviewClient: reviewClient
+  property alias reviewClient: reviewClientObject
   ProjectReviewClient {
-    id: reviewClient
+    id: reviewClientObject
     active: root.opened
     timed: root.opened && !!root.view && root.view.section === 'overview'
     captureActive: root.inert
-    projectId: gitClient.projectId
-    checkoutId: gitClient.checkoutId
-    tasks: (activityClient.snapshot || {}).tasks || []
-    projects: (projectController.state || {}).projects || []
+    projectId: gitClientObject.projectId
+    checkoutId: gitClientObject.checkoutId
+    tasks: (activityClientObject.snapshot || {}).tasks || []
+    projects: (projectControllerObject.state || {}).projects || []
     commands: gitCommands
   }
   // One action observer shared by Overview and full Actions, including receipts.
-  property alias actionClient: actionClient
+  property alias actionClient: actionClientObject
   ProjectActionsClient {
-    id: actionClient
+    id: actionClientObject
     captureActive: root.inert
-    projectId: gitClient.projectId
-    checkoutId: gitClient.checkoutId
+    projectId: gitClientObject.projectId
+    checkoutId: gitClientObject.checkoutId
     summaryObservationActive: root.opened && !!root.view && root.view.section === 'overview' && root.view.activityVisible && !root.inert
     observationActive: root.opened && !!root.view && ['overview', 'actions'].indexOf(root.view.section) >= 0 && !root.inert
   }
   // Snapshot polling is read-only; native protected-run observation stays in the client.
   Timer {
     interval: 5000
-    running: actionClient.observationActive
+    running: actionClientObject.observationActive
     triggeredOnStart: true
     repeat: true
     onTriggered: root.refreshActions()
   }
   // A selection switch clears the snapshot; read the new one once both identities settle.
   Connections {
-    target: actionClient
+    target: actionClientObject
     function onProjectIdChanged() {
       root.refreshActionsSoon()
     }
@@ -289,45 +289,45 @@ Item {
   }
   // Coalesces the project and checkout changes of one switch into one read.
   function refreshActionsSoon() {
-    if (actionClient.observationActive)
+    if (actionClientObject.observationActive)
       Qt.callLater(root.refreshActions)
   }
   // Explicit snapshot/capability refresh never starts a saved command.
   function refreshActions() {
-    if (inert || !opened || !actionClient.projectId)
+    if (inert || !opened || !actionClientObject.projectId)
       return
-    actionClient.refresh()
-    actionClient.checkAvailability()
-    actionClient.observeSummary()
+    actionClientObject.refresh()
+    actionClientObject.checkAvailability()
+    actionClientObject.observeSummary()
   }
   ProjectRegistryClient {
-    id: projectController
+    id: projectControllerObject
     captureActive: root.inert
   }
   ProjectClient {
-    id: projectClient
+    id: projectClientObject
     captureActive: root.inert
   }
   ProjectDiscoveryController {
-    id: discoveryClient
+    id: discoveryClientObject
     captureActive: root.inert
   }
   Connections {
-    target: projectController
+    target: projectControllerObject
     function onStateChanged() {
       root.restoreNavigation()
       root.applyInspection()
     }
     function onReadingChanged() {
-      if (!projectController.reading) {
+      if (!projectControllerObject.reading) {
         root.restoreNavigation()
         root.applyInspection()
         root.flushNavigation()
       }
     }
     function onPendingChanged() {
-      if (!projectController.pending) {
-        if (projectController.error)
+      if (!projectControllerObject.pending) {
+        if (projectControllerObject.error)
           root.inspectionLaunchIntent = null
         root.navigationSaving = false
         root.applyInspection()
@@ -335,25 +335,25 @@ Item {
       }
     }
     function onRootReady(rootId) {
-      discoveryClient.start(rootId)
+      discoveryClientObject.start(rootId)
     }
     function onMutationCompleted(action, args, state) {
       if (action === 'select-checkout' && root.projectId === args.projectId) {
-        var intent = root.inspectionLaunchIntent
+        let intent = root.inspectionLaunchIntent
         root.inspectionLaunchIntent = null
         root.inspectionCheckoutId = ''
         if (intent && root.opened && !root.inert && intent.projectId === args.projectId && intent.checkoutId === args.checkoutId && root.selectedCheckoutId === intent.checkoutId)
           root.startProfile(intent.profileId, intent.profileRevision, intent.another)
       }
       if (action === 'register') {
-        var added = state.projects.filter(function (p) {
+        let added = state.projects.filter(function (p) {
           return p.checkouts.some(function (c) {
             return args.paths.indexOf(c.path) >= 0
           })
         })[0]
         if (added)
           root.projectId = added.id
-        discoveryClient.candidates = discoveryClient.candidates.filter(function (c) {
+        discoveryClientObject.candidates = discoveryClientObject.candidates.filter(function (c) {
           return [c.path].concat((c.checkouts || []).map(function (checkout) {
             return checkout.path
           })).some(function (path) {
@@ -368,7 +368,7 @@ Item {
       if (action === 'remove' && root.projectId === args.projectId)
         root.projectId = ''
       if (action === 'ignore')
-        discoveryClient.candidates = discoveryClient.candidates.filter(function (c) {
+        discoveryClientObject.candidates = discoveryClientObject.candidates.filter(function (c) {
           return !state.ignored.some(function (i) {
             return i.commonDir === c.commonDir
           })
@@ -382,9 +382,9 @@ Item {
     readonly property bool showcaseActive: root.inert
   }
   // Persistent activity observer; accepted task operations outlive the window.
-  property alias activityClient: activityClient
+  property alias activityClient: activityClientObject
   Activity.ActivityClient {
-    id: activityClient
+    id: activityClientObject
     captureActive: root.inert
   }
   Timer {
@@ -392,13 +392,13 @@ Item {
     running: root.opened && !!root.view && root.view.activityVisible && !root.inert
     repeat: true
     triggeredOnStart: true
-    onTriggered: activityClient.refresh()
+    onTriggered: activityClientObject.refresh()
   }
   // Capture shared observations once, independently of a full Actions view.
   function actionSnapshot() {
     var saved = {};
     ['snapshot', 'snapshotProjectId', 'currentRun', 'runId', 'requestId', 'submissionUncertain', 'submissionTarget', 'availability', 'available', 'error', 'output', 'truncated', 'summaryError'].forEach(function (key) {
-      saved[key] = actionClient[key]
+      saved[key] = actionClientObject[key]
     })
     return saved
   }
@@ -425,7 +425,7 @@ Item {
       summaryError: null
     }
     Object.keys(defaults).forEach(function (key) {
-      actionClient[key] = saved && saved[key] !== undefined ? saved[key] : defaults[key]
+      actionClientObject[key] = saved && saved[key] !== undefined ? saved[key] : defaults[key]
     })
   }
   // Scoped inert capture state, with drafts restored to their exact identities.
@@ -440,35 +440,35 @@ Item {
       inspectionCheckoutId: inspectionCheckoutId,
       inspectionError: inspectionError,
       projects: {
-        state: projectController.state,
-        tools: projectController.tools,
-        error: projectController.error,
-        errorObject: projectController.errorObject,
-        extraErrorObject: projectController.extraErrorObject,
-        failure: discoveryClient.failure,
-        candidates: discoveryClient.candidates,
-        partial: discoveryClient.partial,
-        errors: discoveryClient.errors,
-        snapshot: projectClient.snapshot,
-        available: projectClient.available,
-        clientError: projectClient.error,
-        requestError: projectClient.requestError,
-        acceptanceUnknown: projectClient.acceptanceUnknown
+        state: projectControllerObject.state,
+        tools: projectControllerObject.tools,
+        error: projectControllerObject.error,
+        errorObject: projectControllerObject.errorObject,
+        extraErrorObject: projectControllerObject.extraErrorObject,
+        failure: discoveryClientObject.failure,
+        candidates: discoveryClientObject.candidates,
+        partial: discoveryClientObject.partial,
+        errors: discoveryClientObject.errors,
+        snapshot: projectClientObject.snapshot,
+        available: projectClientObject.available,
+        clientError: projectClientObject.error,
+        requestError: projectClientObject.requestError,
+        acceptanceUnknown: projectClientObject.acceptanceUnknown
       },
       actions: actionSnapshot(),
-      gitCache: gitClient.cache,
-      reviews: reviewClient.reviews,
+      gitCache: gitClientObject.cache,
+      reviews: reviewClientObject.reviews,
       activity: {
-        snapshot: activityClient.snapshot,
-        available: activityClient.available,
-        error: activityClient.error
+        snapshot: activityClientObject.snapshot,
+        available: activityClientObject.available,
+        error: activityClientObject.error
       },
       ui: view ? view.captureSnapshot() : null
     })
   }
   // Validate and enter an inert transaction before changing any observation.
   function captureBegin(payloadJson) {
-    if (inspectionDestination || actionClient.pending || activityClient.pending || projectController.pending || projectController.reading || projectClient.pending || projectClient.preparing || discoveryClient.pending || captureSaved || (view && view.captureBusy()))
+    if (inspectionDestination || actionClientObject.pending || activityClientObject.pending || projectControllerObject.pending || projectControllerObject.reading || projectClientObject.pending || projectClientObject.preparing || discoveryClientObject.pending || captureSaved || (view && view.captureBusy()))
       return 'busy'
     var payload
     try {
@@ -489,32 +489,32 @@ Item {
     projectId = Logic.normalizeProjectId(payload.projectId)
     var f = payload.fixture
     restoreActions(f.projectActions || {})
-    gitClient.cache = f.projectGitCache || {}
-    reviewClient.reviews = f.projectReviews || {}
-    activityClient.snapshot = f.activitySnapshot || {
+    gitClientObject.cache = f.projectGitCache || {}
+    reviewClientObject.reviews = f.projectReviews || {}
+    activityClientObject.snapshot = f.activitySnapshot || {
       tasks: [],
       operations: []
     }
-    activityClient.available = false
-    activityClient.error = null
-    projectController.state = f.projectsState
-    projectController.tools = f.projectTools || {
+    activityClientObject.available = false
+    activityClientObject.error = null
+    projectControllerObject.state = f.projectsState
+    projectControllerObject.tools = f.projectTools || {
       defaults: {},
       editors: [],
       terminals: []
     }
-    projectController.error = f.projectError || ''
-    projectController.errorObject = null
-    projectController.extraErrorObject = null
-    discoveryClient.candidates = f.projectCandidates || []
-    discoveryClient.partial = f.projectPartial === true
-    discoveryClient.errors = f.projectErrors || []
-    discoveryClient.failure = null
-    projectClient.snapshot = f.projectSnapshot || {}
-    projectClient.available = f.projectAvailable === true
-    projectClient.error = ''
-    projectClient.requestError = null
-    projectClient.acceptanceUnknown = f.projectAcceptanceUnknown === true
+    projectControllerObject.error = f.projectError || ''
+    projectControllerObject.errorObject = null
+    projectControllerObject.extraErrorObject = null
+    discoveryClientObject.candidates = f.projectCandidates || []
+    discoveryClientObject.partial = f.projectPartial === true
+    discoveryClientObject.errors = f.projectErrors || []
+    discoveryClientObject.failure = null
+    projectClientObject.snapshot = f.projectSnapshot || {}
+    projectClientObject.available = f.projectAvailable === true
+    projectClientObject.error = ''
+    projectClientObject.requestError = null
+    projectClientObject.acceptanceUnknown = f.projectAcceptanceUnknown === true
     if (view)
       view.captureReset(f)
     opened = true
@@ -532,25 +532,25 @@ Item {
     if (!captureSaved || payloadJson !== captureSaved.json)
       return 'invalid'
     var saved = JSON.parse(payloadJson), focus = captureSaved.focus, p = saved.projects
-    gitClient.cache = saved.gitCache || {}
-    reviewClient.reviews = saved.reviews || {}
-    activityClient.snapshot = saved.activity.snapshot
-    activityClient.available = saved.activity.available
-    activityClient.error = saved.activity.error
-    projectController.state = p.state
-    projectController.tools = p.tools
-    projectController.error = p.error
-    projectController.errorObject = p.errorObject || null
-    projectController.extraErrorObject = p.extraErrorObject || null
-    discoveryClient.candidates = p.candidates
-    discoveryClient.partial = p.partial
-    discoveryClient.errors = p.errors
-    discoveryClient.failure = p.failure || null
-    projectClient.snapshot = p.snapshot
-    projectClient.available = p.available
-    projectClient.error = p.clientError
-    projectClient.requestError = p.requestError
-    projectClient.acceptanceUnknown = p.acceptanceUnknown === true
+    gitClientObject.cache = saved.gitCache || {}
+    reviewClientObject.reviews = saved.reviews || {}
+    activityClientObject.snapshot = saved.activity.snapshot
+    activityClientObject.available = saved.activity.available
+    activityClientObject.error = saved.activity.error
+    projectControllerObject.state = p.state
+    projectControllerObject.tools = p.tools
+    projectControllerObject.error = p.error
+    projectControllerObject.errorObject = p.errorObject || null
+    projectControllerObject.extraErrorObject = p.extraErrorObject || null
+    discoveryClientObject.candidates = p.candidates
+    discoveryClientObject.partial = p.partial
+    discoveryClientObject.errors = p.errors
+    discoveryClientObject.failure = p.failure || null
+    projectClientObject.snapshot = p.snapshot
+    projectClientObject.available = p.available
+    projectClientObject.error = p.clientError
+    projectClientObject.requestError = p.requestError
+    projectClientObject.acceptanceUnknown = p.acceptanceUnknown === true
     projectId = saved.projectId
     inspectionCheckoutId = saved.inspectionCheckoutId || ''
     inspectionError = saved.inspectionError || ''
@@ -583,11 +583,11 @@ Item {
   }
   // Accept a typed destination and refresh observations without launching tools.
   function applyInspection() {
-    if (inert || !opened || !inspectionDestination || !view || projectController.reading || projectController.pending)
+    if (inert || !opened || !inspectionDestination || !view || projectControllerObject.reading || projectControllerObject.pending)
       return
     var target = inspectionDestination
     inspectionDestination = null
-    var project = (projectController.state.projects || []).find(function (row) {
+    var project = (projectControllerObject.state.projects || []).find(function (row) {
       return row.id === target.projectId
     })
     if (!project || !(project.checkouts || []).some(function (checkout) {
@@ -621,8 +621,8 @@ Item {
       mode = 'switcher'
       restoreNavigationPending = false
       opened = true
-      projectController.refresh()
-      projectClient.refresh()
+      projectControllerObject.refresh()
+      projectClientObject.refresh()
       if (view)
         view.focusKeys()
       return 'ok'
@@ -639,9 +639,9 @@ Item {
       }
       mode = ''
       opened = true
-      projectController.refresh()
+      projectControllerObject.refresh()
       applyInspection()
-      projectClient.refresh()
+      projectClientObject.refresh()
       if (view)
         view.focusKeys()
       return 'ok'
@@ -658,9 +658,9 @@ Item {
     restoreNavigationPending = !payload || payload.projectId === undefined
     projectId = nextId
     opened = true
-    projectController.refresh()
+    projectControllerObject.refresh()
     restoreNavigation()
-    projectClient.refresh()
+    projectClientObject.refresh()
     if (view)
       view.focusKeys()
     return 'ok'

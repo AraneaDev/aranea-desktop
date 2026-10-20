@@ -281,14 +281,14 @@ Panel {
   // view's Paired and Available rows and the cursor stay section-relative.
   readonly property var scrollRows: {
     var rows = []
-    for (var k = 0; k < knownDevices.length; k++)
+    for (let k = 0; k < knownDevices.length; k++)
       rows.push({
         dev: Model.deviceRow(knownDevices[k]),
         section: "known",
         indexInSection: k
       })
     if (sectionVisible("discovered"))
-      for (var d = 0; d < discoveredDevices.length; d++)
+      for (let d = 0; d < discoveredDevices.length; d++)
         rows.push({
           dev: Model.deviceRow(discoveredDevices[d]),
           section: "discovered",
@@ -301,7 +301,7 @@ Panel {
   // projection so those delegates never hold Device QObject wrappers either.
   readonly property var connectedRows: {
     var rows = []
-    for (var i = 0; i < connectedDevices.length; i++)
+    for (let i = 0; i < connectedDevices.length; i++)
       rows.push(Model.deviceRow(connectedDevices[i]))
     return rows
   }
@@ -315,7 +315,7 @@ Panel {
       return null
     var addr = row.dev.address || ""
     var devs = devices || []
-    for (var i = 0; i < devs.length; i++) {
+    for (let i = 0; i < devs.length; i++) {
       if ((devs[i].address || "") === addr)
         return devs[i]
     }
@@ -327,7 +327,7 @@ Panel {
   readonly property int scrollRowIndex: {
     if (focusSection !== "known" && focusSection !== "discovered")
       return -1
-    for (var i = 0; i < scrollRows.length; i++)
+    for (let i = 0; i < scrollRows.length; i++)
       if (scrollRows[i].section === focusSection && scrollRows[i].indexInSection === selectedIndex)
         return i
     return -1
@@ -346,8 +346,8 @@ Panel {
   // Non-stream Pipewire sink nodes (candidate audio outputs).
   function audioSinks() {
     var sinks = []
-    for (var i = 0; i < pipewireNodes.length; i++) {
-      var node = pipewireNodes[i]
+    for (let i = 0; i < pipewireNodes.length; i++) {
+      let node = pipewireNodes[i]
       if (node && node.isSink && !node.isStream)
         sinks.push(node)
     }
@@ -357,7 +357,7 @@ Panel {
   // The Pipewire sink backing a given Bluetooth device, if any.
   function bluetoothAudioSink(device) {
     var sinks = audioSinks()
-    for (var i = 0; i < sinks.length; i++) {
+    for (let i = 0; i < sinks.length; i++) {
       if (Model.bluetoothSinkMatchesDevice(sinks[i], device))
         return sinks[i]
     }
@@ -479,13 +479,13 @@ Panel {
     if (Object.keys(root.deviceQueue).length === 0)
       return
     var busy = {}
-    for (var i = 0; i < devices.length; i++)
+    for (let i = 0; i < devices.length; i++)
       if (devices[i] && devices[i].address)
         busy[devices[i].address] = root.deviceInFlight(devices[i])
     var r = BluetoothLogic.takeReady(root.deviceQueue, busy)
     root.deviceQueue = r.queue
-    for (var j = 0; j < r.run.length; j++)
-      for (var k = 0; k < devices.length; k++)
+    for (let j = 0; j < r.run.length; j++)
+      for (let k = 0; k < devices.length; k++)
         if (devices[k] && devices[k].address === r.run[j].key)
           root.runIntent(devices[k], r.run[j].intent)
   }
@@ -524,7 +524,7 @@ Panel {
   // pulse stops and the queue can drain (BluetoothLogic.settleConnecting).
   function settleConnectingActions() {
     var states = {}
-    for (var i = 0; i < devices.length; i++)
+    for (let i = 0; i < devices.length; i++)
       if (devices[i] && devices[i].address)
         states[devices[i].address] = devices[i].state !== undefined ? devices[i].state : -1
     var r = BluetoothLogic.settleConnecting(root.pendingActions, root.connectingSeen, states)
@@ -539,19 +539,19 @@ Panel {
     var next = cloneMap(pendingActions)
     var changed = false
 
-    for (var address in next) {
-      var action = next[address]
-      var found = null
+    for (let address in next) {
+      let action = next[address]
+      let found = null
 
-      for (var i = 0; i < devices.length; i++) {
-        var d = devices[i]
+      for (let i = 0; i < devices.length; i++) {
+        let d = devices[i]
         if (d && d.address === address) {
           found = d
           break
         }
       }
 
-      var finishedConnecting = action === "connecting" && found && found.connected
+      let finishedConnecting = action === "connecting" && found && found.connected
       if (finishedConnecting || (action === "disconnecting" && found && !found.connected) || (action === "forgetting" && (!found || (!found.paired && !found.bonded && !found.trusted)))) {
         if (finishedConnecting)
           scheduleAudioOutputSwitch(found)
@@ -656,14 +656,14 @@ Panel {
     }
 
     if (focusSection === "connected" || focusSection === "known") {
-      var dev = deviceAt(focusSection, selectedIndex)
+      let dev = deviceAt(focusSection, selectedIndex)
       if (!dev)
         return
       requestDeviceAction(dev, BluetoothLogic.rowIntent("primary", !!dev.connected, focusSection))
       return
     }
     if (focusSection === "discovered") {
-      var d = discoveredDevices[selectedIndex]
+      let d = discoveredDevices[selectedIndex]
       if (!d)
         return
       requestDeviceAction(d, BluetoothLogic.rowIntent("primary", !!d.connected, "discovered"))
@@ -681,7 +681,7 @@ Panel {
     if (!dev)
       return
     var stops = root.forgetStops()
-    for (var i = 0; i < stops.length; i++)
+    for (let i = 0; i < stops.length; i++)
       if (stops[i].key === dev.address) {
         root.pendingRemovalKey = dev.address
         root.pendingRemovalIndex = i
@@ -758,7 +758,7 @@ Panel {
       return []
     var items = bar.moduleWidgets(moduleName).slice()
     var hosts = bar.moduleWidgets("omarchy.network")
-    for (var i = 0; i < hosts.length; i++) {
+    for (let i = 0; i < hosts.length; i++) {
       if (hosts[i] && hosts[i].bluetoothController && items.indexOf(hosts[i].bluetoothController) < 0)
         items.push(hosts[i].bluetoothController)
     }
@@ -776,7 +776,7 @@ Panel {
     if (!bar || typeof bar.moduleWidgets !== "function")
       return null
     var items = root.siblingControllers()
-    for (var i = 0; i < items.length; i++) {
+    for (let i = 0; i < items.length; i++) {
       if (items[i] && items[i] !== root && items[i].opened === true)
         return items[i]
     }
@@ -798,12 +798,12 @@ Panel {
     }
 
     var sections = ["connected", "known", "discovered"]
-    for (var s = 0; s < sections.length; s++) {
-      var section = sections[s]
+    for (let s = 0; s < sections.length; s++) {
+      let section = sections[s]
       if (!sectionVisible(section))
         continue
-      var list = devicesForSection(section)
-      for (var i = 0; i < list.length; i++) {
+      let list = devicesForSection(section)
+      for (let i = 0; i < list.length; i++) {
         if (list[i] && list[i].address === focusedDeviceAddress) {
           focusSection = section
           selectedIndex = i
@@ -874,7 +874,7 @@ Panel {
     var count = sectionCount(focusSection)
     if (count === 0) {
       // Section emptied out — bounce to the previous visible one.
-      var sIdx = sections.indexOf(focusSection)
+      let sIdx = sections.indexOf(focusSection)
       focusSection = sIdx > 0 ? sections[sIdx - 1] : sections[0]
       selectedIndex = Math.max(0, sectionCount(focusSection) - 1)
       return
@@ -966,7 +966,7 @@ Panel {
     if (!owesDiscoveryStop)
       return
     var items = root.siblingControllers()
-    for (var i = 0; i < items.length; i++) {
+    for (let i = 0; i < items.length; i++) {
       if (items[i] && items[i] !== root) {
         items[i].owesDiscoveryStop = true
         return
@@ -1156,8 +1156,8 @@ Panel {
   // View rows for SECTION ("known" or "discovered") out of scrollRows.
   function scrollViewRows(section) {
     var rows = []
-    for (var i = 0; i < scrollRows.length; i++) {
-      var r = scrollRows[i]
+    for (let i = 0; i < scrollRows.length; i++) {
+      let r = scrollRows[i]
       if (r.section === section)
         rows.push(viewRow(r.dev, deviceAt(section, r.indexInSection), section))
     }
@@ -1178,8 +1178,8 @@ Panel {
   // Address -> signal level (0..3) behind each Available row's node glow.
   readonly property var deviceSignals: {
     var out = {}
-    for (var i = 0; i < discoveredViewRows.length; i++) {
-      var key = discoveredViewRows[i].key
+    for (let i = 0; i < discoveredViewRows.length; i++) {
+      let key = discoveredViewRows[i].key
       out[key] = BluetoothLogic.signalLevel(rssiByAddress[String(key).toUpperCase()])
     }
     return out
@@ -1216,7 +1216,7 @@ Panel {
       return deviceFor({
         dev: connectedRows[index]
       })
-    for (var i = 0; i < scrollRows.length; i++)
+    for (let i = 0; i < scrollRows.length; i++)
       if (scrollRows[i].section === section && scrollRows[i].indexInSection === index)
         return deviceFor(scrollRows[i])
     return null

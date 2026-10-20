@@ -82,11 +82,12 @@ Panel {
       embedded: true,
       embeddingHost: root
     })
+    readonly property var loadedItem: item
     onLoaded: {
-      item.bar = Qt.binding(function () {
+      loadedItem.bar = Qt.binding(function () {
         return root.bar
       })
-      item.hostedDropdown = Qt.binding(function () {
+      loadedItem.hostedDropdown = Qt.binding(function () {
         return displayPage.item
       })
       root.syncSystemPages()
@@ -99,11 +100,12 @@ Panel {
       embedded: true,
       embeddingHost: root
     })
+    readonly property var loadedItem: item
     onLoaded: {
-      item.bar = Qt.binding(function () {
+      loadedItem.bar = Qt.binding(function () {
         return root.bar
       })
-      item.hostedDropdown = Qt.binding(function () {
+      loadedItem.hostedDropdown = Qt.binding(function () {
         return healthPage.item
       })
       root.syncSystemPages()
@@ -416,13 +418,13 @@ Panel {
     profileIndex = parsed.profileIndex
     pendingProfile = PowerLogic.settlePending(pendingProfile, activeProfile)
     if (opened && !cursorActive) {
-      var idx = profiles.indexOf(activeProfile)
+      let idx = profiles.indexOf(activeProfile)
       if (idx >= 0)
         profileIndex = idx
     }
     if (profileKey !== "") {
       // A lost profile hides the outline too (CursorLogic.followShown).
-      var next = CursorLogic.followShown(profileKeyRows(), profileKey, profileIndex, keyboardCursor)
+      let next = CursorLogic.followShown(profileKeyRows(), profileKey, profileIndex, keyboardCursor)
       profileIndex = Math.max(0, next.index)
       profileKey = next.key
       keyboardCursor = next.keyboard
@@ -578,7 +580,7 @@ Panel {
     profileKey = ""
     if (opened) {
       refresh()
-      var idx = profiles.indexOf(activeProfile)
+      let idx = profiles.indexOf(activeProfile)
       profileIndex = idx >= 0 ? idx : 0
       cursorActive = false
       fetchHistory()
@@ -625,7 +627,7 @@ Panel {
     id: actionProc
     onExited: function (exitCode) {
       if (root.queuedProfile !== "") {
-        var next = root.queuedProfile
+        let next = root.queuedProfile
         root.queuedProfile = ""
         root.runProfileCommand(next)
         return
@@ -906,57 +908,58 @@ Panel {
           active: root.displayController !== null
           visible: root.activePage === "display"
           source: Qt.resolvedUrl("../araneadev.monitor/DisplaysDropdown.qml")
+          readonly property var loadedItem: item
           onLoaded: {
             var c = root.displayController
-            item.view = Qt.binding(function () {
+            loadedItem.view = Qt.binding(function () {
               return c.displaysView
             })
-            item.brightnessPercent = Qt.binding(function () {
+            loadedItem.brightnessPercent = Qt.binding(function () {
               return c.brightnessPercent
             })
-            item.brightnessBusy = Qt.binding(function () {
+            loadedItem.brightnessBusy = Qt.binding(function () {
               return c.brightnessBusy
             })
-            item.reflowing = Qt.binding(function () {
+            loadedItem.reflowing = Qt.binding(function () {
               return c.reflowingText
             })
-            item.nightlightOn = Qt.binding(function () {
+            loadedItem.nightlightOn = Qt.binding(function () {
               return c.nightOn
             })
-            item.nightlightCaption = Qt.binding(function () {
+            loadedItem.nightlightCaption = Qt.binding(function () {
               return c.nightCaption
             })
-            item.nightlightPending = Qt.binding(function () {
+            loadedItem.nightlightPending = Qt.binding(function () {
               return c.nightPending
             })
-            item.kbdValue = Qt.binding(function () {
+            loadedItem.kbdValue = Qt.binding(function () {
               return c.kbdValue
             })
-            item.kbdPending = Qt.binding(function () {
+            loadedItem.kbdPending = Qt.binding(function () {
               return c.kbdPending
             })
-            item.textPending = Qt.binding(function () {
+            loadedItem.textPending = Qt.binding(function () {
               return c.textSizePreviewIndex >= 0
             })
-            item.selectedScale = Qt.binding(function () {
+            loadedItem.selectedScale = Qt.binding(function () {
               return c.selectedScaleKey
             })
-            item.pendingScale = Qt.binding(function () {
+            loadedItem.pendingScale = Qt.binding(function () {
               return c.pendingScale
             })
-            item.enabledDisplays = Qt.binding(function () {
+            loadedItem.enabledDisplays = Qt.binding(function () {
               return c.enabledDisplayMap
             })
-            item.pendingDisplays = Qt.binding(function () {
+            loadedItem.pendingDisplays = Qt.binding(function () {
               return c.pendingDisplays
             })
-            item.lastEnabled = Qt.binding(function () {
+            loadedItem.lastEnabled = Qt.binding(function () {
               return c.lastEnabled
             })
-            item.displaysLocked = Qt.binding(function () {
+            loadedItem.displaysLocked = Qt.binding(function () {
               return c.displaysLocked
             })
-            item.textIndex = Qt.binding(function () {
+            loadedItem.textIndex = Qt.binding(function () {
               return c.currentTextIndex()
             })
           }
@@ -974,36 +977,37 @@ Panel {
           active: root.healthController !== null
           visible: root.activePage === "health"
           source: Qt.resolvedUrl("../araneadev.health/HealthDropdown.qml")
+          readonly property var loadedItem: item
           onLoaded: {
             var c = root.healthController
-            item.available = Qt.binding(function () {
+            loadedItem.available = Qt.binding(function () {
               return c.available
             })
-            item.status = Qt.binding(function () {
+            loadedItem.status = Qt.binding(function () {
               return c.status
             })
-            item.problems = Qt.binding(function () {
+            loadedItem.problems = Qt.binding(function () {
               return c.problems
             })
-            item.metrics = Qt.binding(function () {
+            loadedItem.metrics = Qt.binding(function () {
               return c.m
             })
-            item.active = Qt.binding(function () {
+            loadedItem.active = Qt.binding(function () {
               return c.opened
             })
-            item.cursorKey = Qt.binding(function () {
+            loadedItem.cursorKey = Qt.binding(function () {
               return c.cursorKey
             })
-            item.keyboardCursor = Qt.binding(function () {
+            loadedItem.keyboardCursor = Qt.binding(function () {
               return c.keyboardCursor
             })
-            item.resourcesExpanded = Qt.binding(function () {
+            loadedItem.resourcesExpanded = Qt.binding(function () {
               return c.resourcesExpanded
             })
-            item.processesExpanded = Qt.binding(function () {
+            loadedItem.processesExpanded = Qt.binding(function () {
               return c.processesExpanded
             })
-            item.maxContentHeight = Qt.binding(function () {
+            loadedItem.maxContentHeight = Qt.binding(function () {
               return Math.max(0, panel.availableCardHeight - panel.verticalContentInset - systemContent.spacing * 2 - systemTabs.implicitHeight - systemHint.implicitHeight)
             })
           }

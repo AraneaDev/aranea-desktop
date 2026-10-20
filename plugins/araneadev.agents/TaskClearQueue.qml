@@ -56,7 +56,7 @@ Item {
   function takeSet(): var {
     var set = [], used = 2
     while (remaining.length) {
-      var size = ActivityLogic.utf8Length(JSON.stringify(remaining[0])) + 1
+      let size = ActivityLogic.utf8Length(JSON.stringify(remaining[0])) + 1
       if (set.length && used + size > setBytes)
         break
       set.push(remaining[0])

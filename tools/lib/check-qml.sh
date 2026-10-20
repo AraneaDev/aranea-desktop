@@ -13,10 +13,12 @@ update_baselines="${update_baselines:-0}"
 staged="${staged:-0}"
 
 # Prints "count<TAB>file:id:message" for every warning in qmllint JSON (stdin).
+# Qt 6.12 appends remediation text on continuation lines; only the diagnostic
+# summary forms the stable key. Continuations are not separate warnings.
 # Machine-specific paths inside messages (the checked tree, the temporary
 # import root) are replaced, so the baseline is the same everywhere.
 qml_warning_counts() {
-  jq -r '.files[]? | .filename as $file | .warnings[]? | "\($file):\(.id):\(.message)"' |
+  jq -r '.files[]? | .filename as $file | .warnings[]? | "\($file):\(.id):\(.message | split("\n")[0])"' |
     sed -e "s#${check_root}/##g" -e "s#${qml_import_root:-/nonexistent-import-root}#<imports>#g" |
     LC_ALL=C sort | uniq -c | awk '{count = $1; sub(/^ *[0-9]+ /, ""); print count "\t" $0}'
 }
@@ -92,8 +94,11 @@ stage_qml() {
   else
     args+=(--bare)
   fi
-  local json
-  json="$(cd "$check_root" && "$qmllint" "${args[@]}" "${files[@]}" 2>/dev/null)"
+  # Qt 6.12 resolves the adjacent qmldir reliably for absolute input paths.
+  # Relative inputs incorrectly diagnose declared singletons as ordinary types.
+  local json file absolute_files=()
+  for file in "${files[@]}"; do absolute_files+=("$check_root/$file"); done
+  json="$(cd "$check_root" && "$qmllint" "${args[@]}" "${absolute_files[@]}" 2>/dev/null)"
   [[ -n "$import_root" ]] && rm -rf "$import_root"
   echo "qmllint: $mode mode, ${#files[@]} files"
   if ! jq -e '.files' >/dev/null 2>&1 <<<"$json"; then

@@ -38,12 +38,12 @@ Canvas {
     var rain = trace.points && Array.isArray(trace.points.rain) ? trace.points.rain : []
     var w = Math.max(2, trace.width / Math.max(1, rain.length) * 0.6)
     var out = []
-    for (var i = 0; i < rain.length; i++) {
-      var h = Math.max(0, Math.min(1, Number(rain[i].h) || 0)) * trace.height * 0.5
+    for (let i = 0; i < rain.length; i++) {
+      let h = Math.max(0, Math.min(1, Number(rain[i].h) || 0)) * trace.height * 0.5
       if (h <= 0)
         continue
-      var cx = Number(rain[i].x) * trace.width
-      var x = Math.max(0, Math.min(trace.width - w, cx - w / 2))
+      let cx = Number(rain[i].x) * trace.width
+      let x = Math.max(0, Math.min(trace.width - w, cx - w / 2))
       out.push({
         x: x,
         y: trace.height - h,
@@ -79,7 +79,7 @@ Canvas {
     var bars = trace.rainBars()
     ctx.globalAlpha = 0.28
     ctx.fillStyle = String(Aranea.DesignTokens.strandEnd)
-    for (var b = 0; b < bars.length; b++)
+    for (let b = 0; b < bars.length; b++)
       ctx.fillRect(bars[b].x, bars[b].y, bars[b].w, bars[b].h)
 
     var pts = trace.tracePoints()
@@ -92,7 +92,7 @@ Canvas {
     ctx.fillStyle = fillGradient
     ctx.beginPath()
     ctx.moveTo(pts[0].x, trace.height)
-    for (var f = 0; f < pts.length; f++)
+    for (let f = 0; f < pts.length; f++)
       ctx.lineTo(pts[f].x, pts[f].y)
     ctx.lineTo(pts[pts.length - 1].x, trace.height)
     ctx.closePath()
@@ -109,7 +109,7 @@ Canvas {
     // A lone point still shows, as a short tick.
     if (pts.length === 1)
       ctx.lineTo(pts[0].x + 1, pts[0].y)
-    for (var i = 1; i < pts.length; i++)
+    for (let i = 1; i < pts.length; i++)
       ctx.lineTo(pts[i].x, pts[i].y)
     ctx.stroke()
 

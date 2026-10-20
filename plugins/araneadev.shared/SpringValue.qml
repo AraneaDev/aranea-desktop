@@ -27,7 +27,7 @@ Item {
       return
     }
     if (value !== targetValue || animation.running) {
-      var currentValue = value
+      let currentValue = value
       animation.stop()
       if (currentValue !== targetValue) {
         animation.from = currentValue

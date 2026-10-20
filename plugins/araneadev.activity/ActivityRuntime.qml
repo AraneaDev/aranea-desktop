@@ -362,8 +362,8 @@ Item {
           json(['/usr/bin/timeout', '2s', scriptsPath + '/aranea-agent-launch'], JSON.stringify(spec), function (response) {
             var accepted = response.ok === true && response.identity && Number.isInteger(response.identity.pid) && response.identity.pid > 0 && typeof response.identity.startTime === 'string' && /^[0-9]+$/.test(response.identity.startTime)
             if (!accepted || lifetime !== runtime.sessionId) {
-              var helperError = negativeHelperError(response)
-              var refusal = helperError && ['RESUME_UNAVAILABLE', 'INVALID_LAUNCH', 'CHECKOUT_INVALID', 'TOOL_MISSING', 'DEPENDENCY_MISSING'].indexOf(helperError.code) >= 0
+              let helperError = negativeHelperError(response)
+              let refusal = helperError && ['RESUME_UNAVAILABLE', 'INVALID_LAUNCH', 'CHECKOUT_INVALID', 'TOOL_MISSING', 'DEPENDENCY_MISSING'].indexOf(helperError.code) >= 0
               done({
                 ok: false,
                 submissionUnconfirmed: response.transportUnconfirmed === true || lifetime !== runtime.sessionId || !refusal,

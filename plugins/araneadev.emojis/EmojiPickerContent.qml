@@ -12,7 +12,7 @@ import qs.Ui
 import "../araneadev.shared" as Aranea
 
 Item {
-  id: content
+  id: contentObject
 
   // Current search text shown by the overlay chrome.
   property string filterText: ""
@@ -77,11 +77,11 @@ Item {
 
   // Drops the RECENT row's hover fill.
   function clearRecentHover(): void {
-    content.hoveredRecent = -1
-    content.hoveredRecentKey = ""
+    contentObject.hoveredRecent = -1
+    contentObject.hoveredRecentKey = ""
   }
 
-  onLayoutChangedAtChanged: content.clearRecentHover()
+  onLayoutChangedAtChanged: contentObject.clearRecentHover()
 
   // Scroll a result into view after keyboard navigation.
   function reveal(index: int): void {
@@ -94,78 +94,78 @@ Item {
     title: "EMOJI"
     subtitle: "SEARCH // INSERT // COPY"
     counts: resultModel ? String(resultModel.count) : "0"
-    searchText: content.filterText
+    searchText: contentObject.filterText
     searchPlaceholder: "Search emojis…"
-    hints: content.hintText
-    fontFamily: content.fontFamily
-    foreground: content.foreground
-    accent: content.selectedText
+    hints: contentObject.hintText
+    fontFamily: contentObject.fontFamily
+    foreground: contentObject.foreground
+    accent: contentObject.selectedText
 
     Column {
       anchors.fill: parent
       spacing: Style.space(6)
 
       Caption {
-        visible: content.showRecents
+        visible: contentObject.showRecents
         text: "RECENT"
       }
 
       Flow {
-        visible: content.showRecents
-        width: content.columns * content.cellWidth
+        visible: contentObject.showRecents
+        width: contentObject.columns * contentObject.cellWidth
         // Split the remainder of the content width on both sides.
         x: Math.round((parent.width - width) / 2)
         Repeater {
           id: recentRepeater
-          model: content.showRecents ? content.recentModel : []
+          model: contentObject.showRecents ? contentObject.recentModel : []
           delegate: EmojiCell {
             required property string modelData
             required property int index
             objectName: "recentCell"
             glyph: modelData
-            hasCursor: content.cursorActive && content.inRecents && content.recentIndex === index
-            hovered: content.hoveredRecent === index && content.hoveredRecentKey === modelData
-            pointerGate: content.pointerGate
-            layoutChangedAt: content.layoutChangedAt
+            hasCursor: contentObject.cursorActive && contentObject.inRecents && contentObject.recentIndex === index
+            hovered: contentObject.hoveredRecent === index && contentObject.hoveredRecentKey === modelData
+            pointerGate: contentObject.pointerGate
+            layoutChangedAt: contentObject.layoutChangedAt
             onHoverMoved: function (key) {
-              content.hoveredRecent = index
-              content.hoveredRecentKey = key
+              contentObject.hoveredRecent = index
+              contentObject.hoveredRecentKey = key
             }
-            onHoverLeft: if (content.hoveredRecent === index)
-              content.clearRecentHover()
+            onHoverLeft: if (contentObject.hoveredRecent === index)
+              contentObject.clearRecentHover()
             onPicked: function (key) {
-              content.recentPicked(index, key)
+              contentObject.recentPicked(index, key)
             }
           }
         }
       }
 
       Caption {
-        text: content.filterText ? "RESULTS  ·  " + (content.resultModel ? content.resultModel.count : 0) : "ALL"
+        text: contentObject.filterText ? "RESULTS  ·  " + (contentObject.resultModel ? contentObject.resultModel.count : 0) : "ALL"
       }
 
       EmojiGrid {
         id: resultGrid
-        width: content.columns * content.cellWidth
+        width: contentObject.columns * contentObject.cellWidth
         // Split the remainder of the content width on both sides.
         x: Math.round((parent.width - width) / 2)
         height: parent.height - y - nameLine.height - parent.spacing
-        model: content.resultModel
-        filterText: content.filterText
-        selectedIndex: content.selectedIndex
-        cursorActive: content.cursorActive
-        inRecents: content.inRecents
-        fontFamily: content.fontFamily
-        cellWidth: content.cellWidth
-        cellHeight: content.cellHeight
-        cornerRadius: content.cornerRadius
-        selectedBackground: content.selectedBackground
-        selectedText: content.selectedText
-        foreground: content.foreground
-        pointerGate: content.pointerGate
-        layoutChangedAt: content.layoutChangedAt
+        model: contentObject.resultModel
+        filterText: contentObject.filterText
+        selectedIndex: contentObject.selectedIndex
+        cursorActive: contentObject.cursorActive
+        inRecents: contentObject.inRecents
+        fontFamily: contentObject.fontFamily
+        cellWidth: contentObject.cellWidth
+        cellHeight: contentObject.cellHeight
+        cornerRadius: contentObject.cornerRadius
+        selectedBackground: contentObject.selectedBackground
+        selectedText: contentObject.selectedText
+        foreground: contentObject.foreground
+        pointerGate: contentObject.pointerGate
+        layoutChangedAt: contentObject.layoutChangedAt
         onPicked: function (index, key) {
-          content.resultPicked(index, key)
+          contentObject.resultPicked(index, key)
         }
       }
 
@@ -173,10 +173,10 @@ Item {
       EmojiPickerChrome {
         id: nameLine
         width: parent.width
-        selectedName: content.selectedEmoji ? content.selectedEmoji + "  " + content.selectedName : " "
+        selectedName: contentObject.selectedEmoji ? contentObject.selectedEmoji + "  " + contentObject.selectedName : " "
         showFilter: false
-        fontFamily: content.fontFamily
-        foreground: content.foreground
+        fontFamily: contentObject.fontFamily
+        foreground: contentObject.foreground
       }
     }
   }
@@ -184,14 +184,14 @@ Item {
   // The content's own gate, used when the window shares none (tests).
   PointerMoveGate {
     id: ownGate
-    referenceItem: content
+    referenceItem: contentObject
   }
 
   component Caption: Aranea.InkText {
     horizontalAlignment: Text.AlignLeft
     textFormat: Text.PlainText
-    color: Util.alpha(content.foreground, Aranea.DesignTokens.secondaryOpacity)
-    font.family: content.fontFamily
+    color: Util.alpha(contentObject.foreground, Aranea.DesignTokens.secondaryOpacity)
+    font.family: contentObject.fontFamily
     font.pixelSize: Style.font.caption
     font.weight: Font.Medium
     font.letterSpacing: 0.20

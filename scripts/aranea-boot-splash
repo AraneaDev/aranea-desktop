@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Switches the Aranea boot splash (Plymouth) on or off and remembers the choice
+# in <state>/boot-splash, so hooks/post-update can restore it after an Omarchy
+# update. Both switches need sudo.
+#
+# Usage: scripts/aranea-boot-splash on|off|status
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$repo_root/scripts/lib/paths.sh"
+state_file="$(aranea_state_root)/boot-splash"
+
+# Records the choice $1 (on or off).
+record() {
+  mkdir -p "${state_file%/*}"
+  printf '%s' "$1" >"$state_file"
+}
+
+case "${1:-}" in
+  on)
+    omarchy-plymouth-set-by-theme aranea
+    record on
+    ;;
+  off)
+    if command -v omarchy-plymouth-reset >/dev/null 2>&1; then
+      omarchy-plymouth-reset
+    else
+      omarchy plymouth reset
+    fi
+    record off
+    ;;
+  status)
+    printf 'remembered: %s\n' "$(cat "$state_file" 2>/dev/null || echo unset)"
+    printf 'current splash: %s\n' "$(omarchy plymouth current 2>/dev/null || echo unknown)"
+    ;;
+  *)
+    printf 'Usage: %s on|off|status\n' "$0" >&2
+    exit 2
+    ;;
+esac

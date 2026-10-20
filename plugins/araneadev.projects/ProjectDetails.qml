@@ -107,7 +107,7 @@ ColumnLayout {
   // Additional presets and custom configuration are revealed only on request.
   property bool profileAdding: false
   // Public draft boundary participates in the surrounding navigation guard.
-  property alias profileEditor: profileEditor
+  property alias profileEditor: profileEditorObject
   // Successful readback must match the actual submitted draft, not just any refresh.
   property var submittedProfileDraft: null
   // Parent serializes these typed requests with other registry mutations.
@@ -122,7 +122,7 @@ ColumnLayout {
   function beginProfile(profile: var): void {
     if (displayOnly || pending || !project || profileEditing)
       return
-    profileEditor.begin(profile)
+    profileEditorObject.begin(profile)
     profileEditing = true
     profileAdding = false
     submittedProfileDraft = null
@@ -137,10 +137,10 @@ ColumnLayout {
   }
   // A profile save acknowledges the exact original revision and submitted values.
   function acknowledgeProfile(args: var, savedProject: var): void {
-    if (!profileEditing || !project || !savedProject || project.id !== savedProject.id || args.projectId !== project.id || !submittedProfileDraft || JSON.stringify(submittedProfileDraft) !== JSON.stringify(profileEditor.draft))
+    if (!profileEditing || !project || !savedProject || project.id !== savedProject.id || args.projectId !== project.id || !submittedProfileDraft || JSON.stringify(submittedProfileDraft) !== JSON.stringify(profileEditorObject.draft))
       return
-    var submitted = args.profile, expected = profileEditor.expectedProfileRevision
-    if (!submitted || (args.expectedProfileRevision || 0) !== expected || (submitted.id || '') !== (profileEditor.draft.id || ''))
+    var submitted = args.profile, expected = profileEditorObject.expectedProfileRevision
+    if (!submitted || (args.expectedProfileRevision || 0) !== expected || (submitted.id || '') !== (profileEditorObject.draft.id || ''))
       return
     var confirmed = (savedProject.profiles || []).some(function (p) {
       return (!submitted.id || submitted.id === p.id) && p.revision === expected + 1 && p.name === submitted.name && SignalValue.same(p.roles, submitted.roles) && ['editorId', 'terminalId', 'agentId'].every(function (key) {
@@ -151,7 +151,7 @@ ColumnLayout {
       profileEditing = false
       profileAdding = false
       submittedProfileDraft = null
-      profileEditor.fieldError = ''
+      profileEditorObject.fieldError = ''
     }
   }
   // Edit one exact checkout relocation draft without persisting or launching anything.
@@ -382,8 +382,8 @@ ColumnLayout {
   function locatorFor(checkoutId: string): var {
     if (guidedSetup || !checkoutId)
       return null
-    for (var i = 0; i < checkoutRepeater.count; i++) {
-      var item = checkoutRepeater.itemAt(i)
+    for (let i = 0; i < checkoutRepeater.count; i++) {
+      let item = checkoutRepeater.itemAt(i)
       if (item && item.checkoutId === checkoutId)
         return item.locator
     }
@@ -640,7 +640,7 @@ ColumnLayout {
       onClicked: details.profileListRequested()
     }
     ProjectProfileEditor {
-      id: profileEditor
+      id: profileEditorObject
       Layout.fillWidth: true
       visible: details.profileEditing
       tools: details.tools
@@ -650,7 +650,7 @@ ColumnLayout {
       onSaveRequested: function (profile, revision) {
         if (!details.project || details.displayOnly || details.pending)
           return
-        details.submittedProfileDraft = JSON.parse(JSON.stringify(profileEditor.draft))
+        details.submittedProfileDraft = JSON.parse(JSON.stringify(profileEditorObject.draft))
         details.profileSaveRequested(details.project.id, profile, revision)
       }
       onCancelRequested: {

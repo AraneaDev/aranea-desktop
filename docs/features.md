@@ -62,6 +62,27 @@ The microphone badge appears only during active capture and reflects the
 source's mute state. Notifications and Agents remain separate bar controls;
 the tray opens through its disclosure.
 
+## World clock
+
+Click the globe button, or press **Super+Ctrl+Alt+E**, to open World clock.
+The Earth shows real land, daylight, the day/night boundary, and the point where
+the sun is overhead. Hover or select a city to centre the globe there; drag to
+turn it, then let it return home. Each row shows the local time, current time-zone
+abbreviation, and a daylight strip. Times follow the system time-zone database.
+
+Press **A** or choose **Add city** to search the bundled offline catalogue.
+Use **↑/↓** and **Enter** to add a match, or **Esc** to cancel. In the city list,
+**X** removes a city, **[ / ]** reorders it, and **H** makes it home. The home city
+cannot be removed; setting home changes this widget only. **Tab** moves to the
+next dropdown and **Esc** closes it. UTC can be added again through search.
+
+A new list starts with Amsterdam, London, UTC, New York, and Los Angeles.
+An untouched Elsewhen default list is replaced by that set; edited city lists
+are retained, including entries without map coordinates. City and land data
+are bundled from Omarchy Elsewhen, © Jason Fried / Omarchy, under the MIT licence.
+
+![World clock](../screenshots/worldclock.png)
+
 ## Update center
 
 The update center shows repository packages and AUR packages separately, plus

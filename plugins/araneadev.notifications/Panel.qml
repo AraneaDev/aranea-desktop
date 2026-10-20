@@ -192,7 +192,7 @@ Panel {
   function toggleGroup(app: string): void {
     var next = Object.assign({}, root.expanded)
     var group = null
-    for (var i = 0; i < rows.length; i++)
+    for (let i = 0; i < rows.length; i++)
       if (rows[i].kind === "group" && rows[i].app === app)
         group = rows[i]
     next[app] = group ? group.collapsed : true

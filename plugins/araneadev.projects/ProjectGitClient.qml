@@ -149,15 +149,15 @@ Item {
     if (!active || captureActive)
       return
     var queued = [], seen = {}, now = Date.now()
-    for (var i = 0; i < targets.length && queued.length < 12; i++) {
-      var target = targets[i]
+    for (let i = 0; i < targets.length && queued.length < 12; i++) {
+      let target = targets[i]
       if (!target || !target.projectId || !target.checkoutId)
         continue
-      var key = cacheKey(target.projectId, target.checkoutId)
+      let key = cacheKey(target.projectId, target.checkoutId)
       if (seen[key])
         continue
       seen[key] = true
-      var data = (cache[key] || {}).data
+      let data = (cache[key] || {}).data
       if ((inFlight && inFlight.key === key) || (foreground && foreground.key === key) || (data && now - data.observedAt < 30000))
         continue
       queued.push({
@@ -199,13 +199,13 @@ Item {
         return
       client.inFlight = null
       if (!client.captureActive && read.epoch === client.epoch && client.latest[read.key] === read.token) {
-        var response = null
+        let response = null
         try {
           response = JSON.parse(text)
         } catch (e) {}
-        var valid = response && response.ok === true && code === 0 && response.data && response.data.projectId === read.projectId && response.data.checkoutId === read.checkoutId && typeof response.data.observedAt === 'number' && isFinite(response.data.observedAt)
-        var previous = client.cache[read.key] || {}
-        var failure = response && response.ok === false && response.error && typeof response.error.code === 'string' ? response.error : {
+        let valid = response && response.ok === true && code === 0 && response.data && response.data.projectId === read.projectId && response.data.checkoutId === read.checkoutId && typeof response.data.observedAt === 'number' && isFinite(response.data.observedAt)
+        let previous = client.cache[read.key] || {}
+        let failure = response && response.ok === false && response.error && typeof response.error.code === 'string' ? response.error : {
           code: 'READ_FAILED',
           message: diagnostics || 'Git observation could not be read.',
           recovery: 'Refresh the selected checkout.'

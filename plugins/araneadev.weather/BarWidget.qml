@@ -5,6 +5,7 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "." as Local
 
 // Weather pill for the bar, and the host for the detail popup.
 //
@@ -18,7 +19,7 @@ BarWidget {
   // needs; called again after load since the loader's onLoaded can race the
   // bindings below.
   function injectPanel() {
-    var target = panelLoader.item
+    var target = panelLoader.item as Local.Panel
     if (!target)
       return
     if ("bar" in target)

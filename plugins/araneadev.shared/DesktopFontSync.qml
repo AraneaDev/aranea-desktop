@@ -23,7 +23,7 @@ Item {
     var process = processComponent.createObject(sync, {
       command: argv,
       completion: done
-    })
+    }) as CommandProcess
     process.startRequested = true
     process.running = true
   }
@@ -69,36 +69,37 @@ Item {
     interval: 150
     onTriggered: sync.apply()
   }
+  component CommandProcess: Process {
+    id: process
+    // Completion owned by the projection that created this process.
+    property var completion: null
+    // Track failed starts, which emit no exit signal.
+    property bool startRequested: false
+    // An exit after a successful launch must complete through onExited.
+    property bool startedSuccessfully: false
+    // Complete at most once across launch failure and exit callbacks.
+    property bool completed: false
+    // Release the in-flight projection on every completion path.
+    function finish(exitCode): void {
+      if (completed)
+        return
+      completed = true
+      if (completion)
+        completion(exitCode)
+      process.destroy()
+    }
+    onStarted: process.startedSuccessfully = true
+    onRunningChanged: if (startRequested && !running && !startedSuccessfully)
+      process.finish(-1)
+    // Quickshell exposes an unregistered QProcess::ExitStatus parameter to qmllint.
+    // qmllint disable signal-handler-parameters
+    onExited: function (exitCode) {
+      process.finish(exitCode)
+    }
+    // qmllint enable signal-handler-parameters
+  }
   Component {
     id: processComponent
-    Process {
-      id: process
-      // Completion owned by the projection that created this process.
-      property var completion: null
-      // Track failed starts, which emit no exit signal.
-      property bool startRequested: false
-      // An exit after a successful launch must complete through onExited.
-      property bool startedSuccessfully: false
-      // Complete at most once across launch failure and exit callbacks.
-      property bool completed: false
-      // Release the in-flight projection on every completion path.
-      function finish(exitCode): void {
-        if (completed)
-          return
-        completed = true
-        if (completion)
-          completion(exitCode)
-        process.destroy()
-      }
-      onStarted: process.startedSuccessfully = true
-      onRunningChanged: if (startRequested && !running && !startedSuccessfully)
-        process.finish(-1)
-      // Quickshell exposes an unregistered QProcess::ExitStatus parameter to qmllint.
-      // qmllint disable signal-handler-parameters
-      onExited: function (exitCode) {
-        process.finish(exitCode)
-      }
-      // qmllint enable signal-handler-parameters
-    }
+    CommandProcess {}
   }
 }

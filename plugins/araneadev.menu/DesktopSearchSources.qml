@@ -301,7 +301,7 @@ Item {
     var selected = Search.resolveTarget(sources.records, key)
     var record = Search.resolveTarget(Targets.sourceRecords(data), key)
     if (key.indexOf('project-environment:') === 0) {
-      var environmentRequest = Targets.dispatchTarget(selected, data)
+      let environmentRequest = Targets.dispatchTarget(selected, data)
       if (!environmentRequest || !sources.projectClient || !sources.projectClient.returnEnvironment(environmentRequest.payload)) {
         sources.failed('Environment Return is unavailable')
         return false
@@ -309,14 +309,14 @@ Item {
       return true
     }
     if (key.indexOf("project:") === 0 || key.indexOf("project-agent:") === 0) {
-      var projectRequest = Targets.dispatchTarget(selected, data)
+      let projectRequest = Targets.dispatchTarget(selected, data)
       if (!projectRequest || !sources.projectClient || sources.projectClient.captureActive || sources.projectClient.pending) {
         sources.failed("Project is busy or selected checkout is no longer available")
         return false
       }
       syncProjectSession()
-      var feedbackKey = projectFeedbackKey(projectRequest.payload.projectId, projectRequest.payload.checkoutId)
-      var previous = sources.projectFeedback[feedbackKey]
+      let feedbackKey = projectFeedbackKey(projectRequest.payload.projectId, projectRequest.payload.checkoutId)
+      let previous = sources.projectFeedback[feedbackKey]
       sources.projectSubmission = {
         key: feedbackKey,
         checkoutId: projectRequest.payload.checkoutId,

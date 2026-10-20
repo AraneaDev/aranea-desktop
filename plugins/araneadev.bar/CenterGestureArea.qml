@@ -53,7 +53,7 @@ MouseArea {
     if (!(mouse.buttons & Qt.LeftButton))
       return
     if (!dragging) {
-      var distance = Math.abs(mouse.x - pressedX) + Math.abs(mouse.y - pressedY)
+      let distance = Math.abs(mouse.x - pressedX) + Math.abs(mouse.y - pressedY)
       if (distance < dragThreshold)
         return
       startDrag(mouse.x, mouse.y)

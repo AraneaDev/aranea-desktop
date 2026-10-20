@@ -66,7 +66,7 @@ printf '%s\n' "$context" >"$activity_scratch/context"
 # Run the pure reducer using private files to avoid operating-system argv limits.
 run_filter() {
   # Validation uses stdin; never write raw native prompts into scratch storage.
-  if [[ " $* " == *" operation request "* || " $* " == *" operation normalized "* || " $* " == *" operation read-request "* ]]; then
+  if [[ " $* " == *" operation request "* || " $* " == *" operation normalized "* || " $* " == *" operation normalized-fingerprint "* || " $* " == *" operation read-request "* ]]; then
     printf 'null\n' >"$activity_scratch/request"
   else
     printf '%s\n' "${request:-null}" >"$activity_scratch/request"
@@ -102,9 +102,8 @@ if [[ "$1" == mutate ]]; then
     # Keep all tasks for identity checks; never pass this read-only view to mutation.
     native_state=$(printf '%s\n%s\n' "$request" "$state" | jq -cs '.[0].args as $a | .[1] | if ($a.payload.session_id|type) == "string" then .sessions |= map(select(.provider == $a.provider and .providerSessionId == $a.payload.session_id)) else . end')
     normalized=$(agent_hooks_prepare_request "$request" "$native_state" "$context" "$native_provider") || respond_error ADAPTER_UNSUPPORTED 'Native provider request is unsupported.'
-    run_filter -e --arg operation normalized <<<"$normalized" >/dev/null 2>&1 || respond_error INVALID_REQUEST 'Native mapping returned an invalid request.'
-    [[ $(jq -r .args.provider <<<"$normalized") == "$native_provider" ]] || respond_error INVALID_REQUEST 'Native mapping changed the provider.'
-    hash=$(jq -Sc 'del(.nativeMetadata)' <<<"$normalized" | sha256sum | cut -d' ' -f1)
+    # Validate mapping, exact provider and its canonical fingerprint in one pass.
+    hash=$(run_filter -Sce --arg operation normalized-fingerprint --arg activity_provider "$native_provider" <<<"$normalized" 2>/dev/null | sha256sum | cut -d' ' -f1) || respond_error INVALID_REQUEST 'Native mapping returned an invalid request.'
     if ! agent_activity_is_replay "$normalized" "$native_state" "$hash"; then
       normalized=$(agent_activity_prepare "$normalized") || respond_error ASSOCIATION_MISMATCH 'Native checkout path is invalid.'
     fi
@@ -119,7 +118,7 @@ if [[ "$1" == mutate ]]; then
   fi
   activity_tmp=$(mktemp "${registry}.XXXXXX") || respond_error ACTIVITY_WRITE_FAILED 'Cannot create atomic activity write.'
   # Emit a fully validated candidate and its response without reparsing history.
-  if ! run_filter -c --arg operation transaction <<<"$state" >"$activity_scratch/transaction" 2>"${activity_tmp}.error"; then
+  if ! run_filter -c --arg operation store-transaction <<<"$state" >"$activity_scratch/transaction" 2>"${activity_tmp}.error"; then
     code=$(sed -nE 's/.*: ([A-Z_]+)$/\1/p' "${activity_tmp}.error" | tail -1)
     respond_error "${code:-INVALID_REQUEST}" 'Activity mutation was rejected.'
   fi

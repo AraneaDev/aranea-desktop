@@ -72,10 +72,10 @@ FocusScope {
     id: menu
     parent: split.menuHost || split
     // Reading the host epoch makes mapped scrolling anchors reactive.
-    readonly property point anchor: {
-      split.menuRevision
+    function mappedAnchor(revision: int): point {
       return split.mapToItem(parent, split.width, split.height)
     }
+    readonly property point anchor: mappedAnchor(split.menuRevision)
     x: split.menuHost ? Math.max(Style.space(8), Math.min(anchor.x - width, parent.width - width - Style.space(8))) : split.width - width
     y: split.menuHost ? Math.max(Style.space(8), Math.min(anchor.y + Style.space(4), parent.height - height - Style.space(8))) : split.height + Style.space(4)
     width: split.menuHost ? Math.max(1, Math.min(implicitWidth, parent.width - Style.space(16))) : implicitWidth

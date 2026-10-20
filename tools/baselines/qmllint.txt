@@ -27,9 +27,6 @@
 2	plugins/araneadev.bar/Bar.qml:missing-property:Member "sizeVertical" not found on type "QObject"
 2	plugins/araneadev.bar/Bar.qml:missing-property:Member "text" not found on type "QObject"
 1	plugins/araneadev.bar/Bar.qml:missing-property:Member "xs" not found on type "QObject"
-1	plugins/araneadev.bar/Bar.qml:missing-type:No type found for property "adjustment". This may be due to a missing import statement or incomplete qmltypes files.
-1	plugins/araneadev.bar/Bar.qml:missing-type:No type found for property "edges". This may be due to a missing import statement or incomplete qmltypes files.
-1	plugins/araneadev.bar/Bar.qml:missing-type:No type found for property "gravity". This may be due to a missing import statement or incomplete qmltypes files.
 3	plugins/araneadev.bar/Bar.qml:uncreatable-type:Type PanelWindow is not creatable.
 105	plugins/araneadev.bar/Bar.qml:unqualified:Unqualified access
 1	plugins/araneadev.bar/Bar.qml:unqualified:unknown grouped property scope margins.
@@ -51,7 +48,6 @@
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "selectedBackground" not found on type "QObject"
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "selectedText" not found on type "QObject"
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "text" not found on type "QObject"
-3	plugins/araneadev.clipboard/Clipboard.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.clipboard/ClipboardWindow.qml:uncreatable-type:Type PanelWindow is not creatable.
 3	plugins/araneadev.clock/BarWidget.qml:missing-property:Member "iconSlot" not found on type "QObject"
 2	plugins/araneadev.clock/ClockDropdown.qml:missing-property:Member "body" not found on type "QObject"
@@ -78,7 +74,6 @@
 4	plugins/araneadev.health/HealthResourceSection.qml:missing-property:Member "body" not found on type "QObject"
 6	plugins/araneadev.health/HealthResourceSection.qml:missing-property:Member "caption" not found on type "QObject"
 1	plugins/araneadev.health/HealthResourceSection.qml:missing-property:Member "hairline" not found on type "QObject"
-4	plugins/araneadev.health/Monitor.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.lock/LockView.qml:missing-property:Member "bodySmall" not found on type "QObject"
 1	plugins/araneadev.lock/LockView.qml:missing-property:Member "borderActive" not found on type "QObject"
 1	plugins/araneadev.lock/LockView.qml:missing-property:Member "borderError" not found on type "QObject"
@@ -87,14 +82,10 @@
 1	plugins/araneadev.lock/LockView.qml:missing-property:Member "selection" not found on type "QObject"
 3	plugins/araneadev.lock/LockView.qml:missing-property:Member "text" not found on type "QObject"
 1	plugins/araneadev.lock/LockView.qml:missing-property:Member "textError" not found on type "QObject"
-2	plugins/araneadev.lock/Service.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.lock/Service.qml:uncreatable-type:Type PanelWindow is not creatable.
 12	plugins/araneadev.lock/Service.qml:unqualified:Unqualified access
 1	plugins/araneadev.menu/BarWidget.qml:missing-property:Member "barSize" not found on type "QObject"
 2	plugins/araneadev.menu/BarWidget.qml:missing-property:Member "run" not found on type "QObject"
-1	plugins/araneadev.menu/MenuDmenu.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
-1	plugins/araneadev.menu/MenuGuards.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
-1	plugins/araneadev.menu/MenuProviders.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.menu/MenuStyle.qml:missing-property:Member "background" not found on type "QObject"
 2	plugins/araneadev.menu/MenuStyle.qml:missing-property:Member "bodySmall" not found on type "QObject"
 1	plugins/araneadev.menu/MenuStyle.qml:missing-property:Member "border" not found on type "QObject"
@@ -127,7 +118,6 @@
 1	plugins/araneadev.network/NetworkSavedSection.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.network/NetworkSavedSection.qml:missing-property:Member "caption" not found on type "QObject"
 3	plugins/araneadev.network/NetworkWifiSection.qml:missing-property:Member "caption" not found on type "QObject"
-2	plugins/araneadev.notifications/Inbox.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.notifications/Inbox.qml:unused-imports:Unused import
 2	plugins/araneadev.notifications/NotificationCenterContent.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.notifications/NotificationCenterContent.qml:missing-property:Member "caption" not found on type "QObject"
@@ -162,7 +152,6 @@
 1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "panelPadding" not found on type "QObject"
 4	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "scrim" not found on type "QObject"
 1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "text" not found on type "QObject"
-2	plugins/araneadev.polkit/PolkitAgent.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 2	plugins/araneadev.polkit/PolkitAgent.qml:unqualified:Unqualified access
 1	plugins/araneadev.polkit/PolkitAuthField.qml:missing-property:Member "accent" not found on type "QObject"
 1	plugins/araneadev.polkit/PolkitAuthField.qml:missing-property:Member "caption" not found on type "QObject"
@@ -195,7 +184,6 @@
 2	plugins/araneadev.tray/TrayMenuView.qml:missing-property:Member "hairline" not found on type "QObject"
 2	plugins/araneadev.updates/BarWidget.qml:unqualified:Unqualified access
 2	plugins/araneadev.updates/BarWidget.qml:unused-imports:Unused import
-1	plugins/araneadev.updates/Service.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 2	plugins/araneadev.updates/UpdatePanel.qml:missing-property:Member "body" not found on type "QObject"
 4	plugins/araneadev.updates/UpdatePanel.qml:missing-property:Member "caption" not found on type "QObject"
 1	plugins/araneadev.updates/UpdatePanel.qml:missing-property:Member "hairline" not found on type "QObject"

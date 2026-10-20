@@ -70,20 +70,20 @@ Item {
       var nextWhen = ({})
       var nextChecked = ({})
       var lines = guardProc.collected.split("\n")
-      for (var i = 0; i < lines.length; i++) {
-        var line = lines[i].trim()
+      for (let i = 0; i < lines.length; i++) {
+        let line = lines[i].trim()
         if (!line)
           continue
-        var colon = line.lastIndexOf(":")
+        let colon = line.lastIndexOf(":")
         if (colon < 0)
           continue
-        var value = line.substring(colon + 1) === "1"
-        var rest = line.substring(0, colon)
-        var tagAt = rest.lastIndexOf(":")
+        let value = line.substring(colon + 1) === "1"
+        let rest = line.substring(0, colon)
+        let tagAt = rest.lastIndexOf(":")
         if (tagAt < 0)
           continue
-        var id = rest.substring(0, tagAt)
-        var tag = rest.substring(tagAt + 1)
+        let id = rest.substring(0, tagAt)
+        let tag = rest.substring(tagAt + 1)
         if (tag === "w")
           nextWhen[id] = value
         else if (tag === "c")

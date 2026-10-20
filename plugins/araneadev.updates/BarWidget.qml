@@ -126,15 +126,15 @@ Item {
     signal refresh
     // Emitted when a real pointer move lands on pill INDEX.
     signal pillHovered(int index)
-    implicitWidth: content.implicitWidth
-    implicitHeight: content.implicitHeight
+    implicitWidth: contentObject.implicitWidth
+    implicitHeight: contentObject.implicitHeight
     // Resets the inner panel's pointer gate; forwarded so a host's key
     // handling can disarm it without reaching into the panel directly.
     function disarmPointer() {
-      content.disarmPointer()
+      contentObject.disarmPointer()
     }
     UpdatePanel {
-      id: content
+      id: contentObject
       anchors.fill: parent
       status: parent.status
       checking: parent.checking
@@ -164,11 +164,11 @@ Item {
     signal openUpdater
     // Emitted to start a check.
     signal refresh
-    implicitWidth: content.implicitWidth
-    implicitHeight: content.implicitHeight
+    implicitWidth: contentObject.implicitWidth
+    implicitHeight: contentObject.implicitHeight
     // A fresh open starts with the cursor hidden; the first key reveals it.
     onOpenChanged: {
-      content.disarmPointer()
+      contentObject.disarmPointer()
       testHost.cursorIndex = 0
       testHost.keyboardCursor = false
     }
@@ -177,24 +177,24 @@ Item {
       anchors.fill: parent
       onCloseRequested: root.close()
       onTabRequested: function (direction) {
-        content.disarmPointer()
+        contentObject.disarmPointer()
         root.switchPanel(direction)
       }
       onMoveRequested: function (dx, dy) {
-        content.disarmPointer()
+        contentObject.disarmPointer()
         if (dy !== 0) {
-          var next = UpdateLogic.moveCursor(testHost.cursorIndex, testHost.keyboardCursor, dy)
+          let next = UpdateLogic.moveCursor(testHost.cursorIndex, testHost.keyboardCursor, dy)
           testHost.cursorIndex = next.index
           testHost.keyboardCursor = next.keyboardCursor
         }
       }
       onTextKey: function (text) {
-        content.disarmPointer()
+        contentObject.disarmPointer()
         if ((text === "r" || text === "R") && !testHost.checking)
           testHost.refresh()
       }
       onActivateRequested: {
-        content.disarmPointer()
+        contentObject.disarmPointer()
         var intent = CursorLogic.pressIntent(true, testHost.keyboardCursor)
         if (intent === "reveal") {
           testHost.keyboardCursor = true
@@ -206,7 +206,7 @@ Item {
           testHost.refresh()
       }
       PanelContent {
-        id: content
+        id: contentObject
         anchors.fill: parent
         status: testHost.status
         checking: testHost.checking
@@ -226,13 +226,14 @@ Item {
     id: panelLoader
     sourceComponent: root.testStatus !== null ? testPanelHost : null
     onLoaded: {
-      item.status = Qt.binding(function () {
+      var loaded = item as TestPanelHost
+      loaded.status = Qt.binding(function () {
         return root.status
       })
-      item.open = Qt.binding(function () {
+      loaded.open = Qt.binding(function () {
         return root.panelOpen
       })
-      item.checking = Qt.binding(function () {
+      loaded.checking = Qt.binding(function () {
         return root.checking
       })
     }

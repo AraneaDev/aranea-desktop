@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.worldclock",
+  "name": "Aranea World Clock",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "A sun-lit globe and editable world clock zones",
+  "kinds": ["bar-widget"],
+  "entryPoints": { "barWidget": "BarWidget.qml" },
+  "barWidget": {
+    "displayName": "Aranea World Clock",
+    "description": "A sun-lit globe and editable world clock zones",
+    "category": "Time",
+    "aliases": ["worldclock", "world clock", "timezones"],
+    "allowMultiple": false
+  },
+  "omarchy": { "clonedFrom": "omarchy.elsewhen" }
+}

@@ -94,7 +94,7 @@ Item {
   function kbdExited(exitCode) {
     root.kbdSerial++
     if (root.kbdQueued >= 0) {
-      var level = root.kbdQueued
+      let level = root.kbdQueued
       root.kbdQueued = -1
       runKbdCommand(level)
       return

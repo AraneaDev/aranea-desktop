@@ -27,14 +27,14 @@ PanelWindow {
 
   // Makes the pointer ignore hover until it really moves.
   function disarmPointer(): void {
-    pointerGate.reset()
+    pointerGateObject.reset()
   }
 
   // Height of the result grid, for page moves.
   readonly property real resultHeight: pickerContent.resultHeight
 
   PointerMoveGate {
-    id: pointerGate
+    id: pointerGateObject
     referenceItem: card
   }
 
@@ -117,7 +117,7 @@ PanelWindow {
       showRecents: panel.root.showRecents
       selectedIndex: panel.root.selectedIndex
       cursorActive: panel.root.outlineShown
-      pointerGate: pointerGate
+      pointerGate: pointerGateObject
       layoutChangedAt: panel.root.layoutChangedAt
       inRecents: panel.root.inRecents
       recentIndex: panel.root.recentIndex

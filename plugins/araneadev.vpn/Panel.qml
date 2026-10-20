@@ -198,8 +198,8 @@ Panel {
   // The apps' detect.process names, for linkCommand.
   readonly property var processNames: {
     var out = []
-    for (var i = 0; i < apps.length; i++) {
-      var p = apps[i].detect ? apps[i].detect.process : ""
+    for (let i = 0; i < apps.length; i++) {
+      let p = apps[i].detect ? apps[i].detect.process : ""
       if (p && out.indexOf(p) === -1)
         out.push(p)
     }
@@ -208,21 +208,21 @@ Panel {
   // App name -> VpnApps.appState.
   readonly property var appStates: {
     var out = {}
-    for (var i = 0; i < apps.length; i++)
+    for (let i = 0; i < apps.length; i++)
       out[apps[i].name] = VpnApps.appState(apps[i], links, procs)
     return out
   }
   // App name -> its matched interface (VpnApps.appInterface).
   readonly property var appInterfaces: {
     var out = {}
-    for (var i = 0; i < apps.length; i++)
+    for (let i = 0; i < apps.length; i++)
       out[apps[i].name] = VpnApps.appInterface(apps[i], links)
     return out
   }
   // App name -> the IPv4 address on its interface.
   readonly property var appIps: {
     var out = {}
-    for (var name in appInterfaces)
+    for (let name in appInterfaces)
       out[name] = VpnLogic.linkAddress(links, appInterfaces[name])
     return out
   }
@@ -243,7 +243,7 @@ Panel {
   // The interfaces rates are read for.
   readonly property var rateIfaces: {
     var out = []
-    for (var k in rowIfaces)
+    for (let k in rowIfaces)
       if (out.indexOf(rowIfaces[k]) === -1)
         out.push(rowIfaces[k])
     return out
@@ -384,7 +384,7 @@ Panel {
 
   // ROWS' index of KEY, or -1.
   function rowIndex(rows, key) {
-    for (var i = 0; i < rows.length; i++)
+    for (let i = 0; i < rows.length; i++)
       if (rows[i].key === key)
         return i
     return -1
@@ -401,7 +401,7 @@ Panel {
 
   // The NetworkManager profile behind KEY, or null.
   function connFor(key) {
-    for (var i = 0; i < conns.length; i++)
+    for (let i = 0; i < conns.length; i++)
       if (conns[i].uuid === key)
         return conns[i]
     return null
@@ -409,7 +409,7 @@ Panel {
 
   // The app behind row KEY ("app:" + name), or null.
   function appFor(key) {
-    for (var i = 0; i < apps.length; i++)
+    for (let i = 0; i < apps.length; i++)
       if ("app:" + apps[i].name === key)
         return apps[i]
     return null
@@ -715,7 +715,7 @@ Panel {
     }
     onExited: function (exitCode) {
       var next = {}
-      for (var k in root.sessions)
+      for (let k in root.sessions)
         next[k] = root.sessions[k]
       if (exitCode === 0)
         next[sessionProc.uuid] = VpnLogic.parseSession(sessionOut.text)
@@ -828,7 +828,7 @@ Panel {
         raiseAlert()
       }
     } else {
-      var outcome = VpnLogic.connectOutcome(exitCode, stderr, withSecrets)
+      let outcome = VpnLogic.connectOutcome(exitCode, stderr, withSecrets)
       if (outcome === "ok") {
         if (promptKey === key)
           cancelPrompt()
@@ -861,10 +861,10 @@ Panel {
     prevCounters = counters
     prevCountersAt = now
     var next = {}
-    for (var key in rowIfaces) {
-      var iface = rowIfaces[key]
-      var rate = rates[iface]
-      var hist = graphs[key] || []
+    for (let key in rowIfaces) {
+      let iface = rowIfaces[key]
+      let rate = rates[iface]
+      let hist = graphs[key] || []
       next[key] = rate ? GraphLogic.pushSample(hist, {
         iface: iface,
         rx: rate.rx,

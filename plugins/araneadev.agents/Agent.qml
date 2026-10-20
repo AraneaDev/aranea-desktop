@@ -31,7 +31,7 @@ Item {
   // Parses the raw file content into root.record, or null on bad JSON.
   function parse(content) {
     try {
-      var parsed = JSON.parse(String(content || ""))
+      let parsed = JSON.parse(String(content || ""))
       root.record = parsed && typeof parsed === "object" ? parsed : null
     } catch (e) {
       console.warn("agents", "Ignoring bad usage record", root.path, e)

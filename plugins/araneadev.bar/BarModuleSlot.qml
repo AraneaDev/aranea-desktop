@@ -205,13 +205,13 @@ Item {
       }
 
       if (dragging) {
-        var scenePoint = slot.mapToItem(null, mouse.x, mouse.y)
-        var screenPoint = owner.barDragScreenPoint(scenePoint)
+        let scenePoint = slot.mapToItem(null, mouse.x, mouse.y)
+        let screenPoint = owner.barDragScreenPoint(scenePoint)
         owner.barDragSceneX = scenePoint.x
         owner.barDragSceneY = scenePoint.y
         owner.barDragScreenX = screenPoint.x
         owner.barDragScreenY = screenPoint.y
-        var drop = owner.moduleDropAtScene(scenePoint, slot)
+        let drop = owner.moduleDropAtScene(scenePoint, slot)
         owner.barDragTarget = drop ? drop.slot : null
         owner.barDragAfter = drop ? drop.after : false
         owner.barDragTargetGeometry = drop ? owner.dropMarkerRect(drop.slot, drop.after) : null

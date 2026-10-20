@@ -16,7 +16,7 @@ QtObject {
     var process = processComponent.createObject(controller, {
       command: argv,
       completion: done
-    })
+    }) as CommandProcess
     process.startRequested = true
     process.running = true
   }
@@ -102,37 +102,39 @@ QtObject {
   // Report completion after independent owner readback, for local draft acknowledgment.
   signal mutationCompleted(string operation, var args, bool succeeded)
   // Factory for process instances parented to the keep-loaded controller.
-  property Component processComponent: Component {
-    Process {
-      id: process
-      property var completion
-      property bool startRequested: false
-      property bool startedSuccessfully: false
-      property bool completed: false
-      function finish(code, stdout, stderr) {
-        if (completed)
-          return
-        completed = true
-        completion(code, stdout, stderr)
-        process.destroy()
-      }
-      onStarted: process.startedSuccessfully = true
-      // Failed launch has no exited signal; a real exit must wait for collectors.
-      onRunningChanged: if (process.startRequested && !running && !process.startedSuccessfully)
-        process.finish(-1, '', 'Could not start ' + process.command[0] + '. Check that it is installed and executable.')
-      stdout: StdioCollector {
-        id: output
-      }
-      stderr: StdioCollector {
-        id: diagnostics
-      }
-      // Quickshell metadata omits the unused QProcess exit-status enum.
-      // qmllint disable signal-handler-parameters
-      onExited: function (exitCode) {
-        process.finish(exitCode, output.text, diagnostics.text)
-      }
-      // qmllint enable signal-handler-parameters
+  component CommandProcess: Process {
+    id: process
+    property var completion
+    property bool startRequested: false
+    property bool startedSuccessfully: false
+    property bool completed: false
+    function finish(code, stdout, stderr) {
+      if (completed)
+        return
+      completed = true
+      completion(code, stdout, stderr)
+      process.destroy()
     }
+    onStarted: process.startedSuccessfully = true
+    // Failed launch has no exited signal; a real exit must wait for collectors.
+    onRunningChanged: if (process.startRequested && !running && !process.startedSuccessfully)
+      process.finish(-1, '', 'Could not start ' + process.command[0] + '. Check that it is installed and executable.')
+    stdout: StdioCollector {
+      id: output
+    }
+    stderr: StdioCollector {
+      id: diagnostics
+    }
+    // Quickshell metadata omits the unused QProcess exit-status enum.
+    // qmllint disable signal-handler-parameters
+    onExited: function (exitCode) {
+      process.finish(exitCode, output.text, diagnostics.text)
+    }
+    // qmllint enable signal-handler-parameters
+  }
+  // Factory retained for the injectable command process boundary.
+  property Component processComponent: Component {
+    CommandProcess {}
   }
   // Return Applying while busy, otherwise the stored application outcome.
   function resultFor(key) {
@@ -189,7 +191,7 @@ QtObject {
   // Parse a helper envelope; anything unreadable counts as a failure.
   function parseKeybind(stdout) {
     try {
-      var value = JSON.parse(stdout)
+      let value = JSON.parse(stdout)
       return value && typeof value === 'object' ? value : null
     } catch (e) {
       return null
@@ -228,7 +230,7 @@ QtObject {
   function requestKeybind(operation, args) {
     var argv
     if (operation === 'keybind-add') {
-      var key = args && args.key
+      let key = args && args.key
       if (typeof key !== 'string' || key === '')
         return false
       argv = [keybindPath, 'add', '--key', key, '--json']

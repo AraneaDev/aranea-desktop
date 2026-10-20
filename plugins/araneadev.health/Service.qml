@@ -18,9 +18,9 @@ Item {
   property bool checksEnabled: true
 
   // The health checks; Panel.qml calls monitor.checkDisk() when it opens.
-  property alias monitor: monitor
+  property alias monitor: monitorObject
   Monitor {
-    id: monitor
+    id: monitorObject
     autoStart: service.checksEnabled
   }
 
@@ -40,14 +40,14 @@ Item {
 
   Metrics {
     id: metrics
-    diskRows: monitor.diskRows
+    diskRows: monitorObject.diskRows
     topActive: service.openPanels > 0
   }
 
   // Annotated open problems (HealthLogic.annotateProblems rows).
-  readonly property var problems: monitor.openProblems
+  readonly property var problems: monitorObject.openProblems
   // "healthy", "attention" or "critical" (HealthLogic.statusFor).
-  readonly property string status: HealthLogic.statusFor(monitor.openProblems)
+  readonly property string status: HealthLogic.statusFor(monitorObject.openProblems)
 
   // Toggles the health dropdown through the shell, if one was injected.
   function toggle(): void {

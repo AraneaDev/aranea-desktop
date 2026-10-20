@@ -69,7 +69,7 @@ Column {
       index: index,
       key: key
     }
-    for (var field in extra || {})
+    for (let field in extra || {})
       arg[field] = extra[field]
     dropdown.action(name, arg)
   }

@@ -149,7 +149,7 @@ PanelWindow {
     opacity: surfaceMotion.opacity
     enabled: surfaceMotion.opened
     width: panel.cardWidth
-    height: Math.min(content.implicitHeight + card.contentTopInset + card.contentBottomInset, panel.height - Style.gapsOut * 2)
+    height: Math.min(contentObject.implicitHeight + card.contentTopInset + card.contentBottomInset, panel.height - Style.gapsOut * 2)
     cornerRadius: panel.root.cornerRadius
     anchors.centerIn: parent
     anchors.horizontalCenterOffset: panel.root.shakeOffset
@@ -178,7 +178,7 @@ PanelWindow {
     }
 
     ColumnLayout {
-      id: content
+      id: contentObject
       anchors.top: parent.top
       anchors.left: parent.left
       anchors.right: parent.right

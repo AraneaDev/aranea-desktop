@@ -72,8 +72,8 @@ ColumnLayout {
       return asset.available === true
     })
     var time = ''
-    for (var minute = 0; minute < 1440; minute++) {
-      var clock = ('0' + Math.floor(minute / 60)).slice(-2) + ':' + ('0' + minute % 60).slice(-2)
+    for (let minute = 0; minute < 1440; minute++) {
+      let clock = ('0' + Math.floor(minute / 60)).slice(-2) + ':' + ('0' + minute % 60).slice(-2)
       if (!draft.some(function (entry) {
         return entry.time === clock
       })) {

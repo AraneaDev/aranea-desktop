@@ -140,8 +140,8 @@ Panel {
   // Per-app playback streams, excluding the speaker-tuning's own output.
   readonly property var candidateStreams: {
     var list = []
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i]
+    for (let i = 0; i < nodes.length; i++) {
+      let n = nodes[i]
       if (!n || !n.isStream || !isPlaybackStream(n))
         continue
       // A tuning's output is a playback stream too, but it is the processing
@@ -179,7 +179,7 @@ Panel {
   // Candidate streams that actually carry an audio channel.
   readonly property var audioStreams: {
     var list = []
-    for (var i = 0; i < candidateStreams.length; i++)
+    for (let i = 0; i < candidateStreams.length; i++)
       if (candidateStreams[i].audio)
         list.push(candidateStreams[i])
     return list
@@ -219,8 +219,8 @@ Panel {
       return sink
     if (volumeSinkName === String(sink.name))
       return sink
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i]
+    for (let i = 0; i < nodes.length; i++) {
+      let n = nodes[i]
       if (n && n.isSink && !n.isStream && String(n.name) === volumeSinkName && n.audio)
         return n
     }
@@ -383,7 +383,7 @@ Panel {
       // Escape upward.
       if (sIdx > 0) {
         focusSection = sections[sIdx - 1]
-        var prevMax = sectionCount(focusSection) - 1
+        let prevMax = sectionCount(focusSection) - 1
         selectedIndex = prevMax >= 0 ? prevMax : (sectionHasSlider(focusSection) ? -1 : 0)
       } else {
         focusSection = "header"
@@ -428,7 +428,7 @@ Panel {
       return
     }
     if (focusSection === "streams" && selectedIndex >= 0 && selectedIndex < displayAudioStreams.length) {
-      var s = displayAudioStreams[selectedIndex]
+      let s = displayAudioStreams[selectedIndex]
       if (s && s.audio)
         s.audio.volume = Math.max(0, Math.min(1.5, s.audio.volume + delta))
       return
@@ -452,7 +452,7 @@ Panel {
         toggleOutputMute()
         return
       }
-      var sink = displayAudioSinks[selectedIndex]
+      let sink = displayAudioSinks[selectedIndex]
       if (sink)
         requestDefault("output", sink)
       return
@@ -462,13 +462,13 @@ Panel {
         toggleInputMute()
         return
       }
-      var src = displayAudioSources[selectedIndex]
+      let src = displayAudioSources[selectedIndex]
       if (src)
         requestDefault("input", src)
       return
     }
     if (focusSection === "streams" && selectedIndex >= 0) {
-      var st = displayAudioStreams[selectedIndex]
+      let st = displayAudioStreams[selectedIndex]
       if (st && st.audio)
         st.audio.muted = !st.audio.muted
       return
@@ -553,7 +553,7 @@ Panel {
       "nowplaying": "nowPlaying"
     }
     var kids = dropdown.children
-    for (var i = 0; i < kids.length; i++)
+    for (let i = 0; i < kids.length; i++)
       if (kids[i].objectName === names[section])
         return kids[i]
     return null
@@ -562,11 +562,11 @@ Panel {
   // The first descendant of ITEM named NAME (with Repeater index INDEX, if given).
   function findNamed(item, name, index) {
     var kids = item ? item.children : []
-    for (var i = 0; i < kids.length; i++) {
-      var kid = kids[i]
+    for (let i = 0; i < kids.length; i++) {
+      let kid = kids[i]
       if (kid.objectName === name && (index === undefined || kid.index === index))
         return kid
-      var found = findNamed(kid, name, index)
+      let found = findNamed(kid, name, index)
       if (found)
         return found
     }
@@ -812,8 +812,8 @@ Panel {
   // pending switch never rebuilds the rows.
   function deviceRows(nodes, isSink, unplugged) {
     var rows = []
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i]
+    for (let i = 0; i < nodes.length; i++) {
+      let n = nodes[i]
       rows.push({
         key: AudioLogic.deviceKey(n),
         label: nodeLabel(n),
@@ -822,8 +822,8 @@ Panel {
         available: true
       })
     }
-    for (var j = 0; j < (unplugged || []).length; j++) {
-      var u = unplugged[j]
+    for (let j = 0; j < (unplugged || []).length; j++) {
+      let u = unplugged[j]
       rows.push({
         key: AudioLogic.deviceKey(u),
         label: nodeLabel(u),
@@ -907,11 +907,11 @@ Panel {
     else if (name === "inputDevice")
       requestDefault("input", AudioLogic.nodeAt(displayAudioSources, arg.index, arg.key, true))
     else if (name === "streamVolume") {
-      var s = AudioLogic.nodeAt(displayAudioStreams, arg.index, arg.key)
+      let s = AudioLogic.nodeAt(displayAudioStreams, arg.index, arg.key)
       if (s && s.audio)
         s.audio.volume = Math.max(0, Math.min(1.5, arg.value))
     } else if (name === "streamMute") {
-      var m = AudioLogic.nodeAt(displayAudioStreams, arg.index, arg.key)
+      let m = AudioLogic.nodeAt(displayAudioStreams, arg.index, arg.key)
       if (m && m.audio)
         m.audio.muted = !m.audio.muted
     } else if (name === "previous" && transportPlayer && transportPlayer.canGoPrevious)
@@ -1071,7 +1071,7 @@ Panel {
           return
         root.keyboardCursor = true
         if (root.focusSection === "streams" && root.selectedIndex >= 0 && root.selectedIndex < root.displayAudioStreams.length) {
-          var s = root.displayAudioStreams[root.selectedIndex]
+          let s = root.displayAudioStreams[root.selectedIndex]
           if (s && s.audio)
             s.audio.muted = !s.audio.muted
         } else if (root.focusSection === "input") {

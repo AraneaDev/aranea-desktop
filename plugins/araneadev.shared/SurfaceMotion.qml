@@ -36,7 +36,7 @@ Item {
       return
     }
     if (scale !== targetScale || scaleSpring.running) {
-      var currentScale = scale
+      let currentScale = scale
       scaleSpring.stop()
       if (currentScale !== targetScale) {
         scaleSpring.from = currentScale

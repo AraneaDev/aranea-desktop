@@ -39,8 +39,8 @@ Canvas {
         y: graph.plotY(1 - Math.min(100, graph.nowPercent) / 100)
       }
     var segs = Array.isArray(graph.segments) ? graph.segments : []
-    for (var i = segs.length - 1; i >= 0; i--) {
-      var seg = segs[i]
+    for (let i = segs.length - 1; i >= 0; i--) {
+      let seg = segs[i]
       if (Array.isArray(seg) && seg.length > 0)
         return {
           x: seg[seg.length - 1].x * graph.width,
@@ -78,14 +78,14 @@ Canvas {
     fillGradient.addColorStop(0, String(Aranea.DesignTokens.accent))
     fillGradient.addColorStop(1, String(Aranea.DesignTokens.strandEnd))
     ctx.fillStyle = fillGradient
-    for (var f = 0; f < segs.length; f++) {
-      var fillSeg = segs[f]
+    for (let f = 0; f < segs.length; f++) {
+      let fillSeg = segs[f]
       if (!Array.isArray(fillSeg) || fillSeg.length === 0)
         continue
       ctx.beginPath()
       ctx.moveTo(fillSeg[0].x * graph.width, floorY)
       ctx.lineTo(fillSeg[0].x * graph.width, graph.plotY(fillSeg[0].y))
-      for (var g = 1; g < fillSeg.length; g++)
+      for (let g = 1; g < fillSeg.length; g++)
         ctx.lineTo(fillSeg[g].x * graph.width, graph.plotY(fillSeg[g].y))
       ctx.lineTo(fillSeg[fillSeg.length - 1].x * graph.width, floorY)
       ctx.closePath()
@@ -98,8 +98,8 @@ Canvas {
     gradient.addColorStop(1, String(Aranea.DesignTokens.strandEnd))
     ctx.strokeStyle = gradient
     ctx.lineWidth = 1.6
-    for (var i = 0; i < segs.length; i++) {
-      var seg = segs[i]
+    for (let i = 0; i < segs.length; i++) {
+      let seg = segs[i]
       if (!Array.isArray(seg) || seg.length === 0)
         continue
       ctx.beginPath()
@@ -107,7 +107,7 @@ Canvas {
       // A lone point still shows, as a short tick.
       if (seg.length === 1)
         ctx.lineTo(seg[0].x * graph.width + 1, graph.plotY(seg[0].y))
-      for (var j = 1; j < seg.length; j++)
+      for (let j = 1; j < seg.length; j++)
         ctx.lineTo(seg[j].x * graph.width, graph.plotY(seg[j].y))
       ctx.stroke()
     }

@@ -53,7 +53,7 @@ Item {
 
   // Model index of the entry with this file name, or -1.
   function indexOf(fileName: string): int {
-    for (var i = 0; i < inboxModel.count; i++) {
+    for (let i = 0; i < inboxModel.count; i++) {
       if (inboxModel.get(i).fileName === fileName)
         return i
     }
@@ -75,7 +75,7 @@ Item {
   // function calls it once, after its last model change.
   function publishSnapshot(): void {
     var rows = []
-    for (var i = 0; i < inboxModel.count; i++)
+    for (let i = 0; i < inboxModel.count; i++)
       rows.push(inboxModel.get(i))
     snapshot = InboxLogic.snapshotOf(rows)
     revision++
@@ -110,7 +110,7 @@ Item {
     var row = modelRow(entry)
     var i = indexOf(row.fileName)
     if (i >= 0) {
-      for (var key in row)
+      for (let key in row)
         inboxModel.setProperty(i, key, row[key])
     } else {
       inboxModel.insert(0, row)
@@ -161,8 +161,8 @@ Item {
   // Removes the entries InboxLogic.pruneInbox drops (too old or over the limit).
   function prune(): void {
     var rows = []
-    for (var i = 0; i < inboxModel.count; i++) {
-      var r = inboxModel.get(i)
+    for (let i = 0; i < inboxModel.count; i++) {
+      let r = inboxModel.get(i)
       rows.push({
         fileName: r.fileName,
         timestamp: r.timestamp,
@@ -171,7 +171,7 @@ Item {
       })
     }
     var result = InboxLogic.pruneInbox(rows, Date.now())
-    for (var d = 0; d < result.drop.length; d++) {
+    for (let d = 0; d < result.drop.length; d++) {
       remove(result.drop[d].fileName)
       pruned(result.drop[d].fileName)
     }
@@ -208,7 +208,7 @@ Item {
     var persistable = NotificationLogic.persistablePopup(entry, imagesDir)
     var record = persistable.entry
     var command = ["bash", "-c", "IFS= read -r json || exit 0\n" + "mkdir -p \"$1\" \"$2\" || exit 0\n" + "dir=\"$1\" name=\"$3\"\n" + "shift 3\n" + copyImagesScript + "printf '%s\\n' \"$json\" > \"$dir/$name.tmp\" && mv -f -- \"$dir/$name.tmp\" \"$dir/$name\"", "--", inboxDir, imagesDir, NotificationLogic.popupFileName(record)]
-    for (var i = 0; i < persistable.copies.length; i++)
+    for (let i = 0; i < persistable.copies.length; i++)
       command.push(persistable.copies[i].from, persistable.copies[i].to)
     enqueue(command, done ? function (output) {
       done(record, output)
@@ -328,8 +328,8 @@ Item {
     var now = Date.now()
     var diskRows = []
     var future = []
-    for (var i = 0; i < entries.length; i++) {
-      var row = modelRow(entries[i])
+    for (let i = 0; i < entries.length; i++) {
+      let row = modelRow(entries[i])
       // A legacy health item (1.7.0 posted system-health problems here with
       // a sourceKey); health now lives in its own dropdown.
       if (row.sourceKey) {
@@ -341,23 +341,23 @@ Item {
       diskRows.push(row)
     }
     var liveRows = []
-    for (var j = 0; j < inboxModel.count; j++)
+    for (let j = 0; j < inboxModel.count; j++)
       liveRows.push(get(inboxModel.get(j).fileName))
     var rows = InboxLogic.mergeLoaded(diskRows, liveRows, removedDuringLoad, clearedDuringLoad)
     var dropped = clearedDuringLoad ? ({}) : removedDuringLoad
     var cleared = clearedDuringLoad
     inboxModel.clear()
-    for (var k = 0; k < rows.length; k++)
+    for (let k = 0; k < rows.length; k++)
       inboxModel.append(rows[k])
     publishSnapshot()
     // An entry dated in the future (the clock was ahead when it arrived) is
     // stored again under the current time, so it can age out; its file name
     // follows the timestamp, so the old file goes.
-    for (var f = 0; f < future.length; f++) {
-      var oldName = NotificationLogic.popupFileName(future[f])
+    for (let f = 0; f < future.length; f++) {
+      let oldName = NotificationLogic.popupFileName(future[f])
       if (cleared || dropped[oldName])
         continue
-      var fixed = Object.assign({}, future[f])
+      let fixed = Object.assign({}, future[f])
       // Distinct and in their original order (future is newest first).
       fixed.timestamp = now - f
       // Write first: the new write copies the old persisted images, and the

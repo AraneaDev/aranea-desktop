@@ -70,7 +70,7 @@ QtObject {
   // Parse one private store response without silently resetting malformed data.
   function parseStore(output: string, code: int): var {
     try {
-      var value = JSON.parse(output)
+      let value = JSON.parse(output)
       if (value && typeof value.ok === 'boolean' && (!value.ok || value.state && Array.isArray(value.state.projects) && Array.isArray(value.state.roots) && Array.isArray(value.state.ignored)))
         return value
     } catch (e) {}
@@ -119,7 +119,7 @@ QtObject {
         state = value.state
         finished(0, '', null)
       } else {
-        var message = value.error ? value.error.message + (value.error.recovery ? ' ' + value.error.recovery : '') : diagnostics
+        let message = value.error ? value.error.message + (value.error.recovery ? ' ' + value.error.recovery : '') : diagnostics
         finished(0, message || 'Project registry not available. Check registry storage and retry.', value.error || {
           code: 'REGISTRY_UNAVAILABLE',
           message: diagnostics || 'Project registry not available. Check registry storage and retry.'
@@ -131,7 +131,7 @@ QtObject {
         return
       var message = ''
       try {
-        var value = JSON.parse(output)
+        let value = JSON.parse(output)
         if (code !== 0 || !Array.isArray(value.editors) || !Array.isArray(value.terminals))
           throw new Error('Invalid tool response')
         tools = value
@@ -193,7 +193,7 @@ QtObject {
           rootReady(rootId)
       }
       if (action === 'root-add') {
-        var matched = state.roots.filter(function (r) {
+        let matched = state.roots.filter(function (r) {
           return r.path === args.path || !priorRoots.some(function (prior) {
             return prior.id === r.id
           })
