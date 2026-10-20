@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.34.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.33.1...v2.34.0) (2026-10-20)
+
+
+### Features
+
+* **sudo:** add a white passwordless sudo toggle ([#198](https://github.com/AraneaDev/aranea-desktop/issues/198)) ([7053022](https://github.com/AraneaDev/aranea-desktop/commit/7053022892eded099e3895fe48b1ef70695ae4a4))
+
 ## [2.33.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.33.0...v2.33.1) (2026-10-20)
 
 
