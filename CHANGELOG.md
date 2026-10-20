@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.35.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.34.0...v2.35.0) (2026-10-20)
+
+
+### Features
+
+* **clock:** unify calendar world clock and weather ([#200](https://github.com/AraneaDev/aranea-desktop/issues/200)) ([2d3c7e8](https://github.com/AraneaDev/aranea-desktop/commit/2d3c7e894ae99a25109b71a10e0df72da87c6bc4))
+
 ## [2.34.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.33.1...v2.34.0) (2026-10-20)
 
 
