@@ -81,6 +81,23 @@ source = source.replace('WlrLayershell.', 'nativeLayer.')
 source = re.sub(r'(?m)^(  |        )anchors \{', r'\1nativeAnchors {', source)
 pathlib.Path(sys.argv[2]).write_text(source)
 PYBOUNDARY
+    elif [[ "$plugin" == */araneadev.osd && "$name" == osd-messages ]]; then
+      # Keep OSD state, layout and real presentation; replace only its native
+      # layer-shell window so session-message checks never need a compositor.
+      mkdir -p "$run_dir/cfg/plugins/araneadev.osd"
+      for source in "$plugin"/*; do
+        [[ "${source##*/}" == Osd.qml ]] && continue
+        ln -s "$source" "$run_dir/cfg/plugins/araneadev.osd/${source##*/}"
+      done
+      python - "$plugin/Osd.qml" "$run_dir/cfg/plugins/araneadev.osd/Osd.qml" <<'PYOSDWINDOW'
+import pathlib, re, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+source = source.replace('import QtQuick', 'import QtQuick\nimport "../../fixtures/agent-panel-host"')
+source = re.sub(r'\bPanelWindow\s*\{', 'NativePanelWindow {', source)
+source = source.replace('WlrLayershell.', 'nativeLayer.')
+source = source.replace('    anchors {', '    nativeAnchors {')
+pathlib.Path(sys.argv[2]).write_text(source)
+PYOSDWINDOW
     elif [[ "$plugin" == */araneadev.bar && "$name" == sudo-relay ]]; then
       mkdir -p "$run_dir/cfg/plugins/araneadev.bar"
       for source in "$plugin"/*; do

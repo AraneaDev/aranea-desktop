@@ -1,6 +1,6 @@
 // Aranea on-screen display (the araneadev.osd plugin's "panel" entry point,
 // replacing the stock Omarchy OSD): a bottom-centre card with an icon, a
-// filament progress strand (OsdStrand.qml) and a value or message. Driven
+// filament progress strand (OsdStrand.qml) for levels, or a plain message. Driven
 // through the "osd" IPC target (show/close/state/ping); display rules live
 // in OsdModel.js.
 
@@ -26,7 +26,7 @@ Item {
   property int value: 0
   // Progress maximum.
   property int maxValue: 100
-  // Show a progress strand and value; false shows a short strand and message.
+  // Show a progress strand and value; false shows only the icon and message.
   property bool hasProgress: true
   // Ms before the card hides; 0 keeps it open.
   property int duration: 1200
@@ -42,8 +42,8 @@ Item {
   readonly property int pad: Style.space(14)
   // Spacing between the icon, strand and text.
   readonly property int gap: Style.space(12)
-  // Strand width: long with progress, short without.
-  readonly property int strandWidth: root.hasProgress ? Style.space(180) : Style.space(80)
+  // Width reserved only when the request contains a progress value.
+  readonly property int strandWidth: Style.space(180)
   // Icon column: fixed to the widest ink of every glyph the OSD can show
   // (OsdModel.allIconGlyphs), so the card never resizes when the icon
   // changes. Recomputed at startup and whenever the icon font's family or
@@ -68,7 +68,7 @@ Item {
   // Message column width: the message's width, capped.
   readonly property int messageWidth: Math.min(Style.space(220), messageMetrics.advanceWidth)
   // Width of the card content between the paddings.
-  readonly property real contentWidth: root.iconWidth + root.gap + root.strandWidth + (root.hasProgress ? root.gap + root.valueWidth : (root.message.length > 0 ? root.gap + root.messageWidth : 0))
+  readonly property real contentWidth: root.iconWidth + (root.hasProgress ? root.gap + root.strandWidth + root.gap + root.valueWidth : (root.message.length > 0 ? root.gap + root.messageWidth : 0))
 
   // Widest ink among OsdModel.allIconGlyphs() at the icon font:
   // OsdModel.maxInkWidth (pure, unit-tested against a fake measure
@@ -245,6 +245,9 @@ Item {
         }
 
         OsdStrand {
+          // Session and other messages carry no level: hide the gauge and
+          // let Row omit its width and spacing entirely.
+          visible: root.hasProgress
           width: root.strandWidth
           height: Style.space(16)
           anchors.verticalCenter: parent.verticalCenter
