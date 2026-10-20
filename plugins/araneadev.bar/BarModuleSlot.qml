@@ -44,6 +44,21 @@ Item {
     var registryName = owner.canonicalWidgetId(moduleName)
     return w[registryName] ? w[registryName].component : null
   }
+  // Only the trusted stock registry widget can retain a hidden IPC host.
+  readonly property bool nativeIndicatorsHost: registered && firstParty && moduleName === "omarchy.indicators"
+  // A sole-sudo migration keeps native expiry refreshes without a duplicate icon.
+  readonly property bool hiddenSudoHost: {
+    if (!nativeIndicatorsHost || moduleSettings.araneaSudoHostHidden !== true)
+      return false
+    var host = activeItem
+    if (!host || !host.indicatorEntries || !host.indicatorEntries.length || typeof host.entryId !== "function")
+      return false
+    for (let i = 0; i < host.indicatorEntries.length; i++) {
+      if (host.entryId(host.indicatorEntries[i]) !== "PasswordlessSudo")
+        return false
+    }
+    return true
+  }
   // Whether the entry loads a custom QML source.
   readonly property bool qmlCustom: customType === "qml"
   // Whether the entry runs a configured command.
@@ -74,8 +89,9 @@ Item {
     return Math.max(Style.space(10), Math.round((vertical ? slot.height : slot.width) * 0.55))
   }
 
-  implicitWidth: activeItem && activeItem.visible ? (owner && owner.vertical ? owner.barSize : activeItem.implicitWidth) : 0
-  implicitHeight: activeItem && activeItem.visible ? activeItem.implicitHeight : 0
+  visible: !hiddenSudoHost
+  implicitWidth: !hiddenSudoHost && activeItem && activeItem.visible ? (owner && owner.vertical ? owner.barSize : activeItem.implicitWidth) : 0
+  implicitHeight: !hiddenSudoHost && activeItem && activeItem.visible ? activeItem.implicitHeight : 0
   width: implicitWidth
   height: implicitHeight
   z: modulePointer.dragging ? 100 : 0
@@ -88,6 +104,14 @@ Item {
     if (owner.barDragSource === slot)
       owner.clearBarDrag()
     owner.unregisterModuleSlot(slot)
+  }
+
+  Connections {
+    target: slot.nativeIndicatorsHost ? slot.activeItem : null
+    function onRefreshRequested() {
+      if (slot.owner)
+        slot.owner.refreshPasswordlessSudoForSlot(slot)
+    }
   }
 
   HoverHandler {

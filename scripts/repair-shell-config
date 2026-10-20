@@ -75,7 +75,13 @@ settings_installed=false
 activity_installed=false
 projects_installed=false
 vpn_installed=false
+sudo_installed=false
+sudo_marker="$state_root/sudo-widget-placed"
+sudo_parked="$state_root/sudo-widget-parked"
+place_sudo=true
+[[ -e "$sudo_marker" && ! -e "$sudo_parked" ]] && place_sudo=false
 for dir in "$given_config_dir" "$config_dir"; do
+  [[ -f "$dir/plugins/araneadev.sudo/manifest.json" ]] && sudo_installed=true
   [[ -f "$dir/plugins/araneadev.activity/manifest.json" ]] && activity_installed=true
   [[ -f "$dir/plugins/araneadev.projects/manifest.json" ]] && projects_installed=true
   [[ -f "$dir/plugins/araneadev.settings/manifest.json" ]] && settings_installed=true
@@ -112,7 +118,8 @@ note_polkit_handover() {
   fi
 }
 
-jq --argjson activity "$activity_installed" --argjson projects "$projects_installed" --argjson settings "$settings_installed" --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson clock "$clock_installed" --argjson worldclock "$worldclock_installed" --argjson monitor "$monitor_installed" --argjson network "$network_installed" --argjson power "$power_installed" --argjson weather "$weather_installed" --argjson tray "$tray_installed" --argjson agents "$agents_installed" --argjson vpn "$vpn_installed" --argjson placeVpn "$place_vpn" '
+jq -L "$(dirname "${BASH_SOURCE[0]}")/lib" --argjson sudo "$sudo_installed" --argjson placeSudo "$place_sudo" --argjson activity "$activity_installed" --argjson projects "$projects_installed" --argjson settings "$settings_installed" --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson clock "$clock_installed" --argjson worldclock "$worldclock_installed" --argjson monitor "$monitor_installed" --argjson network "$network_installed" --argjson power "$power_installed" --argjson weather "$weather_installed" --argjson tray "$tray_installed" --argjson agents "$agents_installed" --argjson vpn "$vpn_installed" --argjson placeVpn "$place_vpn" '
+  include "sudo-shell-config";
   def entry_id: if type == "string" then . else .id? end;
   # Drops later duplicates by id (string or {id} entries), keeping order.
   def dedupe_by_id: reduce .[] as $e ([]; ($e | entry_id) as $id | if ([.[] | entry_id] | index($id)) != null then . else . + [$e] end);
@@ -286,6 +293,7 @@ jq --argjson activity "$activity_installed" --argjson projects "$projects_instal
              else . end)
          else . end))
      else . end)
+  | repair_sudo($sudo;$placeSudo)
 ' "$config_file" >"$tmp_file"
 
 if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.notifications") != null' "$tmp_file" >/dev/null 2>&1; then
@@ -302,6 +310,12 @@ if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id?
   mkdir -p "$state_root"
   : >"$vpn_marker"
   rm -f "$vpn_parked"
+fi
+
+if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.sudo") != null' "$tmp_file" >/dev/null 2>&1; then
+  mkdir -p "$state_root"
+  : >"$sudo_marker"
+  rm -f "$sudo_parked"
 fi
 
 note_polkit_handover

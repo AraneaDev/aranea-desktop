@@ -954,6 +954,22 @@ Item {
     return items
   }
 
+  // Relay native grant/expiry events only to the standalone toggle on this output.
+  function refreshPasswordlessSudoForSlot(sourceSlot) {
+    if (!sourceSlot || !sourceSlot.registered || !sourceSlot.firstParty || sourceSlot.moduleName !== "omarchy.indicators")
+      return
+    var sourceWindow = root.slotWindow(sourceSlot)
+    if (!sourceWindow)
+      return
+    for (let i = 0; i < root.moduleSlots.length; i++) {
+      let slot = root.moduleSlots[i]
+      if (!slot || !slot.registered || slot.moduleName !== "araneadev.sudo" || !slot.activeItem)
+        continue
+      if (root.sameWindow(sourceWindow, root.slotWindow(slot)) && typeof slot.activeItem.refresh === "function")
+        slot.activeItem.refresh()
+    }
+  }
+
   // Name of the screen a slot is on, or "".
   function slotScreenName(slot): string {
     var window = slotWindow(slot)

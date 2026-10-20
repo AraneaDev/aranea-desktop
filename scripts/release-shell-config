@@ -58,10 +58,11 @@ note_polkit_handover() {
   fi
 }
 
-jq '
+jq -L "$(dirname "${BASH_SOURCE[0]}")/lib" '
+  include "sudo-shell-config";
   def entry_id: if type == "string" then . else .id? end;
   # Aranea clones that step aside, and the stock plugins that take over again.
-  def ours: ["araneadev.activity", "araneadev.projects", "araneadev.settings", "araneadev.notifications", "araneadev.health", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit", "araneadev.lock", "araneadev.osd", "araneadev.menu", "araneadev.workspaces", "araneadev.updates", "araneadev.audio", "araneadev.bluetooth", "araneadev.clock", "araneadev.worldclock", "araneadev.monitor", "araneadev.network", "araneadev.vpn", "araneadev.power", "araneadev.weather", "araneadev.tray", "araneadev.agents"];
+  def ours: ["araneadev.activity", "araneadev.projects", "araneadev.settings", "araneadev.notifications", "araneadev.health", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit", "araneadev.lock", "araneadev.osd", "araneadev.menu", "araneadev.workspaces", "araneadev.updates", "araneadev.audio", "araneadev.bluetooth", "araneadev.clock", "araneadev.worldclock", "araneadev.monitor", "araneadev.network", "araneadev.vpn", "araneadev.power", "araneadev.weather", "araneadev.tray", "araneadev.agents", "araneadev.sudo"];
   def stock: ["omarchy.notifications", "omarchy.clipboard", "omarchy.emojis", "omarchy.polkit", "omarchy.lock", "omarchy.osd", "omarchy.bar", "omarchy.menu"];
   def retarget($from; $to):
     if type == "string" then (if . == $from then $to else . end)
@@ -69,7 +70,8 @@ jq '
     else . end;
   # The bar goes back to Omarchy: no bar id means its own bar. The Aranea
   # menu entry becomes the stock menu entry, keeping its place and settings.
-  (if (.bar | type) == "object" and .bar.id == "araneadev.bar" then .bar |= del(.id) else . end)
+  release_sudo
+  | (if (.bar | type) == "object" and .bar.id == "araneadev.bar" then .bar |= del(.id) else . end)
   | (if (.bar.layout | type) == "object" then
        .bar.layout |= with_entries(.value |= (if type == "array" then map(
          retarget("araneadev.menu"; "omarchy.menu")
@@ -118,6 +120,11 @@ if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id?
   "$config_file" >/dev/null 2>&1; then
   mkdir -p "$state_root"
   : >"$vpn_parked"
+fi
+
+if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.sudo") != null' "$config_file" >/dev/null 2>&1; then
+  mkdir -p "$state_root"
+  : >"$state_root/sudo-widget-parked"
 fi
 
 note_polkit_handover

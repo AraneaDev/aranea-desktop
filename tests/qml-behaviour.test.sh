@@ -81,6 +81,52 @@ source = source.replace('WlrLayershell.', 'nativeLayer.')
 source = re.sub(r'(?m)^(  |        )anchors \{', r'\1nativeAnchors {', source)
 pathlib.Path(sys.argv[2]).write_text(source)
 PYBOUNDARY
+    elif [[ "$plugin" == */araneadev.osd && "$name" == osd-messages ]]; then
+      # Keep OSD state, layout and real presentation; replace only its native
+      # layer-shell window so session-message checks never need a compositor.
+      mkdir -p "$run_dir/cfg/plugins/araneadev.osd"
+      for source in "$plugin"/*; do
+        [[ "${source##*/}" == Osd.qml ]] && continue
+        ln -s "$source" "$run_dir/cfg/plugins/araneadev.osd/${source##*/}"
+      done
+      python - "$plugin/Osd.qml" "$run_dir/cfg/plugins/araneadev.osd/Osd.qml" <<'PYOSDWINDOW'
+import pathlib, re, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+source = source.replace('import QtQuick', 'import QtQuick\nimport "../../fixtures/agent-panel-host"')
+source = re.sub(r'\bPanelWindow\s*\{', 'NativePanelWindow {', source)
+source = source.replace('WlrLayershell.', 'nativeLayer.')
+source = source.replace('    anchors {', '    nativeAnchors {')
+pathlib.Path(sys.argv[2]).write_text(source)
+PYOSDWINDOW
+    elif [[ "$plugin" == */araneadev.bar && "$name" == sudo-relay ]]; then
+      mkdir -p "$run_dir/cfg/plugins/araneadev.bar"
+      for source in "$plugin"/*; do
+        [[ "${source##*/}" == Bar.qml ]] && continue
+        ln -s "$source" "$run_dir/cfg/plugins/araneadev.bar/${source##*/}"
+      done
+      python - "$plugin/Bar.qml" "$run_dir/cfg/plugins/araneadev.bar/Bar.qml" <<'PYBARWINDOW'
+import pathlib, re, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+# Keep the real root owner, registry, module slots and methods. Only its
+# compositor-owned window delegates become inert types with no outputs.
+source = source.replace("model: Quickshell.screens", "model: []")
+tokens = re.compile(r'//[^\n]*|/\*[\s\S]*?\*/|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|`(?:\\.|[^`\\])*`|[{}]')
+for name in ("BarPanel", "DragGhostPanel", "BarMoveGhostPanel"):
+    start = source.index("  component " + name + ": PanelWindow {")
+    opening = source.index("{", start)
+    depth = 0
+    for token in tokens.finditer(source, opening):
+        if token[0] == "{":
+            depth += 1
+        elif token[0] == "}":
+            depth -= 1
+            if depth == 0:
+                end = token.end()
+                break
+    replacement = "  component " + name + ": Item { property var screen; property var ghostScreen }"
+    source = source[:start] + replacement + source[end:]
+pathlib.Path(sys.argv[2]).write_text(source)
+PYBARWINDOW
     else
       ln -s "$plugin" "$run_dir/cfg/plugins/${plugin##*/}"
     fi
@@ -94,6 +140,13 @@ PYBOUNDARY
   for display_command in display-fixture omarchy-display-text-size omarchy-toggle-nightlight brightnessctl omarchy-brightness-keyboard omarchy-monitor-state omarchy-battery-status omarchy-powerprofiles-list upower ls; do
     ln -s "$repo_root/tests/qml/fixtures/display-command.py" "$run_dir/display-bin/$display_command"
   done
+  # Replace the entire native sudo helper; never execute a grant or policy command.
+  mkdir -p "$run_dir/sudo-bin" "$run_dir/sudo-state"
+  if [[ "$name" == sudo-widget || "$name" == sudo-relay ]]; then
+    printf '0\n' >"$run_dir/sudo-state/active"
+    ln -s "$repo_root/tests/qml/fixtures/sudo-bin/omarchy-sudo-passwordless" "$run_dir/sudo-bin/omarchy-sudo-passwordless"
+    ln -s "$repo_root/tests/qml/fixtures/sudo-bin/omarchy-sudo-passwordless" "$run_dir/sudo-bin/omarchy-notification-send"
+  fi
   # No display, compositor, session bus or desktop platform theme (the gtk3
   # theme aborts without a display).
   # From the run directory, so a relative path in a test can never write
@@ -101,7 +154,7 @@ PYBOUNDARY
   # cleanup also stops the commands a test started.
   (cd "$run_dir" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
     -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE QT_QPA_PLATFORM=offscreen \
-    PATH="$run_dir/display-bin:$PATH" ARANEA_DISPLAY_FIXTURE_ROOT="$run_dir/display-state" \
+    PATH="$run_dir/sudo-bin:$run_dir/display-bin:$PATH" OMARCHY_PATH="${shell_dir%/shell}" ARANEA_SUDO_FIXTURE_ROOT="$run_dir/sudo-state" ARANEA_DISPLAY_FIXTURE_ROOT="$run_dir/display-state" \
     XDG_RUNTIME_DIR="$run_dir/run" XDG_CACHE_HOME="$run_dir/cache" \
     "$quickshell_bin" -p "$run_dir/cfg") >"$run_dir/log" 2>&1 &
   qs_pid=$!

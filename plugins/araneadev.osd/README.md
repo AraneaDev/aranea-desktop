@@ -6,7 +6,8 @@
 ## Responsibilities
 
 - Display brightness, volume, microphone, and other transient levels.
-- Render the Aranea filament gauge and semantic state colors.
+- Render the Aranea filament gauge for levels; show plain icon-and-text
+  messages for shutdown, reboot, logout, and other status feedback.
 - Normalize values and clamp unsafe input before presenting them.
 
 `Osd.qml` owns the panel and visual composition; `OsdStrand.qml` draws the
@@ -17,5 +18,5 @@ notification lifecycle.
 
 ## Validation
 
-Run `tests/qml-behaviour.test.sh osd-strand overlay-components` and the OSD JS
+Run `tests/qml-behaviour.test.sh osd-strand osd-messages overlay-components` and the OSD JS
 suite.
