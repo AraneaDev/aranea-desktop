@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Aranea theme: restore the Aranea boot splash after an Omarchy update.
+# An Omarchy upgrade replaces the Plymouth logo with the default one. Omarchy
+# runs post-update hooks while the update still holds sudo authorization, which
+# the splash needs. post-boot records the choice in the boot-splash state file.
+#
+# Install with:
+#   omarchy hook install post-update hooks/post-update
+
+state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+installed_theme="$HOME/.config/omarchy/themes/aranea"
+
+[[ -d "$installed_theme" ]] || exit 0
+[[ "$(cat "$state_home/aranea/boot-splash" 2>/dev/null)" == on ]] || exit 0
+[[ "$(omarchy plymouth current 2>/dev/null)" == default ]] || exit 0
+
+# A hook must never fail the update, so a failed restore only warns.
+if omarchy-plymouth-set-by-theme aranea >/dev/null; then
+  echo "Aranea: restored the Aranea boot splash."
+else
+  echo "Aranea: warning: could not restore the Aranea boot splash; run scripts/aranea-boot-splash on." >&2
+fi
+exit 0
