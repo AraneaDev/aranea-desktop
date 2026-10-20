@@ -64,7 +64,7 @@ Column {
       Text {
         objectName: "homeTime"
         anchors.right: parent.right
-        text: dropdown.view.homeTime || "—:—"
+        text: dropdown.view.homeTime || "-:-"
         color: Aranea.DesignTokens.accent
         font.family: Aranea.Typography.technicalFamily
         font.pixelSize: dropdown.fontSizes.display
@@ -72,7 +72,7 @@ Column {
       Text {
         objectName: "utcTime"
         anchors.right: parent.right
-        text: "UTC " + (dropdown.view.utcTime || "—:—")
+        text: "UTC " + (dropdown.view.utcTime || "-:-")
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.5)
         font.family: Aranea.Typography.technicalFamily
         font.pixelSize: dropdown.fontSizes.caption

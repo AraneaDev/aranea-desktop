@@ -139,7 +139,7 @@ Column {
         anchors.verticalCenter: parent.verticalCenter
         width: Style.space(50)
         horizontalAlignment: Text.AlignRight
-        text: match.modelData.time || "—:—"
+        text: match.modelData.time || "-:-"
         color: Aranea.DesignTokens.foreground
         font.family: Aranea.Typography.technicalFamily
         font.pixelSize: search.fontSizes.body

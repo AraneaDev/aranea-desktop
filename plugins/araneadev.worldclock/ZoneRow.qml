@@ -127,7 +127,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     width: Style.space(50)
     horizontalAlignment: Text.AlignRight
-    text: zone.row.time || "—:—"
+    text: zone.row.time || "-:-"
     color: zone.row.home ? Aranea.DesignTokens.accent : Aranea.DesignTokens.foreground
     font.family: Aranea.Typography.technicalFamily
     font.pixelSize: zone.fontSizes.body

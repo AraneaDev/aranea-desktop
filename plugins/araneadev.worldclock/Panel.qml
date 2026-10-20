@@ -121,7 +121,7 @@ Panel {
   // Formats wall-clock time from a zone observation; missing data stays unknown.
   function timeFor(zone) {
     let info = root.zoneData[zone]
-    return zone === "UTC" ? Logic.localTime(0, root.nowMs) : info ? Logic.localTime(info.offsetMinutes, root.nowMs) : "—:—"
+    return zone === "UTC" ? Logic.localTime(0, root.nowMs) : info ? Logic.localTime(info.offsetMinutes, root.nowMs) : "-:-"
   }
   // Formats a zone offset relative to the displayed home city.
   function offsetFor(zone) {
