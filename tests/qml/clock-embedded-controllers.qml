@@ -68,6 +68,82 @@ ShellRoot {
       requests++
     }
   }
+  // Inspect issued production requests at the inert external-process boundary.
+  function pendingWeatherUrls(weather) {
+    var urls = []
+    t.findChildren(weather, "").forEach(function (child) {
+      if ("running" in child && "command" in child && child.running) {
+        var command = child.command
+        if (command.length && command[0] === "curl")
+          urls.push(command[command.length - 1])
+      }
+    })
+    return urls
+  }
+  // A fresh primary must not strand canceled secondary requests on reopen.
+  function checkCanceledWeather(weather) {
+    weather.readyDefers = 6
+    weather.configuredLocationState = {
+      name: "",
+      latitude: null,
+      longitude: null
+    }
+    weather.autoCoords = {
+      lat: 1,
+      lon: 2
+    }
+    weather.report = {
+      current_condition: [
+        {
+          temp_C: "12"
+        }
+      ]
+    }
+    weather.publishShared(true)
+    weather.open()
+    weather.refreshDailyForecast({
+      lat: 1,
+      lon: 2
+    })
+    var primaryTime = weather.fetchedAtMs
+    var cycle = weather.refreshCycle
+    t.check(pendingWeatherUrls(weather).some(function (url) {
+      return url.indexOf("api.open-meteo.com/v1/forecast") >= 0
+    }), "fresh primary has an outstanding secondary forecast")
+    t.check(pendingWeatherUrls(weather).some(function (url) {
+      return url.indexOf("air-quality-api.open-meteo.com") >= 0
+    }), "fresh primary has an outstanding air request")
+    weather.close()
+    calls.reload()
+    t.step(150, function () {
+      calls.reload()
+      t.step(100, function () {
+        t.equal(pendingWeatherUrls(weather), [], "hidden weather cancels outstanding secondary commands")
+        var hiddenCalls = calls.text()
+        t.step(300, function () {
+          calls.reload()
+          t.step(100, function () {
+            t.equal(calls.text(), hiddenCalls, "canceled secondary work issues no commands while hidden")
+            weather.open()
+            var resumed = pendingWeatherUrls(weather)
+            t.check(resumed.some(function (url) {
+              return url.indexOf("api.open-meteo.com/v1/forecast") >= 0
+            }), "reopening resumes the canceled secondary forecast")
+            t.check(resumed.some(function (url) {
+              return url.indexOf("air-quality-api.open-meteo.com") >= 0
+            }), "reopening resumes the canceled air request")
+            t.check(!resumed.some(function (url) {
+              return url.indexOf("wttr.in") >= 0
+            }), "reopening retains the fresh primary without another primary request")
+            t.equal(weather.refreshCycle, cycle, "resuming canceled extras retains the existing refresh cycle")
+            t.equal(weather.fetchedAtMs, primaryTime, "resuming canceled extras preserves primary freshness")
+            weather.close()
+            t.done()
+          })
+        })
+      })
+    })
+  }
   Component.onCompleted: {
     weatherLoader.setSource("plugins/araneadev.weather/Panel.qml", {
       embedded: true,
@@ -184,7 +260,7 @@ ShellRoot {
                 t.check(host.opened && host.activePage === "weather" && weather.opened, "weather toggle selects its inactive section")
                 weather.close()
                 t.check(!host.opened && !weather.opened, "embedded close delegates to its owner")
-                t.done()
+                checkCanceledWeather(weather)
               })
             })
           })

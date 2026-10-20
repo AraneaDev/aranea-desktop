@@ -127,10 +127,43 @@ Panel {
     root.controller.show()
     locationFile.reload()
     root.autoRefresh()
+    root.resumeCanceledWeatherRequests()
   }
 
   // Cancel page work without closing Clock or allowing deferred focus to escape.
   function deactivateEmbedded() {
+    if (root.opened) {
+      let requests = []
+      if (forecastProc.running || forecastRetryTimer.running)
+        requests.push({
+          process: forecastProc,
+          dataKey: "report",
+          data: root.report
+        })
+      if (dailyForecastProc.running || dailyForecastRetryTimer.running)
+        requests.push({
+          process: dailyForecastProc,
+          dataKey: "dailyForecastReport",
+          data: root.dailyForecastReport
+        })
+      if (airProc.running)
+        requests.push({
+          process: airProc,
+          dataKey: "air",
+          data: root.air
+        })
+      if (locationProc.running)
+        requests.push({
+          process: locationProc,
+          dataKey: "wttrLocation",
+          data: root.wttrLocation
+        })
+      root.canceledWeatherRequests = {
+        query: root.locationQuery,
+        cycle: root.refreshCycle,
+        requests: requests
+      }
+    }
     root.controller.hide()
     root.cancelEditingLocation()
     root.editQuery = ""
@@ -149,6 +182,23 @@ Panel {
     root.awaitingPeer = false
     root.fetchClaimMs = 0
     root.disarmPointer()
+  }
+
+  // Resume only requests canceled by a page switch, retaining fresh primary data.
+  function resumeCanceledWeatherRequests() {
+    if (!root.sectionActive || !root.canceledWeatherRequests)
+      return
+    var canceled = root.canceledWeatherRequests
+    root.canceledWeatherRequests = null
+    // A new location or full refresh already supersedes the canceled work.
+    if (canceled.query !== root.locationQuery || canceled.cycle !== root.refreshCycle)
+      return
+    canceled.requests.forEach(function (request) {
+      // A peer may have supplied this response while the page was hidden.
+      // An interrupted air collector can clear its old value on cancellation.
+      if (root[request.dataKey] === request.data || (request.dataKey === "air" && root.air === null))
+        request.process.running = true
+    })
   }
 
   // Hides the popup and cancels any in-progress location edit.
@@ -357,6 +407,8 @@ Panel {
   // instances: {locationQuery, fetchedAtMs, publishedAtMs, report, daily, forecast, air,
   // autoCoords, wttrLocation, label}; null before any.
   property var sharedWeather: null
+  // Same-location requests interrupted when an embedded page becomes inactive.
+  property var canceledWeatherRequests: null
   // True while an automatic refresh waits for another instance's fetch.
   property bool awaitingPeer: false
   // When this instance last started a fetch (Date.now()), so another
