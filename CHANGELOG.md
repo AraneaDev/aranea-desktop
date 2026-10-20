@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.33.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.33.0...v2.33.1) (2026-10-20)
+
+
+### Fixes
+
+* restore live updates and workspace panel bindings ([#196](https://github.com/AraneaDev/aranea-desktop/issues/196)) ([735f0ce](https://github.com/AraneaDev/aranea-desktop/commit/735f0ceaf4722a78f9dc9159d5c058150d8cfbe6))
+
 ## [2.33.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.32.3...v2.33.0) (2026-10-20)
 
 
