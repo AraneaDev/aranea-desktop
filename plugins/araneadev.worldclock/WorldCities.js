@@ -145,7 +145,7 @@ function normalize(list, systemZone) {
       out.push(copyCity(list[i], true))
     }
   }
-  if (out.length === 0) return SEED
+  if (out.length === 0) return serialize(SEED)
   var home = -1
   for (var j = 0; j < out.length; j++) {
     if (out[j].home) {
@@ -334,6 +334,10 @@ function isElsewhenAutoSeed(list, homeZone, offsets) {
   if (!Array.isArray(list) || !homeZone || !offsets) return false
   var homeRow = null
   for (var i = 0; i < list.length; i++) if (list[i] && list[i].home) homeRow = list[i]
+  // Upstream never writes `home`; its home is the row for the system zone.
+  if (!homeRow)
+    for (var h = 0; h < list.length && !homeRow; h++)
+      if (list[h] && list[h].zone === homeZone) homeRow = list[h]
   if (!homeRow || homeRow.zone !== homeZone) return false
   var want = seedZones({ label: homeRow.name, id: homeZone }, offsets)
   if (want.length !== list.length) return false

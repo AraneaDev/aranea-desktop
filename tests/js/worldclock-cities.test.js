@@ -34,13 +34,22 @@ function offsetsAt(zones, utcMs) {
   return out
 }
 const OFFSETS = offsetsAt(cities.seedCandidateZones().concat([HOME]), Date.UTC(2026, 9, 20, 10, 13))
-const TIM = [
+const TIM_HOME = [
   { name: "Amsterdam", zone: "Europe/Amsterdam", lat: 52.37, lon: 4.89, home: true },
   { name: "Delhi", zone: "Asia/Kolkata", lat: 28.65, lon: 77.23 },
   { name: "Tokyo", zone: "Asia/Tokyo", lat: 35.69, lon: 139.69 },
   { name: "Los Angeles", zone: "America/Los_Angeles", lat: 34.05, lon: -118.24 },
   { name: "New York", zone: "America/New_York", lat: 40.71, lon: -74.01 }
 ]
+const TIM = TIM_HOME.map((c) => ({ name: c.name, zone: c.zone, lat: c.lat, lon: c.lon })) // upstream writes no `home`
+
+test("normalize: fallback is a copy, SEED stays intact", () => {
+  const n = cities.normalize(undefined, HOME)
+  n[0].name = "X"
+  n.pop()
+  assert.equal(SEED.length, 5)
+  assert.equal(SEED[0].name, "Amsterdam")
+})
 
 test("SEED: five cities, Amsterdam home, UTC without coordinates", () => {
   assert.deepEqual(
@@ -219,6 +228,7 @@ test("seedCandidateZones: the 34 upstream candidates", () => {
 
 test("isElsewhenAutoSeed: Tim's live list, edits, SEED, degenerate input", () => {
   assert.equal(cities.isElsewhenAutoSeed(TIM, HOME, OFFSETS), true)
+  assert.equal(cities.isElsewhenAutoSeed(TIM_HOME, HOME, OFFSETS), true)
   assert.equal(
     cities.isElsewhenAutoSeed(
       TIM.filter((c) => c.name !== "Delhi"),
