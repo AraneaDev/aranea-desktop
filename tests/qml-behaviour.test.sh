@@ -8,7 +8,6 @@
 #
 # Usage: tests/qml-behaviour.test.sh [name...]
 set -euo pipefail
-
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
 
