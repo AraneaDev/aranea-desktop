@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.35.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.35.0...v2.35.1) (2026-10-20)
+
+
+### Fixes
+
+* **clock:** restore embedded tabs and refresh capture assets ([#202](https://github.com/AraneaDev/aranea-desktop/issues/202)) ([633734f](https://github.com/AraneaDev/aranea-desktop/commit/633734f2b2ae68e5fefa57e04e7c15e544c2ee63))
+
 ## [2.35.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.34.0...v2.35.0) (2026-10-20)
 
 
