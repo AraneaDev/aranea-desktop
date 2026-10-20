@@ -1015,28 +1015,89 @@ Item {
     return chosen ? chosen.activeItem : null
   }
 
-  // Open the panel of a widget id (called by the shell's summon IPC); false if not found.
+  // Only these former standalone controls are hosted by the unified clock.
+  function clockSectionForPlugin(pluginId: string): string {
+    if (pluginId === "araneadev.weather" || pluginId === "omarchy.weather")
+      return "weather"
+    if (pluginId === "araneadev.worldclock" || pluginId === "omarchy.elsewhen")
+      return "worldclock"
+    return ""
+  }
+
+  // Native and cloned spellings name the same configured standalone page.
+  function findStandalonePanelWidget(pluginId: string): var {
+    var item = findPanelWidget(pluginId)
+    if (item)
+      return item
+    var section = clockSectionForPlugin(pluginId)
+    if (section === "weather")
+      return findPanelWidget(pluginId === "omarchy.weather" ? "araneadev.weather" : "omarchy.weather")
+    if (section === "worldclock")
+      return findPanelWidget(pluginId === "omarchy.elsewhen" ? "araneadev.worldclock" : "omarchy.elsewhen")
+    return null
+  }
+
+  // Matching open sections win for hide/toggle; other pages do not steal focus.
+  function findClockSectionWidget(section: string): var {
+    if (!section)
+      return null
+    var candidates = []
+    for (let i = 0; i < moduleSlots.length; i++) {
+      let slot = moduleSlots[i]
+      if (!slot || slot.moduleName !== "araneadev.clock" || !slot.activeItem)
+        continue
+      let item = slot.activeItem
+      if (typeof item.openSection !== "function" || typeof item.isSectionOpen !== "function" || typeof item.close !== "function")
+        continue
+      candidates.push({
+        slot: slot,
+        screenName: slotScreenName(slot),
+        opened: item.isSectionOpen(section)
+      })
+    }
+    var chosen = BarModel.pickPanelSlot(candidates, focusedScreenName())
+    return chosen ? chosen.activeItem : null
+  }
+
+  // Open an exact standalone widget first, otherwise its focused Clock section.
   function summonBarWidget(pluginId) {
-    var item = findPanelWidget(pluginId)
-    if (!item || typeof item.open !== "function")
+    var item = findStandalonePanelWidget(String(pluginId || ""))
+    if (item && typeof item.open === "function") {
+      item.open()
+      return true
+    }
+    var section = clockSectionForPlugin(String(pluginId || ""))
+    var clock = findClockSectionWidget(section)
+    if (!clock)
       return false
-    item.open()
+    clock.openSection(section)
     return true
   }
 
-  // Close the panel of a widget id; false if not found.
+  // Hide only the requested section, leaving a different Clock page untouched.
   function hideBarWidget(pluginId) {
-    var item = findPanelWidget(pluginId)
-    if (!item || typeof item.close !== "function")
+    var item = findStandalonePanelWidget(String(pluginId || ""))
+    if (item && typeof item.close === "function") {
+      item.close()
+      return true
+    }
+    var section = clockSectionForPlugin(String(pluginId || ""))
+    var clock = findClockSectionWidget(section)
+    if (!clock)
       return false
-    item.close()
+    if (clock.isSectionOpen(section))
+      clock.close()
     return true
   }
 
-  // Whether the panel of a widget id is open (used by the shell's toggle IPC).
+  // A different open Clock page counts as closed for the requested alias.
   function isBarWidgetOpen(pluginId: string): bool {
-    var item = findPanelWidget(pluginId)
-    return !!item && item.opened === true
+    var item = findStandalonePanelWidget(String(pluginId || ""))
+    if (item)
+      return item.opened === true
+    var section = clockSectionForPlugin(pluginId)
+    var clock = findClockSectionWidget(section)
+    return !!clock && clock.isSectionOpen(section)
   }
 
   // Wrapper around BarModel.entrySettings.

@@ -60,6 +60,7 @@ note_polkit_handover() {
 
 jq -L "$(dirname "${BASH_SOURCE[0]}")/lib" '
   include "sudo-shell-config";
+  include "clock-shell-config";
   def entry_id: if type == "string" then . else .id? end;
   # Aranea clones that step aside, and the stock plugins that take over again.
   def ours: ["araneadev.activity", "araneadev.projects", "araneadev.settings", "araneadev.notifications", "araneadev.health", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit", "araneadev.lock", "araneadev.osd", "araneadev.menu", "araneadev.workspaces", "araneadev.updates", "araneadev.audio", "araneadev.bluetooth", "araneadev.clock", "araneadev.worldclock", "araneadev.monitor", "araneadev.network", "araneadev.vpn", "araneadev.power", "araneadev.weather", "araneadev.tray", "araneadev.agents", "araneadev.sudo"];
@@ -70,7 +71,8 @@ jq -L "$(dirname "${BASH_SOURCE[0]}")/lib" '
     else . end;
   # The bar goes back to Omarchy: no bar id means its own bar. The Aranea
   # menu entry becomes the stock menu entry, keeping its place and settings.
-  release_sudo
+  release_clock
+  | release_sudo
   | (if (.bar | type) == "object" and .bar.id == "araneadev.bar" then .bar |= del(.id) else . end)
   | (if (.bar.layout | type) == "object" then
        .bar.layout |= with_entries(.value |= (if type == "array" then map(

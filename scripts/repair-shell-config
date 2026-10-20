@@ -120,6 +120,7 @@ note_polkit_handover() {
 
 jq -L "$(dirname "${BASH_SOURCE[0]}")/lib" --argjson sudo "$sudo_installed" --argjson placeSudo "$place_sudo" --argjson activity "$activity_installed" --argjson projects "$projects_installed" --argjson settings "$settings_installed" --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson clock "$clock_installed" --argjson worldclock "$worldclock_installed" --argjson monitor "$monitor_installed" --argjson network "$network_installed" --argjson power "$power_installed" --argjson weather "$weather_installed" --argjson tray "$tray_installed" --argjson agents "$agents_installed" --argjson vpn "$vpn_installed" --argjson placeVpn "$place_vpn" '
   include "sudo-shell-config";
+  include "clock-shell-config";
   def entry_id: if type == "string" then . else .id? end;
   # Drops later duplicates by id (string or {id} entries), keeping order.
   def dedupe_by_id: reduce .[] as $e ([]; ($e | entry_id) as $id | if ([.[] | entry_id] | index($id)) != null then . else . + [$e] end);
@@ -293,6 +294,7 @@ jq -L "$(dirname "${BASH_SOURCE[0]}")/lib" --argjson sudo "$sudo_installed" --ar
              else . end)
          else . end))
      else . end)
+  | (if $clock then repair_clock($worldclock;$weather) else . end)
   | repair_sudo($sudo;$placeSudo)
 ' "$config_file" >"$tmp_file"
 
