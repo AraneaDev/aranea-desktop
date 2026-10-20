@@ -15,3 +15,6 @@ plugins/araneadev.projects/AgentSuggestion.js
 plugins/araneadev.projects/ProjectOverview.js
 plugins/araneadev.projects/ProjectRoleEvidence.js
 plugins/araneadev.projects/ProjectSwitcher.js
+# Verbatim MIT data copies from Omarchy Elsewhen (upstream drift is byte-based).
+plugins/araneadev.worldclock/cities.json
+plugins/araneadev.worldclock/world.json

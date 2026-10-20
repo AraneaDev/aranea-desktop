@@ -37,7 +37,10 @@ chmod +x "$fake"/*
 export PATH="$fake:$PATH"
 
 # Sets the splash the fake Omarchy reports and clears the call log.
-splash_is() { printf '%s\n' "$1" >"$current_file"; : >"$calls"; }
+splash_is() {
+  printf '%s\n' "$1" >"$current_file"
+  : >"$calls"
+}
 # Fails unless the state file holds $1 (or is absent for "none").
 state_is() {
   if [[ $1 == none ]]; then [[ ! -e "$state" ]]; else [[ "$(<"$state")" == "$1" ]]; fi
@@ -73,13 +76,28 @@ grep -Fxq 'set-by-theme aranea' "$calls"
 grep -Fq 'Aranea boot splash' <<<"$out"
 for case_name in off-default on-aranea on-other none-default; do
   case "$case_name" in
-    off-default) printf off >"$state"; splash_is default ;;
-    on-aranea) printf on >"$state"; splash_is aranea ;;
-    on-other) printf on >"$state"; splash_is tokyo-night ;;
-    none-default) rm -f "$state"; splash_is default ;;
+    off-default)
+      printf off >"$state"
+      splash_is default
+      ;;
+    on-aranea)
+      printf on >"$state"
+      splash_is aranea
+      ;;
+    on-other)
+      printf on >"$state"
+      splash_is tokyo-night
+      ;;
+    none-default)
+      rm -f "$state"
+      splash_is default
+      ;;
   esac
   "$repo_root/hooks/post-update" >/dev/null
-  ! grep -q '^set-by-theme' "$calls" || { echo "post-update acted for $case_name" >&2; exit 1; }
+  ! grep -q '^set-by-theme' "$calls" || {
+    echo "post-update acted for $case_name" >&2
+    exit 1
+  }
 done
 
 # Aranea not installed: nothing to restore from.
@@ -87,7 +105,10 @@ printf on >"$state"
 splash_is default
 rmdir "$HOME/.config/omarchy/themes/aranea"
 "$repo_root/hooks/post-update" >/dev/null
-if grep -q '^set-by-theme' "$calls"; then echo 'unexpected restore' >&2; exit 1; fi
+if grep -q '^set-by-theme' "$calls"; then
+  echo 'unexpected restore' >&2
+  exit 1
+fi
 mkdir "$HOME/.config/omarchy/themes/aranea"
 
 # A failing restore warns but never fails the update.
@@ -114,9 +135,15 @@ grep -Fq 'off' <<<"$out"
 grep -Fq 'default' <<<"$out"
 # A failed switch leaves the record alone and reports failure.
 touch "$ARANEA_TEST_SANDBOX/set-fails"
-if "$repo_root/scripts/aranea-boot-splash" on >/dev/null 2>&1; then echo "on ignored a failure" >&2; exit 1; fi
+if "$repo_root/scripts/aranea-boot-splash" on >/dev/null 2>&1; then
+  echo "on ignored a failure" >&2
+  exit 1
+fi
 state_is off
-if "$repo_root/scripts/aranea-boot-splash" bogus >/dev/null 2>&1; then echo "bogus accepted" >&2; exit 1; fi
+if "$repo_root/scripts/aranea-boot-splash" bogus >/dev/null 2>&1; then
+  echo "bogus accepted" >&2
+  exit 1
+fi
 
 # The installer and uninstaller handle the hook.
 # shellcheck disable=SC2016

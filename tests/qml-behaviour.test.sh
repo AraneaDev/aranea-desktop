@@ -2,6 +2,7 @@
 # Runs the offscreen QML behaviour tests (tests/qml/*.qml) under quickshell
 # with QT_QPA_PLATFORM=offscreen; passes when a test prints "QMLTEST DONE 0",
 # no "QMLTEST FAIL", no runtime error or binding loop, and loads cleanly.
+# "QMLTEST SKIP" lines (checks this environment cannot run) are listed.
 # Skips (exit 0; 1 with ARANEA_CHECK_REQUIRE_ALL=1) without quickshell or the
 # Omarchy shell.
 #
@@ -63,7 +64,7 @@ run_test() {
   ln -s "$repo_root/tests/qml/fixtures" "$run_dir/cfg/fixtures"
   for plugin in "$repo_root"/plugins/araneadev.*; do
     [[ -d "$plugin" ]] || continue
-    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == health-alerts || "$name" == clock-civil-dates) ]]; then
+    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == health-alerts || "$name" == clock-civil-dates || "$name" == worldclock-panel) ]]; then
       # Adapt only native windows/attached layer-shell state. Placement, mask,
       # motion, coordinator, focus timer and production panel content stay real.
       mkdir -p "$run_dir/cfg/plugins/araneadev.shared"
@@ -140,7 +141,13 @@ PYBOUNDARY
     echo "qmltest: $name FAILED"
     return 1
   fi
-  echo "qmltest: $name ok ($(grep -c 'QMLTEST PASS' <<<"$log") checks)"
+  # A skipped check (QmlTest.skip: this environment cannot run it) is named,
+  # so the gap is visible in the stage output.
+  local skipped suffix=""
+  skipped="$(grep -c 'QMLTEST SKIP' <<<"$log" || true)"
+  ((skipped)) && suffix=", $skipped skipped"
+  echo "qmltest: $name ok ($(grep -c 'QMLTEST PASS' <<<"$log") checks$suffix)"
+  grep -E 'QMLTEST SKIP' <<<"$log" | sed 's/^.*QMLTEST SKIP/  QMLTEST SKIP/' || true
 }
 
 tests=()

@@ -36,7 +36,7 @@ export PATH="$work_dir/bin:$PATH"
 cat >"$config_dir/shell.json" <<'EOF'
 {"plugins": [{"id": "araneadev.lock"}], "disabledPlugins": []}
 EOF
-for plugin_id in araneadev.lock araneadev.menu araneadev.bar araneadev.notifications araneadev.health araneadev.clipboard araneadev.emojis araneadev.polkit araneadev.osd araneadev.workspaces araneadev.updates araneadev.audio araneadev.bluetooth araneadev.monitor araneadev.network araneadev.vpn araneadev.power araneadev.clock araneadev.weather araneadev.tray araneadev.agents; do
+for plugin_id in araneadev.lock araneadev.menu araneadev.bar araneadev.notifications araneadev.health araneadev.clipboard araneadev.emojis araneadev.polkit araneadev.osd araneadev.workspaces araneadev.updates araneadev.audio araneadev.bluetooth araneadev.monitor araneadev.network araneadev.vpn araneadev.power araneadev.clock araneadev.worldclock araneadev.weather araneadev.tray araneadev.agents; do
   cp -a "$repo_root/plugins/$plugin_id" "$plugins_dir/$plugin_id"
 done
 

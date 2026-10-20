@@ -1000,3 +1000,33 @@ jq -e '([.plugins[] | if type=="string" then . else .id end | select(.=="aranead
 jq -e '.plugins==["user.widget"] and .providers.codex.enabled==false' "$activity_config" >/dev/null
 "$repo_root/scripts/repair-shell-config" "$activity_config" >/dev/null
 jq -e 'any(.plugins[]; .id?=="araneadev.activity")' "$activity_config" >/dev/null
+
+# World clock takeover requires a deployed plugin and preserves the city data
+# through both ids, including unfamiliar cities without coordinates.
+worldclock_config="$test_root/worldclock-config/shell.json"
+mkdir -p "$(dirname "$worldclock_config")"
+cat >"$worldclock_config" <<'JSON'
+{"bar":{"layout":{"left":["omarchy.elsewhen"],"right":[{"id":"omarchy.elsewhen","cities":[{"name":"Amsterdam","zone":"Europe/Amsterdam"},{"name":"My city","zone":"Etc/GMT+3"}],"hour24":false}]}}}
+JSON
+"$repo_root/scripts/repair-shell-config" "$worldclock_config"
+jq -e '.bar.layout.left == ["omarchy.elsewhen"] and .bar.layout.right[0].id == "omarchy.elsewhen"
+  and ((.cloneSourceRestores // []) | index("araneadev.worldclock")) == null' "$worldclock_config" >/dev/null
+jq -c '.bar.layout.right[0].cities' "$worldclock_config" >"$test_root/worldclock-cities-before.json"
+mkdir -p "$(dirname "$worldclock_config")/plugins/araneadev.worldclock"
+: >"$(dirname "$worldclock_config")/plugins/araneadev.worldclock/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$worldclock_config"
+jq -e '.bar.layout.left == ["araneadev.worldclock"] and .bar.layout.right[0].id == "araneadev.worldclock"
+  and (.cloneSourceRestores | index("araneadev.worldclock")) != null' "$worldclock_config" >/dev/null || {
+  echo 'World clock takeover did not retarget the deployed widget' >&2
+  exit 1
+}
+jq -c '.bar.layout.right[0].cities' "$worldclock_config" >"$test_root/worldclock-cities-after.json"
+cmp "$test_root/worldclock-cities-before.json" "$test_root/worldclock-cities-after.json"
+cp "$worldclock_config" "$test_root/worldclock-repaired.json"
+"$repo_root/scripts/repair-shell-config" "$worldclock_config"
+cmp "$worldclock_config" "$test_root/worldclock-repaired.json"
+"$repo_root/scripts/release-shell-config" "$worldclock_config"
+jq -e '.bar.layout.left == ["omarchy.elsewhen"] and .bar.layout.right[0].id == "omarchy.elsewhen"
+  and ((.cloneSourceRestores // []) | index("araneadev.worldclock")) == null' "$worldclock_config" >/dev/null
+jq -c '.bar.layout.right[0].cities' "$worldclock_config" >"$test_root/worldclock-cities-after.json"
+cmp "$test_root/worldclock-cities-before.json" "$test_root/worldclock-cities-after.json"
