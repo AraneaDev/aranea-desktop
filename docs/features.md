@@ -62,9 +62,18 @@ The microphone badge appears only during active capture and reflects the
 source's mute state. Notifications and Agents remain separate bar controls;
 the tray opens through its disclosure.
 
+## Clock
+
+Click the time to open one dropdown anchored below that clock. **Calendar** is the
+default page; choose **World Clock** or **Weather** from the tabs. The separate globe
+and weather buttons are consolidated into this control. Existing calendar settings,
+city lists, home city, weather location, units and refresh preferences are retained.
+Changing pages cancels unfinished edits. Weather's unit and refresh controls remain
+available in its page; the other pages keep their existing controls and keys.
+
 ## World clock
 
-Click the globe button, or press **Super+Ctrl+Alt+E**, to open World clock.
+Select **World Clock** in the time dropdown, or press **Super+Ctrl+Alt+E** to open it directly.
 The Earth shows real land, daylight, the day/night boundary, and the point where
 the sun is overhead. Hover or select a city to centre the globe there; drag to
 turn it, then let it return home. Each row shows the local time, current time-zone

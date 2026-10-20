@@ -4,14 +4,14 @@
   "name": "Aranea Clock",
   "version": "1.0.0",
   "author": "AraneaDev",
-  "description": "Date/time label with a calendar popup",
+  "description": "Calendar, world clock and weather in one time dropdown",
   "kinds": ["bar-widget"],
   "entryPoints": {
     "barWidget": "BarWidget.qml"
   },
   "barWidget": {
     "displayName": "Aranea Clock",
-    "description": "Date/time label with a calendar popup",
+    "description": "Calendar, world clock and weather in one time dropdown",
     "category": "Time",
     "allowMultiple": false
   },

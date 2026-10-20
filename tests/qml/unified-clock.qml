@@ -207,6 +207,42 @@ ShellRoot {
         p.selectPage("weather")
         t.check(bar.centerHoverRevealSuppressed, "World to Weather retains shared owner hover suppression")
         t.check(!clock.worldClockPanel.adding && clock.weatherPanel.opened, "page changes cancel city edits and activate Weather")
+        var preferences = t.findChild(frame, "clockWeatherPreferences")
+        t.check(preferences !== null, "Weather page retains its unit and refresh controls")
+        if (!preferences) {
+          t.done()
+          return
+        }
+        t.findChild(preferences, "metricUnits").activate()
+        t.equal(fixture.written.weather, {
+          unit: "metric",
+          refreshMinutes: 20
+        }, "real Weather unit control patches only nested preferences")
+        var refreshInput = t.findChild(preferences, "refreshMinutes")
+        refreshInput.text = "25"
+        preferences.commitRefresh()
+        t.equal(fixture.written.weather, {
+          unit: "metric",
+          refreshMinutes: 25
+        }, "real refresh control preserves the current unit")
+        t.equal(fixture.written.birthYear, 1980, "Weather controls preserve Calendar settings")
+        t.equal(fixture.written.worldClock.cities, [
+          {
+            name: "London",
+            zone: "Europe/London",
+            home: true
+          }
+        ], "Weather controls preserve edited cities")
+        refreshInput.forceActiveFocus()
+        refreshInput.text = "42"
+        p.selectPage("calendar")
+        t.check(!refreshInput.focus, "leaving Weather releases its numeric editor focus")
+        t.equal(refreshInput.text, "25", "leaving Weather cancels unsubmitted refresh input")
+        p.selectPage("weather")
+        t.equal(fixture.written.weather, {
+          unit: "metric",
+          refreshMinutes: 25
+        }, "cancelled refresh never changes saved preferences")
         clock.weatherPanel.startEditingLocation()
         p.selectPage("calendar")
         t.check(!clock.weatherPanel.editingLocation && p.activePageController === p, "Calendar selection cancels Weather edits")

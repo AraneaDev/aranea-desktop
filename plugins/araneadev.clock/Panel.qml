@@ -717,9 +717,9 @@ Panel {
     bar: root.bar
     open: root.opened
     centerOnBar: false
-    blocked: root.activePage === "calendar" ? root.editingLife : root.activePage === "worldclock" ? !!(root.worldClockPanel && root.worldClockPanel.adding) : !!(root.weatherPanel && root.weatherPanel.editingLocation && !root.weatherPanel.savingLocation)
+    blocked: root.activePage === "calendar" ? root.editingLife : root.activePage === "worldclock" ? !!(root.worldClockPanel && root.worldClockPanel.adding) : !!(root.weatherPanel && root.weatherPanel.editingLocation && !root.weatherPanel.savingLocation) || weatherPreferences.editing
     contentWidth: panel.fittedContentWidth(Style.space(440))
-    contentHeight: panel.fittedContentHeight(tabs.implicitHeight + Style.space(12) + (root.activePage === "worldclock" ? (root.worldDropdown ? root.worldDropdown.implicitHeight : 0) : root.activePage === "weather" ? (root.weatherDropdown ? root.weatherDropdown.implicitHeight : 0) : dropdown.implicitHeight))
+    contentHeight: panel.fittedContentHeight(tabs.implicitHeight + Style.space(12) + (root.activePage === "worldclock" ? (root.worldDropdown ? root.worldDropdown.implicitHeight : 0) : root.activePage === "weather" ? weatherPage.implicitHeight : dropdown.implicitHeight))
     onCloseRequested: root.close()
     onTabRequested: function (direction) {
       root.disarmPointer()
@@ -758,7 +758,7 @@ Panel {
         anchors.bottom: parent.bottom
         width: parent.width
         contentWidth: width
-        contentHeight: root.activePage === "worldclock" ? (root.worldDropdown ? root.worldDropdown.implicitHeight : 0) : root.activePage === "weather" ? (root.weatherDropdown ? root.weatherDropdown.implicitHeight : 0) : dropdown.implicitHeight
+        contentHeight: root.activePage === "worldclock" ? (root.worldDropdown ? root.worldDropdown.implicitHeight : 0) : root.activePage === "weather" ? weatherPage.implicitHeight : dropdown.implicitHeight
         boundsBehavior: Flickable.StopAtBounds
         clip: true
         // Keep long lists and the inline city editor within the fitted viewport.
@@ -807,24 +807,42 @@ Panel {
               root.worldClockPanel.handleAction(name, arg)
           }
         }
-        Loader {
-          id: weatherViewLoader
+        Column {
+          id: weatherPage
           width: viewport.width
           visible: root.isSectionOpen("weather")
-          Component.onCompleted: setSource(Qt.resolvedUrl("../araneadev.weather/WeatherDropdown.qml"), {
-            width: Qt.binding(function () {
-              return weatherViewLoader.width
-            }),
-            view: Qt.binding(function () {
-              return root.weatherPanel ? root.weatherPanel.weatherView : {}
-            }),
-            hourlyPoints: Qt.binding(function () {
-              return root.weatherPanel ? root.weatherPanel.hourlyPoints : null
-            }),
-            editText: Qt.binding(function () {
-              return root.weatherPanel ? root.weatherPanel.editText : ""
+          spacing: Style.space(12)
+          Loader {
+            id: weatherViewLoader
+            width: viewport.width
+            visible: root.isSectionOpen("weather")
+            Component.onCompleted: setSource(Qt.resolvedUrl("../araneadev.weather/WeatherDropdown.qml"), {
+              width: Qt.binding(function () {
+                return weatherViewLoader.width
+              }),
+              view: Qt.binding(function () {
+                return root.weatherPanel ? root.weatherPanel.weatherView : {}
+              }),
+              hourlyPoints: Qt.binding(function () {
+                return root.weatherPanel ? root.weatherPanel.hourlyPoints : null
+              }),
+              editText: Qt.binding(function () {
+                return root.weatherPanel ? root.weatherPanel.editText : ""
+              })
             })
-          })
+          }
+          ClockWeatherPreferences {
+            id: weatherPreferences
+            objectName: "clockWeatherPreferences"
+            width: parent.width
+            visible: root.isSectionOpen("weather")
+            unit: root.weatherPanel ? String(root.weatherPanel.setting("unit", "")) : ""
+            refreshMinutes: root.weatherPanel ? root.weatherPanel.refreshMinutes : 15
+            focusTarget: panel.focusTarget
+            onSettingsRequested: function (values) {
+              root.persistSection("weather", values)
+            }
+          }
         }
         Connections {
           target: root.weatherDropdown
