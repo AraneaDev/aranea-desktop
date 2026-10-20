@@ -84,11 +84,20 @@ jobs:
       - name: Install packages
         run: |
           for attempt in 1 2 3; do
-            pacman -Syyuu --noconfirm --needed --disable-download-timeout git curl jq ripgrep python nodejs npm quickshell qt6-declarative imagemagick librsvg libxml2 lua sway dbus libcap diffutils inotify-tools && exit 0
+            pacman -Syyuu --noconfirm --needed --disable-download-timeout git curl jq ripgrep python nodejs npm quickshell cpptrace qt6-declarative imagemagick librsvg libxml2 lua sway dbus libcap diffutils inotify-tools && exit 0
             echo "Package install attempt $attempt failed; retrying" >&2
             sleep $((attempt * 20))
           done
           exit 1
+
+      # This reviewed Omarchy build resolves core types across submodules on
+      # Qt 6.12. Arch's older build has opaque stubs that shadow those types.
+      - name: Install the reviewed Omarchy Quickshell build
+        run: |
+          package=quickshell-0.3.2.r7.g2b4501a-1-x86_64.pkg.tar.zst
+          curl --fail --location --retry 3 "https://pkgs.omarchy.org/rc/x86_64/$package" -o "/tmp/$package"
+          printf '%s  %s\n' f9f813213597d1ee25e16860ed326e810857810460c09ee87d06bc3b655c2da1 "/tmp/$package" | sha256sum --check
+          pacman -U --noconfirm "/tmp/$package"
 
       # Arch's sway carries cap_sys_nice as a file capability, and a container
       # that may not grant it cannot exec sway at all ("Operation not
