@@ -44,6 +44,8 @@ Column {
 
   // Seeds both fields and focuses the born one with its text selected.
   function startEditing() {
+    if (!life.editing || !life.visible)
+      return
     bornField.text = life.bornText
     liveToField.text = life.liveToText
     bornField.selectAll()

@@ -431,7 +431,8 @@ Panel {
     zoneProbe.running = false
     root.showcaseState = null
     root.cancelAdd()
-    root.setCenterHoverRevealSuppressed(false)
+    if (!root.embedded)
+      root.setCenterHoverRevealSuppressed(false)
   }
   FileView {
     id: catalogFile
