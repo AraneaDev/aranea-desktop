@@ -26,7 +26,7 @@ expected_surfaces=(
 expected_hero_frames=(
   desktop menu menu-submenu settings settings-scaling settings-schedule menu-search menu-input apps favorites recent
   notifications notifications-empty health updates workspaces clipboard emojis
-  image-picker network vpn audio bluetooth agents projects project-overview project-actions project-switcher project-review power monitor tray tray-manage clock weather lock osd
+  image-picker network vpn audio bluetooth agents projects project-overview project-actions project-switcher project-review power monitor tray tray-manage clock worldclock weather lock osd
 )
 [[ "${surfaces[*]}" == "${expected_surfaces[*]}" ]]
 
@@ -112,10 +112,8 @@ line_of() { grep -nF -- "$1" "$capture_script" | head -n 1 | cut -d: -f1; }
 (($(line_of "trap 'finish_picker || exit 1' EXIT") < $(line_of "mv \"\$picker_file\" \"\$picker_backup/saved\"")))
 # shellcheck disable=SC2016 # a literal, not an expansion
 grep -Fq 'inbox_backup="$(mktemp -d "$(aranea_state_root)/capture-backup.XXXXXX")"' "$capture_script"
-if grep -Fq "capture_status" "$capture_script"; then
-  echo "capture_status is gone: capture fails only when no frame was written" >&2
-  exit 1
-fi
+# Menu frame publication and command failures are exercised behaviorally in
+# menu-capture-cleanup and capture-batch, rather than banning a variable name.
 # ...and the cleanup only undoes what was done: it never deletes an unmoved
 # history file or clears an untouched clipboard.
 (($(line_of 'picker_swapped=1') > $(line_of "mv \"\$picker_file\" \"\$picker_backup/saved\"")))

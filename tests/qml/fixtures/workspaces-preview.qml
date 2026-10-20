@@ -19,7 +19,7 @@ ShellRoot {
       Image {
         id: wallpaper
         anchors.fill: parent
-        source: Quickshell.env('ARANEA_SETTINGS_RENDER_ROOT') + '/backgrounds/variants/lunar-weaver.png'
+        source: Qt.resolvedUrl('background.png')
         fillMode: Image.PreserveAspectCrop
       }
       Rectangle {
@@ -70,6 +70,12 @@ ShellRoot {
     running: true
     repeat: true
     onTriggered: {
+      if (wallpaper.status === Image.Error) {
+        stop()
+        console.log('SETTINGSRENDER FAIL background did not load')
+        Qt.quit()
+        return
+      }
       if (wallpaper.status !== Image.Ready)
         return
       surface.grabToImage(function (result) {

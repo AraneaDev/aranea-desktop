@@ -64,6 +64,7 @@ set -euo pipefail
 # composes the disk-unlock prompt from the boot theme's own assets and
 # omarchy.script geometry (tools/render-plymouth-preview; no plymouthd, sudo
 # or reboot). A render that fails exits non-zero with no screenshot written.
+#   ARANEA_CAPTURE_BACKGROUND    Workspaces artwork (defaults to current background, then Signal Shrine)
 #   ARANEA_CAPTURE_WIFI_NAMES    JSON array of Wi-Fi names (default below)
 #   ARANEA_CAPTURE_BT_NAMES      JSON array of Bluetooth names (default below)
 #   ARANEA_NETWORK_GRAPH_DELAY   seconds the Network graph records (default 20)
@@ -260,7 +261,7 @@ build_hero_showcase() {
   # application launchers, notifications and panels, then system controls and
   # the workspace/update finish. Terminal-heavy captures stay in the gallery
   # but are omitted from the short showcase loop.
-  local frames=(desktop menu menu-submenu settings settings-scaling settings-schedule menu-search menu-input apps favorites recent notifications notifications-empty health updates workspaces clipboard emojis image-picker network vpn audio bluetooth agents projects project-overview project-actions project-switcher project-review power monitor tray tray-manage clock weather lock osd)
+  local frames=(desktop menu menu-submenu settings settings-scaling settings-schedule menu-search menu-input apps favorites recent notifications notifications-empty health updates workspaces clipboard emojis image-picker network vpn audio bluetooth agents projects project-overview project-actions project-switcher project-review power monitor tray tray-manage clock worldclock weather lock osd)
   local frame
   local frame_paths=()
   for frame in "${frames[@]}"; do
@@ -377,23 +378,24 @@ if ((capture_all)); then
     exit 3
   fi
   sleep 3
-  # Captures one surface in a child run; fails when it wrote no new PNG. The
+  # Captures one surface in a child run; fails on a child error or no new PNG. The
   # previous PNG is set aside first (so it never counts as a new capture) and
   # put back when the capture fails, so the README keeps its old screenshot.
   capture_one() {
-    local all_surface="$1"
+    local all_surface="$1" capture_status=0
     local png="$output/$all_surface.png" previous="$output/.$all_surface.png.previous"
     rm -f -- "$previous"
     if [[ -f "$png" ]]; then mv -- "$png" "$previous"; fi
     if [[ -n "${ARANEA_CAPTURE_SURFACE_COMMAND:-}" ]]; then
-      "$ARANEA_CAPTURE_SURFACE_COMMAND" "$all_surface" "$output" || true
+      "$ARANEA_CAPTURE_SURFACE_COMMAND" "$all_surface" "$output" || capture_status=$?
     else
-      "$0" --surface "$all_surface" --output "$output" || true
+      "$0" --surface "$all_surface" --output "$output" || capture_status=$?
     fi
-    if [[ -f "$png" ]]; then
+    if [[ "$capture_status" -eq 0 && -f "$png" ]]; then
       rm -f -- "$previous"
       return 0
     fi
+    rm -f -- "$png"
     if [[ -f "$previous" ]]; then mv -- "$previous" "$png"; fi
     return 1
   }
@@ -438,9 +440,23 @@ esac
 focus_capture_workspace
 mkdir -p "$output"
 
-# Project and workspace captures are isolated before any desktop reads or dispatch.
+# Workspace captures receive the selected artwork explicitly; the inert renderer
+# never reads the live desktop. Other project previews remain fully isolated.
 case "$surface" in
-  projects-empty | projects-discovery | projects-grouped | projects-partial | project-details | project-launch-partial | workspaces)
+  workspaces)
+    workspace_args=()
+    if [[ -v ARANEA_CAPTURE_BACKGROUND ]]; then
+      workspace_args=(--background "$ARANEA_CAPTURE_BACKGROUND")
+    else
+      workspace_background="$(readlink -f "$HOME/.local/state/omarchy/current/background" 2>/dev/null || true)"
+      if [[ -f "$workspace_background" && -r "$workspace_background" ]]; then
+        workspace_args=(--background "$workspace_background")
+      fi
+    fi
+    "$repo_root/tools/render-settings-preview" --output "$output/$surface.png" --fixture "$surface" "${workspace_args[@]}"
+    exit 0
+    ;;
+  projects-empty | projects-discovery | projects-grouped | projects-partial | project-details | project-launch-partial)
     "$repo_root/tools/render-settings-preview" --output "$output/$surface.png" --fixture "$surface"
     exit 0
     ;;
@@ -602,8 +618,32 @@ capture_projects_surface() {
   capture_inert_surface aranea.projects.capture Projects "$payload"
 }
 
+# Read the native app grid's exact layer identity; unknown compositor state fails closed.
+capture_app_grid_count() {
+  local layers
+  layers="$(hyprctl layers -j 2>/dev/null)" || return 3
+  jq -er -s 'if length == 1 and (.[0] | type == "object")
+    then [.[0] | .. | objects | select(.namespace? == "omarchy-dock-apps")] | length
+    else error("invalid layer state") end' <<<"$layers" 2>/dev/null
+}
+
+# Dock exposes a toggle only: call it only for an observed open grid, then verify dismissal.
+close_capture_app_grid() {
+  local count attempt
+  count="$(capture_app_grid_count)" || return 3
+  if ((count == 0)); then return 0; fi
+  omarchy-shell omarchy.dock apps >/dev/null 2>&1 || return 3
+  for attempt in {1..20}; do
+    count="$(capture_app_grid_count)" || return 3
+    if ((count == 0)); then return 0; fi
+    sleep 0.1
+  done
+  echo 'Native app grid did not close; refusing capture' >&2
+  return 3
+}
+
 # Opens the Aranea menu page for $surface and grabs the screen with grim.
-capture_menu_surface() {
+capture_menu_surface() (
   command -v omarchy-shell >/dev/null 2>&1 || {
     echo "omarchy-shell is required to capture $surface" >&2
     exit 3
@@ -625,19 +665,26 @@ capture_menu_surface() {
     *) return 1 ;;
   esac
 
+  local staged
+  staged="$(mktemp "$output/.$surface-capture.XXXXXX.png")"
+  trap 'omarchy-shell shell hide araneadev.menu >/dev/null 2>&1 || true; close_capture_app_grid || true; rm -f -- "$staged"' EXIT
   omarchy-shell shell hide araneadev.menu >/dev/null 2>&1 || true
+  close_capture_app_grid || return 3
   omarchy-shell shell toggle araneadev.menu "$payload"
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   hyprctl dismissnotify >/dev/null 2>&1 || true
   # A grim error after the frame was written is not fatal; no frame is.
-  capture_frame "$output/$surface.png" || true
+  capture_frame "$staged" || true
   omarchy-shell shell hide araneadev.menu >/dev/null 2>&1 || true
-  if [[ ! -f "$output/$surface.png" ]]; then
+  close_capture_app_grid || return 3
+  if [[ ! -s "$staged" ]]; then
     echo "capture failed: $output/$surface.png was not written" >&2
     return 3
   fi
+  mv -f -- "$staged" "$output/$surface.png"
+  trap - EXIT
   printf 'captured: %s\n' "$output/$surface.png"
-}
+)
 
 # Prints the address of every window on the capture workspace (2), one per
 # line.
@@ -1094,6 +1141,8 @@ capture_osd_surface() {
   # avoids terminal/chat text leaking into the reference frame.
   hyprctl dispatch 'hl.dsp.focus({ workspace = "2" })' >/dev/null 2>&1 || true
   hyprctl dismissnotify >/dev/null 2>&1 || true
+  omarchy-shell shell hide araneadev.menu >/dev/null 2>&1 || true
+  close_capture_app_grid || return 3
   omarchy-shell shell hide araneadev.osd >/dev/null 2>&1 || true
   local summon_result
   summon_result="$(omarchy-shell shell summon araneadev.osd '{"icon":"volume","message":"","value":71,"max":100,"duration":5000}' 2>&1)"
