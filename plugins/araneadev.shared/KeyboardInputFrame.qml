@@ -36,9 +36,26 @@ Item {
       frame.unhandledKey(event)
   }
 
+  // Omarchy 4.5's catcher turns Delete into deleteRequested and accepts it,
+  // which would hide Shift+Delete. The catcher forwards every key here
+  // before its own handler, so Delete keeps reaching unhandledKey with its
+  // modifiers and deleteRequested stays the stock "x"/"X" signal.
+  Item {
+    id: deleteGate
+    Keys.onPressed: function (event) {
+      event.accepted = false
+      if (keyCatcher.blocked || event.key !== Qt.Key_Delete)
+        return
+      frame.unhandledKey(event)
+      // Taken or not, the catcher must not reinterpret it.
+      event.accepted = true
+    }
+  }
+
   PanelKeyCatcher {
     id: keyCatcher
     anchors.fill: parent
+    Keys.forwardTo: [deleteGate]
     onCloseRequested: frame.closeRequested()
     onTabRequested: function (direction) {
       frame.tabRequested(direction)

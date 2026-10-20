@@ -254,7 +254,7 @@ Panel {
       real: selectedProviderId,
       showcase: showcaseSelectedId
     }, !!agentsShowcase)
-    for (var i = 0; i < providers.length; i++)
+    for (let i = 0; i < providers.length; i++)
       if (providers[i].providerId === id)
         return i
     return 0
@@ -500,9 +500,9 @@ Panel {
       return []
     var out = []
     var list = p.limits || []
-    for (var i = 0; i < list.length; i++) {
-      var entry = list[i] || {}
-      var percent = Number(entry.percent)
+    for (let i = 0; i < list.length; i++) {
+      let entry = list[i] || {}
+      let percent = Number(entry.percent)
       if (percent >= 0)
         out.push(limitWindow(entry.label, percent, entry.resetsAt, entry.title))
     }
@@ -514,7 +514,7 @@ Panel {
   function bindingWindow(p) {
     var windows = limitWindows(p)
     var best = null
-    for (var i = 0; i < windows.length; i++) {
+    for (let i = 0; i < windows.length; i++) {
       if (!best || windows[i].percent > best.percent)
         best = windows[i]
     }
@@ -636,7 +636,7 @@ Panel {
   function weekPeak(p) {
     var days = p ? (p.recentDays || []) : []
     var peak = 0
-    for (var i = 0; i < days.length; i++)
+    for (let i = 0; i < days.length; i++)
       peak = Math.max(peak, Number(days[i].messageCount || 0))
     return peak
   }
@@ -646,12 +646,12 @@ Panel {
   function modelRows(p) {
     var usageByModel = p ? (p.modelUsage || {}) : {}
     var rows = []
-    for (var id in usageByModel) {
-      var bucket = usageByModel[id] || {}
-      var input = Number(bucket.inputTokens || 0)
-      var output = Number(bucket.outputTokens || 0)
-      var cacheRead = Number(bucket.cacheReadInputTokens || 0)
-      var cacheWrite = Number(bucket.cacheCreationInputTokens || 0)
+    for (let id in usageByModel) {
+      let bucket = usageByModel[id] || {}
+      let input = Number(bucket.inputTokens || 0)
+      let output = Number(bucket.outputTokens || 0)
+      let cacheRead = Number(bucket.cacheReadInputTokens || 0)
+      let cacheWrite = Number(bucket.cacheCreationInputTokens || 0)
       rows.push({
         name: usage.friendlyModelName(id),
         total: input + output + cacheRead + cacheWrite,
@@ -754,10 +754,10 @@ Panel {
     if (p.showcaseUpdatedMs !== undefined)
       return Number(p.showcaseUpdatedMs) || 0
     var list = usage.agents || []
-    for (var i = 0; i < list.length; i++) {
-      var record = list[i] ? list[i].record : null
+    for (let i = 0; i < list.length; i++) {
+      let record = list[i] ? list[i].record : null
       if (record && String(record.id || "") === p.providerId) {
-        var ms = Date.parse(String(record.updatedAt || ""))
+        let ms = Date.parse(String(record.updatedAt || ""))
         return isFinite(ms) ? ms : 0
       }
     }
@@ -779,7 +779,7 @@ Panel {
   // in ROWS already took that title.
   function limitKey(rows, title) {
     var key = title
-    for (var n = 2; rows.some(function (r) {
+    for (let n = 2; rows.some(function (r) {
       return r.key === key
     }); n++)
       key = title + "#" + n
@@ -791,14 +791,14 @@ Panel {
   function limitViewRows(p) {
     var list = p ? (p.limits || []) : []
     var rows = []
-    for (var i = 0; i < list.length; i++) {
-      var entry = list[i] || {}
-      var percent = Number(entry.percent)
+    for (let i = 0; i < list.length; i++) {
+      let entry = list[i] || {}
+      let percent = Number(entry.percent)
       if (!(percent >= 0))
         continue
-      var w = limitWindow(entry.label, percent, entry.resetsAt, entry.title)
-      var tone = AgentsLogic.ringTone(clamp(w.percent, 0, 1))
-      var remainingMs = resetMsFor(w)
+      let w = limitWindow(entry.label, percent, entry.resetsAt, entry.title)
+      let tone = AgentsLogic.ringTone(clamp(w.percent, 0, 1))
+      let remainingMs = resetMsFor(w)
       rows.push({
         key: limitKey(rows, w.title),
         label: w.title,
@@ -818,12 +818,12 @@ Panel {
     var peak = Math.max(1, weekPeak(p))
     var today = todayDate()
     var rows = []
-    for (var i = 0; i < days.length; i++) {
-      var day = days[i] || {}
+    for (let i = 0; i < days.length; i++) {
+      let day = days[i] || {}
       // By date, not by position: the Claude stats-cache fallback can hand
       // us a window that stops short of today.
-      var isToday = String(day.date || "") === today
-      var count = Number(day.messageCount || 0)
+      let isToday = String(day.date || "") === today
+      let count = Number(day.messageCount || 0)
       rows.push({
         key: AgentsLogic.dayKey(day),
         label: dayLabel(day.date, isToday),
@@ -1054,7 +1054,7 @@ Panel {
     function select(providerId: string): string {
       if (root.captureActive || root.agentsShowcase)
         return "refused"
-      for (var i = 0; i < root.providers.length; i++) {
+      for (let i = 0; i < root.providers.length; i++) {
         if (root.providers[i].providerId === providerId) {
           root.selectProvider(i)
           return "ok"

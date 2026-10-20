@@ -118,6 +118,13 @@ The update center checks repository and AUR packages, including the installed Om
 [Troubleshooting](docs/troubleshooting.md) when a check or recovery action needs
 attention.
 
+### World clock
+
+The globe button opens a separate world clock with live daylight, a sun-lit Earth,
+and offline city search. Start with Amsterdam, London, UTC, New York, and Los Angeles;
+add, reorder, or choose a home city from the dropdown. Existing custom Elsewhen city
+lists are preserved. See [World clock](docs/features.md#world-clock) for the keys.
+
 ## Projects and agents
 
 Open **Command center → Projects → Add project** to register a development
@@ -195,9 +202,9 @@ demonstration data; the desktop background is Signal Shrine.
 | ---------------------------------- | ----------------------------------------------- | ------------------------------------ |
 | ![Tray menu](screenshots/tray.png) | ![Tray management](screenshots/tray-manage.png) | ![Filament OSD](screenshots/osd.png) |
 
-| Calendar                           | Weather                             |
-| ---------------------------------- | ----------------------------------- |
-| ![Calendar](screenshots/clock.png) | ![Weather](screenshots/weather.png) |
+| Calendar                           | World clock                                | Weather                             |
+| ---------------------------------- | ------------------------------------------ | ----------------------------------- |
+| ![Calendar](screenshots/clock.png) | ![World clock](screenshots/worldclock.png) | ![Weather](screenshots/weather.png) |
 
 ### Projects
 

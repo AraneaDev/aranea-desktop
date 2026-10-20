@@ -9,6 +9,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
+import "." as Local
 import "../araneadev.shared" as Aranea
 import "Model.js" as Model
 import "ClockLogic.js" as ClockLogic
@@ -65,7 +66,7 @@ BarWidget {
     var entry = {
       id: root.moduleName
     }
-    for (var key in root.settings)
+    for (let key in root.settings)
       if (key !== "id")
         entry[key] = root.settings[key]
     entry[vertical ? "verticalFormat" : "format"] = next
@@ -177,7 +178,7 @@ BarWidget {
   // needs; called again after load since the loader's onLoaded can race the
   // bindings below.
   function injectPanel() {
-    var target = panelLoader.item
+    var target = panelLoader.item as Local.Panel
     if (!target)
       return
     if ("bar" in target)

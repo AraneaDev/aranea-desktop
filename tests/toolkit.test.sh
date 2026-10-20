@@ -80,7 +80,8 @@ grep -Fxq 'coverage/' "$repo_root/.gitignore"
 grep -Fq 'tools/check --skip smoke' "$repo_root/.github/workflows/ci.yml"
 grep -Fq 'ARANEA_CHECK_REQUIRE_ALL' "$repo_root/.github/workflows/ci.yml"
 grep -Fq 'container: archlinux' "$repo_root/.github/workflows/ci.yml"
-grep -Eqx 'v[0-9]+\.[0-9]+\.[0-9]+' "$repo_root/.omarchy-version"
+# Reviewed upstream pins may be stable releases or official release candidates.
+grep -Eqx 'v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?' "$repo_root/.omarchy-version"
 if grep -hE '^\s*-?\s*uses: [^@]+@v[0-9]' "$repo_root"/.github/workflows/*.yml; then
   echo "action pinned by tag, not SHA" >&2
   exit 1

@@ -28,7 +28,7 @@ linux 6.1-1 -> 6.2-1
 omarchy 4.0-1 -> 4.1-1
 EOF
 echo 0 >"$UPDATE_FIXTURE/checkupdates.rc"
-echo 'my-app 1-1 -> 2-1' >"$UPDATE_FIXTURE/yay.out"
+echo 'my-app 1-1 -> 2-1 [52m]' >"$UPDATE_FIXTURE/yay.out"
 echo 0 >"$UPDATE_FIXTURE/yay.rc"
 collector="$repo_root/scripts/aranea-update-status"
 "$collector" >"$TMPDIR/status.json"

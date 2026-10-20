@@ -253,7 +253,7 @@ BarWidget {
     // live child opener references.
     var openers = submenuStack
     submenuStack = []
-    for (var i = openers.length - 1; i >= 0; i--)
+    for (let i = openers.length - 1; i >= 0; i--)
       openers[i].opener.destroy()
     entrySerials = {
       map: new Map(),
@@ -325,7 +325,7 @@ BarWidget {
     if (!item || !item.menu) {
       if (!item || !mouse)
         return
-      var point = anchorItem.QsWindow.contentItem.mapFromItem(anchorItem, mouse.x, mouse.y)
+      let point = anchorItem.QsWindow.contentItem.mapFromItem(anchorItem, mouse.x, mouse.y)
       item.display(anchorItem.QsWindow.window, point.x, point.y)
       return
     }
@@ -350,8 +350,8 @@ BarWidget {
 
   // The live TrayItem delegate showing ITEM, or null.
   function trayItemViewFor(item) {
-    for (var i = 0; i < root.trayItemViews.length; i++) {
-      var view = root.trayItemViews[i]
+    for (let i = 0; i < root.trayItemViews.length; i++) {
+      let view = root.trayItemViews[i]
       if (view && view.modelData === item)
         return view
     }
@@ -427,8 +427,8 @@ BarWidget {
   function bucket(category) {
     var values = SystemTray.items.values
     var result = []
-    for (var i = 0; i < values.length; i++) {
-      var item = values[i]
+    for (let i = 0; i < values.length; i++) {
+      let item = values[i]
       if (item.status === Status.Passive)
         continue
       if (ownedByOmarchy(item))
@@ -463,8 +463,8 @@ BarWidget {
   function shownLists() {
     var pinned = root.pinnedIds.slice()
     var hidden = root.hiddenIds.slice()
-    for (var id in root.pendingState) {
-      var p = root.pendingState[id]
+    for (let id in root.pendingState) {
+      let p = root.pendingState[id]
       pinned = pinned.filter(function (x) {
         return x !== id
       })
@@ -502,8 +502,8 @@ BarWidget {
     var now = Date.now()
     var next = {}
     var changed = false
-    for (var i = 0; i < ids.length; i++) {
-      var p = root.pendingState[ids[i]]
+    for (let i = 0; i < ids.length; i++) {
+      let p = root.pendingState[ids[i]]
       if (!p.sawChange && now >= p.at) {
         p = Object.assign({}, p, {
           sawChange: true
@@ -529,10 +529,10 @@ BarWidget {
     var now = Date.now()
     var next = {}
     var changed = false
-    for (var i = 0; i < ids.length; i++) {
-      var id = ids[i]
-      var p = root.pendingState[id]
-      var echoed = p.sawChange && (root.pinnedIds.indexOf(id) !== -1) === p.pinned && (root.hiddenIds.indexOf(id) !== -1) === p.hidden
+    for (let i = 0; i < ids.length; i++) {
+      let id = ids[i]
+      let p = root.pendingState[id]
+      let echoed = p.sawChange && (root.pinnedIds.indexOf(id) !== -1) === p.pinned && (root.hiddenIds.indexOf(id) !== -1) === p.hidden
       if (echoed || now - p.at >= root.pendingTimeoutMs || present.indexOf(id) === -1)
         changed = true
       else
@@ -573,7 +573,7 @@ BarWidget {
   function listOf(list) {
     var out = []
     var count = list ? list.length : 0
-    for (var i = 0; i < count; i++)
+    for (let i = 0; i < count; i++)
       out.push(list[i])
     return out
   }
@@ -691,7 +691,7 @@ BarWidget {
     if (dy !== 0) {
       root.placeMenuCursor(TrayLogic.nextCursor(root.menuRowList, root.menuCursorIndex, dy))
     } else if (dx > 0) {
-      var row = root.menuRowList[root.menuCursorIndex]
+      let row = root.menuRowList[root.menuCursorIndex]
       if (row && row.hasChildren && CursorLogic.cursorConfirmed(root.menuRowList, root.menuCursorKey, root.menuCursorIndex))
         root.activateMenuRow(root.menuCursorIndex, root.menuCursorKey)
     } else if (dx < 0) {

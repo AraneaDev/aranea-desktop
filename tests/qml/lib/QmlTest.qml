@@ -18,6 +18,13 @@ Item {
     }
   }
 
+  // Reports NAME as skipped, with the REASON it cannot run here (e.g. the
+  // offscreen software scene graph has no shaders). Neither a pass nor a
+  // failure; the runner counts and shows it.
+  function skip(name, reason) {
+    console.log("QMLTEST SKIP " + name + ": " + reason)
+  }
+
   // JSON with object keys sorted. Since Qt 6.12 a var signal parameter
   // arrives as a converted map: keys sorted, nested arrays as sequence
   // objects that fail Array.isArray. Neither is part of any contract under

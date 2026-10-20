@@ -30,8 +30,8 @@ Item {
   function nearestTextStop(px) {
     var best = 0
     var bestDist = 1e9
-    for (var i = 0; i < textSizeStops.length; i++) {
-      var d = Math.abs(textSizeStops[i] - px)
+    for (let i = 0; i < textSizeStops.length; i++) {
+      let d = Math.abs(textSizeStops[i] - px)
       if (d < bestDist) {
         bestDist = d
         best = i
@@ -91,7 +91,7 @@ Item {
   // preview the CLI failed on or that Style already shows.
   function textScaleExited(exitCode) {
     if (root.queuedTextPx > 0) {
-      var px = root.queuedTextPx
+      let px = root.queuedTextPx
       root.queuedTextPx = 0
       setTextSize(px)
       return

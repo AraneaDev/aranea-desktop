@@ -110,13 +110,13 @@ Item {
       history.saveAppHistory()
     }
     var appRows = []
-    for (var j = 0; j < rows.length; j++) {
-      var entry = rows[j].entry
-      var appId = String(entry.id || "")
+    for (let j = 0; j < rows.length; j++) {
+      let entry = rows[j].entry
+      let appId = String(entry.id || "")
       if (!appId)
         continue
-      var subtext = library.entrySubtext(entry)
-      var aliases = subtext ? [subtext] : []
+      let subtext = library.entrySubtext(entry)
+      let aliases = subtext ? [subtext] : []
       try {
         if (entry.keywords && typeof entry.keywords.join === "function")
           aliases = aliases.concat(entry.keywords)

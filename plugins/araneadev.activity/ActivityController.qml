@@ -189,7 +189,7 @@ Item {
       if (!response || !response.ok || !response.state) {
         error = response && response.error || failure('STORE_UNAVAILABLE', 'Activity store is not available.')
       } else {
-        var previous = ready ? storeState : null
+        let previous = ready ? storeState : null
         storeState = response.state
         consumeNotifications(previous, storeState)
         ready = true
@@ -421,7 +421,7 @@ Item {
         error: failure('TASK_NOT_FOUND', 'The task is no longer tracked.')
       }
     if (!result.reused) {
-      var op = Object.assign({}, result.operation, {
+      let op = Object.assign({}, result.operation, {
         task: task,
         priorEpoch: task ? task.producerEpoch : null,
         desktopId: runtime.sessionId,
@@ -627,8 +627,8 @@ Item {
           return
         var retained = operation(id), observationEnded = retained.state === 'completed'
         if (!response || !response.ok) {
-          var uncertain = !response || response.submissionUnconfirmed === true
-          var problem = failure(uncertain ? 'LAUNCH_UNCONFIRMED' : response.code || 'LAUNCH_FAILED', uncertain ? 'The launch may have started an agent, but that could not be confirmed. Check the operation and the running terminals; this session will not be launched again.' : response.message || 'Resume launch failed.')
+          let uncertain = !response || response.submissionUnconfirmed === true
+          let problem = failure(uncertain ? 'LAUNCH_UNCONFIRMED' : response.code || 'LAUNCH_FAILED', uncertain ? 'The launch may have started an agent, but that could not be confirmed. Check the operation and the running terminals; this session will not be launched again.' : response.message || 'Resume launch failed.')
           publish(Object.assign({}, retained, {
             submissionPending: uncertain,
             submissionUnconfirmed: uncertain,
@@ -771,12 +771,12 @@ Item {
           }))
       })
       if (controller.busy && controller.queue.length) {
-        var id = controller.queue[0], op = controller.operation(id)
+        let id = controller.queue[0], op = controller.operation(id)
         if (!controller.current(id))
           controller.finish(id, 'partial', controller.failure('OPERATION_LOST', 'The desktop restarted; the work is not confirmed.'), null)
         else if (op.remaining <= interval || controller.clock() >= op.deadline) {
           if (op.action === 'reopen' && op.launchIdentity) {
-            var next = Operations.observe(op, op.terminal, null, true)
+            let next = Operations.observe(op, op.terminal, null, true)
             controller.finish(id, 'partial', next.error, next.steps)
           } else
             controller.finish(id, 'partial', controller.failure('OBSERVATION_TIMEOUT', 'The action is still not confirmed.'), null)

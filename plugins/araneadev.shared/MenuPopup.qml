@@ -44,7 +44,7 @@ Aranea.SurfaceCard {
       return
     var count = entries ? entries.length : 0
     var first = -1
-    for (var i = 0; i < count; i++) {
+    for (let i = 0; i < count; i++) {
       if (!interactive(i))
         continue
       if (first < 0)
@@ -63,7 +63,7 @@ Aranea.SurfaceCard {
     var direction = step > 0 ? 1 : -1
     var count = entries ? entries.length : 0
     var start = cursor < 0 ? (direction > 0 ? 0 : count - 1) : cursor + direction
-    for (var i = start; i >= 0 && i < count; i += direction) {
+    for (let i = start; i >= 0 && i < count; i += direction) {
       if (interactive(i)) {
         select(i)
         return
@@ -179,7 +179,7 @@ Aranea.SurfaceCard {
             active: menu.interactive(row.index)
             pointerGate: menu.pointerGate
           }
-          FocusFrame {
+          Aranea.FocusFrame {
             objectName: 'cursorOutline'
             anchors.fill: parent
             focused: menu.cursor === row.index && menu.interactive(row.index)

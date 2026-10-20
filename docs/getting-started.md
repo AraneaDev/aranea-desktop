@@ -69,6 +69,9 @@ The boot splash is optional and applied separately:
 omarchy plymouth set-by-theme aranea
 ```
 
+Aranea remembers this choice and restores the splash after an Omarchy update
+resets it. Run `scripts/aranea-boot-splash off` to go back to the default splash.
+
 ## After installation
 
 Click the spider button to open the command center. Its top tiles open **Files**,

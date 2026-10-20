@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# Builds the World Clock globe's committed assets from their sources:
+#
+#   plugins/araneadev.worldclock/land.png
+#     The land mask the globe shader samples: world.json's [lon, lat, ...]
+#     rings rasterised by a scanline polygon fill (even-odd per ring, rings
+#     unioned, like the v3 mockup's canvas fill) into a 2048x1024
+#     equirectangular map, white opaque land on transparent sea, one sample
+#     per pixel centre (no antialiasing; the sampler filters). The PNG is
+#     written by a tiny inline encoder (node:zlib deflate, fixed level, no
+#     timestamps or text chunks), so the same input always gives the same
+#     bytes; no ImageMagick or npm package is needed.
+#   plugins/araneadev.worldclock/shaders/globe.frag.qsb
+#     shaders/globe.frag baked by qsb for Qt Quick's RHI backends.
+#
+# tests/worldclock-assets.test.sh rebuilds both into a scratch directory and
+# compares them byte for byte with the committed files.
+#
+# Usage: tools/build-worldclock-globe [--out DIR]
+#
+#   --out DIR   write land.png and shaders/globe.frag.qsb under DIR instead
+#               of the plugin directory (the sources are always the plugin's)
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+plugin="$repo_root/plugins/araneadev.worldclock"
+qsb="${QSB:-/usr/lib/qt6/bin/qsb}"
+out="$plugin"
+
+while (($#)); do
+  case "$1" in
+    --out)
+      out="${2:?--out needs a directory}"
+      shift 2
+      ;;
+    -h | --help)
+      sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+mkdir -p "$out/shaders"
+
+node - "$plugin/world.json" "$out/land.png" <<'JS'
+const fs = require("node:fs")
+const zlib = require("node:zlib")
+
+const [source, target] = process.argv.slice(2)
+const W = 2048
+const H = 1024
+const rings = JSON.parse(fs.readFileSync(source, "utf8"))
+const mask = new Uint8Array(W * H)
+
+// Fills one ring into the mask: for every pixel row, the even-odd spans
+// between the ring's edge crossings at the row's centre latitude.
+function fillRing(ring) {
+  const n = ring.length / 2
+  for (let y = 0; y < H; y++) {
+    const lat = 90 - ((y + 0.5) * 180) / H
+    const xs = []
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n
+      const lon1 = ring[2 * i]
+      const lat1 = ring[2 * i + 1]
+      const lon2 = ring[2 * j]
+      const lat2 = ring[2 * j + 1]
+      if ((lat1 <= lat) === (lat2 <= lat)) continue
+      const lon = lon1 + ((lat - lat1) / (lat2 - lat1)) * (lon2 - lon1)
+      xs.push(((lon + 180) / 360) * W - 0.5)
+    }
+    xs.sort((a, b) => a - b)
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const from = Math.max(0, Math.ceil(xs[k]))
+      const to = Math.min(W - 1, Math.floor(xs[k + 1]))
+      for (let x = from; x <= to; x++) mask[y * W + x] = 1
+    }
+  }
+}
+
+// A PNG chunk: length, type, data and the CRC of type + data.
+function chunk(type, data) {
+  const head = Buffer.alloc(8)
+  head.writeUInt32BE(data.length, 0)
+  head.write(type, 4, "ascii")
+  const crc = Buffer.alloc(4)
+  crc.writeUInt32BE(zlib.crc32(Buffer.concat([head.subarray(4), data])), 0)
+  return Buffer.concat([head, data, crc])
+}
+
+rings.forEach(fillRing)
+
+// Grey + alpha, 8 bits, one filter-0 byte per row.
+const raw = Buffer.alloc(H * (1 + W * 2))
+for (let y = 0; y < H; y++) {
+  const row = y * (1 + W * 2)
+  for (let x = 0; x < W; x++) {
+    const v = mask[y * W + x] ? 255 : 0
+    raw[row + 1 + 2 * x] = v
+    raw[row + 2 + 2 * x] = v
+  }
+}
+const ihdr = Buffer.alloc(13)
+ihdr.writeUInt32BE(W, 0)
+ihdr.writeUInt32BE(H, 4)
+ihdr[8] = 8
+ihdr[9] = 4
+const png = Buffer.concat([
+  Buffer.from("89504e470d0a1a0a", "hex"),
+  chunk("IHDR", ihdr),
+  chunk("IDAT", zlib.deflateSync(raw, { level: 9 })),
+  chunk("IEND", Buffer.alloc(0))
+])
+fs.writeFileSync(target, png)
+JS
+
+"$qsb" --glsl "100 es,120,150" --hlsl 50 --msl 12 \
+  -o "$out/shaders/globe.frag.qsb" "$plugin/shaders/globe.frag"

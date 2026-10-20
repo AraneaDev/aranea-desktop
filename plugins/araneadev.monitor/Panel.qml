@@ -135,8 +135,8 @@ Panel {
   // filtered to the ones its mode actually honors), or scalePresets itself
   // before any display has loaded.
   readonly property var scaleValues: {
-    for (var i = 0; i < displays.length; i++) {
-      var display = displays[i]
+    for (let i = 0; i < displays.length; i++) {
+      let display = displays[i]
       if (display && display.focused)
         return Model.availableScales(scalePresets, display.width, display.height)
     }
@@ -293,7 +293,7 @@ Panel {
 
   // The focused display, or null before any display has loaded.
   readonly property var focusedDisplay: {
-    for (var i = 0; i < displays.length; i++) {
+    for (let i = 0; i < displays.length; i++) {
       if (displays[i] && displays[i].focused)
         return displays[i]
     }
@@ -328,8 +328,8 @@ Panel {
   // Which displays are enabled, as read: {name: bool}.
   readonly property var enabledDisplayMap: {
     var map = {}
-    for (var i = 0; i < displays.length; i++) {
-      var d = displays[i]
+    for (let i = 0; i < displays.length; i++) {
+      let d = displays[i]
       if (d && d.name)
         map[String(d.name)] = !!d.enabled
     }
@@ -418,7 +418,7 @@ Panel {
     if (!sections || sections.length === 0)
       return
     if (focusSection === "monitors") {
-      var row = selectedIndex + delta
+      let row = selectedIndex + delta
       if (row >= 0 && row < displayRows.length) {
         selectedIndex = row
         cursorKey = keyAt(focusSection, selectedIndex)
@@ -500,7 +500,7 @@ Panel {
     }
     var rows = sectionRows(focusSection)
     if (cursorKey !== "") {
-      var next = CursorLogic.followShown(rows, cursorKey, selectedIndex, keyboardCursor)
+      let next = CursorLogic.followShown(rows, cursorKey, selectedIndex, keyboardCursor)
       selectedIndex = Math.max(0, next.index)
       cursorKey = next.key
       keyboardCursor = next.keyboard
@@ -611,8 +611,8 @@ Panel {
   // The index into scaleValues matching the focused display's current
   // scale, or -1 with no match or no focused display.
   function activeScaleIndex() {
-    for (var i = 0; i < displays.length; i++) {
-      var display = displays[i]
+    for (let i = 0; i < displays.length; i++) {
+      let display = displays[i]
       if (display && display.focused)
         return Model.matchingScaleIndex(scaleValues, monitorScale, display.width, display.height)
     }
@@ -622,8 +622,8 @@ Panel {
   // The scale a requested preset actually resolves to on the focused
   // display's mode, delegating to Model.cleanScale.
   function effectiveScale(scale) {
-    for (var i = 0; i < displays.length; i++) {
-      var display = displays[i]
+    for (let i = 0; i < displays.length; i++) {
+      let display = displays[i]
       if (display && display.focused)
         return Model.cleanScale(scale, display.width, display.height)
     }
@@ -793,7 +793,7 @@ Panel {
     if (root.displaysLocked)
       return true
     var names = Object.keys(root.pendingDisplays)
-    for (var i = 0; i < names.length; i++) {
+    for (let i = 0; i < names.length; i++) {
       if (typeof root.displayExits[names[i]] === "number")
         return true
     }

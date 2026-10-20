@@ -20,7 +20,7 @@ expected_surfaces=(
   menu menu-submenu settings settings-scaling settings-schedule menu-search menu-input desktop health lock plymouth
   btop file-manager neovim notifications notifications-empty clipboard emojis polkit
   network vpn audio bluetooth agents
-  power monitor tray tray-manage clock weather image-picker apps favorites recent
+  power monitor tray tray-manage clock worldclock weather image-picker apps favorites recent
   dawn osd workspaces updates projects project-overview project-actions project-problem project-switcher project-review project-preferences
 )
 expected_hero_frames=(

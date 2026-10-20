@@ -309,7 +309,9 @@ exec /usr/bin/script -qefc "$(printf '%q ' "$@")" /dev/null
 APP
 rm -f "$ARANEA_TEST_SANDBOX/pager-ran"
 # Control: the previous argv (core.pager only) does execute the planted pager under a pty.
-/usr/bin/script -qefc "$(printf '%q ' git -c core.pager=less -C "$repo" diff --no-ext-diff --no-textconv "$base...HEAD")" /dev/null </dev/null >/dev/null 2>&1 || true
+# An inherited GIT_PAGER (for example cat in an agent runner) outranks pager.diff.
+# Clear it only for this control; the guarded launch must set its own safe pager.
+env -u GIT_PAGER /usr/bin/script -qefc "$(printf '%q ' git -c core.pager=less -C "$repo" diff --no-ext-diff --no-textconv "$base...HEAD")" /dev/null </dev/null >/dev/null 2>&1 || true
 [[ -f "$ARANEA_TEST_SANDBOX/pager-ran" ]] || {
   echo "Control failed: pager.diff should run under a pty with only core.pager set"
   exit 1

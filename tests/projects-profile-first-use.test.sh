@@ -57,8 +57,8 @@ if ! grep -q 'QMLTEST DONE 0' "$work/log" || grep -Eq 'QMLTEST FAIL|TypeError|Re
   exit 1
 fi
 [[ ! -e "$ARANEA_TEST_SANDBOX/execution-trap" ]]
-# Shared host Style can probe geometry only through sandbox guard stubs.
-if [[ -f "$ARANEA_TEST_SANDBOX/guard.log" ]] && grep -Ev '^hyprctl -j getoption (general:gaps_out|decoration:rounding)$' "$ARANEA_TEST_SANDBOX/guard.log"; then
+# Shared host Style can probe geometry and the animations toggle only through sandbox guard stubs.
+if [[ -f "$ARANEA_TEST_SANDBOX/guard.log" ]] && grep -Ev '^hyprctl -j getoption (general:gaps_out|decoration:rounding|animations:enabled)$' "$ARANEA_TEST_SANDBOX/guard.log"; then
   exit 1
 fi
 echo 'projects first use: actual registration/preset and manual save enable exact visible primary passed'

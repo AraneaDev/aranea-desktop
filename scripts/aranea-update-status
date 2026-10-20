@@ -18,7 +18,8 @@ source_failed() {
   printf '%s check unavailable\n' "$1" >>"$scratch/errors"
 }
 
-# Package tools print NAME OLD -> NEW; their no-update exit codes differ.
+# Package tools print NAME OLD -> NEW (newer yay appends an [age] tag); their
+# no-update exit codes differ.
 check_packages() {
   local source="$1" empty_code="$2" rc=0
   shift 2
@@ -32,7 +33,7 @@ check_packages() {
   fi
   if ! jq -Rn --arg source "$source" '
     [inputs | select(length > 0)
-      | capture("^(?<name>\\S+)\\s+(?<current>\\S+)\\s+->\\s+(?<latest>\\S+)$")
+      | capture("^(?<name>\\S+)\\s+(?<current>\\S+)\\s+->\\s+(?<latest>\\S+)(\\s+\\[[^]]*\\])?$")
       | . + {source:$source}]
     | .[]' "$scratch/$source.out" >"$scratch/$source.rows"; then
     source_failed "$source"

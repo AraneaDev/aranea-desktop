@@ -50,7 +50,7 @@ if grep -Fq '"ESC BACK  ·  ENTER OPEN"' "$menu_qml"; then
   exit 1
 fi
 grep -Fq 'precision: SystemClock.Minutes' "$menu_style"
-grep -Fq 'Qt.formatDateTime(menuClock.date, "HH:mm")' "$menu_style"
+grep -Fq 'Qt.formatDateTime(menuClockObject.date, "HH:mm")' "$menu_style"
 # --- 4b: provider state per menu; routes resolve when the rows exist
 grep -Fq 'property var loadingMenus: ({})' "$menu_providers"
 grep -Fq 'property var errorMenus: ({})' "$menu_providers"
@@ -103,7 +103,7 @@ grep -Fq 'ClickSettle.clickSettled(' "$menu_results"
 grep -Fq 'ClickSettle.clickSettled(' "$repo_root/plugins/araneadev.menu/MenuRootTile.qml"
 # --- 4b final review: state loads before use; stale routes never reopen; clock only when open
 block_grep "$menu_history" 'id: appHistoryFile' 'blockLoading: true'
-block_grep "$menu_style" 'id: menuClock' 'enabled: style.opened'
+block_grep "$menu_style" 'id: menuClockObject' 'enabled: style.opened'
 [[ "$(grep -c 'root.pendingInitialMenu = ""' "$menu_qml")" -ge 4 ]] || {
   echo "every other open/cancel path must drop a pending Favorites/Recent route" >&2
   exit 1

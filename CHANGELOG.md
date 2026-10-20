@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.33.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.32.3...v2.33.0) (2026-10-20)
+
+
+### Features
+
+* add Aranea world clock and align with Omarchy 4.5 ([#194](https://github.com/AraneaDev/aranea-desktop/issues/194)) ([fff3d23](https://github.com/AraneaDev/aranea-desktop/commit/fff3d2384570051640e526238885cb0f11748179))
+
 ## [2.32.3](https://github.com/AraneaDev/aranea-desktop/compare/v2.32.2...v2.32.3) (2026-10-19)
 
 

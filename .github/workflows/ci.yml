@@ -42,7 +42,7 @@ jobs:
           npm ci
 
       # Everything that does not depend on the Qt version: Ubuntu's Qt is
-      # far older than the Qt 6.11 the QML is formatted and linted with, so
+      # far older than the Qt 6.12 the QML is formatted and linted with, so
       # QML formatting, qmllint and the runtime smoke test run in the Arch
       # job below (the format stage notes the skipped QML part).
       - name: Run tools/check
@@ -71,25 +71,33 @@ jobs:
     container: archlinux:latest
     timeout-minutes: 30
     steps:
-      # Qt 6.12 adds a QtQuick.Color singleton that conflicts with the
-      # pinned Omarchy shell. Keep the entire Arch package set on the
-      # verified Qt 6.11 snapshot, including its matching dependencies.
+      # Match the Qt 6.12 desktop supported by the reviewed Omarchy 4.5
+      # shell. Pin the whole package set, including matching dependencies.
       - name: Pin the supported Arch toolchain
         run: |
           # Pacman expands these variables when reading the mirror list.
           # shellcheck disable=SC2016
-          echo 'Server = https://archive.archlinux.org/repos/2026/10/06/$repo/os/$arch' > /etc/pacman.d/mirrorlist
+          echo 'Server = https://archive.archlinux.org/repos/2026/10/19/$repo/os/$arch' > /etc/pacman.d/mirrorlist
 
       # The archive mirror sometimes stalls ("Operation too slow"). Wait out
       # slow transfers and retry; downloaded packages stay in the cache.
       - name: Install packages
         run: |
           for attempt in 1 2 3; do
-            pacman -Syyuu --noconfirm --needed --disable-download-timeout git curl jq ripgrep python nodejs npm quickshell qt6-declarative imagemagick librsvg libxml2 lua sway dbus libcap diffutils inotify-tools && exit 0
+            pacman -Syyuu --noconfirm --needed --disable-download-timeout git curl jq ripgrep python nodejs npm quickshell cpptrace qt6-declarative imagemagick librsvg libxml2 lua sway dbus libcap diffutils inotify-tools && exit 0
             echo "Package install attempt $attempt failed; retrying" >&2
             sleep $((attempt * 20))
           done
           exit 1
+
+      # This reviewed Omarchy build resolves core types across submodules on
+      # Qt 6.12. Arch's older build has opaque stubs that shadow those types.
+      - name: Install the reviewed Omarchy Quickshell build
+        run: |
+          package=quickshell-0.3.2.r7.g2b4501a-1-x86_64.pkg.tar.zst
+          curl --fail --location --retry 3 "https://pkgs.omarchy.org/rc/x86_64/$package" -o "/tmp/$package"
+          printf '%s  %s\n' f9f813213597d1ee25e16860ed326e810857810460c09ee87d06bc3b655c2da1 "/tmp/$package" | sha256sum --check
+          pacman -U --noconfirm "/tmp/$package"
 
       # Arch's sway carries cap_sys_nice as a file capability, and a container
       # that may not grant it cannot exec sway at all ("Operation not

@@ -60,6 +60,11 @@ ShellRoot {
   Network.Panel {
     id: host
   }
+  // Emits the stock catcher's textKey as a printable key does. Omarchy 4.5
+  // added the held modifiers; an older shell ignores the extra argument.
+  function stockTextKey(text) {
+    host.keyCatcher.textKey(text, Qt.NoModifier)
+  }
   Component.onCompleted: t.step(100, function () {
     var bt = host.bluetoothController
     t.check(bt !== undefined && bt !== null, "Network loads the optional Bluetooth controller")
@@ -78,14 +83,14 @@ ShellRoot {
     t.check(bt.cursorActive && bt.keyboardCursor, "first hosted key reveals the Bluetooth cursor")
     host.passwordSsid = "fixture network"
     host.passwordText = "inert fixture text"
-    host.keyCatcher.textKey("N")
+    stockTextKey("N")
     t.check(host.opened && !bt.opened, "leaving Bluetooth closes only its controller")
     t.equal(host.passwordText, "", "page changes clear unsubmitted Wi-Fi credentials")
-    host.keyCatcher.textKey("V")
+    stockTextKey("V")
     t.check(host.activePage === "vpn" && host.vpnController.opened, "V selects the shared VPN page")
     host.vpnController.openPrompt("inert fixture profile", "inert fixture user")
     host.vpnController.promptPassword = "inert fixture text"
-    host.keyCatcher.textKey("B")
+    stockTextKey("B")
     t.equal(host.vpnController.promptPassword, "", "leaving VPN clears unsubmitted credentials")
     t.check(bt.opened, "returning to Bluetooth reopens its controller")
     // Replace only the hardware action; the real key catcher and page routing stay real.

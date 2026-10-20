@@ -5,7 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
 source "$repo_root/tests/lib/qml-host.sh"
 require_qml_host
-for dependency in sway dbus-run-session inotifywait; do
+for dependency in sway setpriv dbus-run-session inotifywait; do
   if ! command -v "$dependency" >/dev/null; then
     printf 'SKIP: stock-host reload test needs %s\n' "$dependency"
     [[ "$(sandbox_inherited_value ARANEA_CHECK_REQUIRE_ALL)" != 1 ]] || exit 1
@@ -36,7 +36,11 @@ for path in bin config default; do ln -s "$stock_root/$path" "$stage/stock/$path
 printf 'output HEADLESS-1 mode 1000x600\nseat seat0 fallback true\n' >"$stage/sway.conf"
 export XDG_RUNTIME_DIR="$stage/runtime" WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1
 unset WAYLAND_DISPLAY DISPLAY SWAYSOCK HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME QT_STYLE_OVERRIDE
-sway -c "$stage/sway.conf" >"$stage/sway.log" 2>&1 &
+# No new privileges, as the smoke stage runs it: Arch's sway carries
+# cap_sys_nice and turns realtime, and a shell whose hard RLIMIT_RTTIME is 0
+# (inherited from a terminal whose audio client hit a zero portal budget)
+# then has the kernel SIGKILL it before the socket accepts connections.
+setpriv --no-new-privs sway -c "$stage/sway.conf" >"$stage/sway.log" 2>&1 &
 sway_pid=$!
 for ((attempt = 0; attempt < 60; attempt++)); do
   socket=$(find "$stage/runtime" -maxdepth 1 -type s -name 'wayland-*' -print -quit)

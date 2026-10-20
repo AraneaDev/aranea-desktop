@@ -184,7 +184,7 @@ Item {
   function loadEmojis(raw) {
     root.emojis = EmojiSearch.parseEmojis(raw)
     var map = {}
-    for (var i = 0; i < root.emojis.length; i++)
+    for (let i = 0; i < root.emojis.length; i++)
       map[root.emojis[i].e] = root.emojis[i].k
     root.keywordsByEmoji = map
     if (root.opened)
@@ -196,11 +196,11 @@ Item {
   // pointer.
   function syncRows(rows: var): void {
     var keep = Math.min(displayModel.count, rows.length)
-    for (var i = 0; i < keep; i++)
+    for (let i = 0; i < keep; i++)
       displayModel.set(i, rows[i])
     if (displayModel.count > rows.length)
       displayModel.remove(rows.length, displayModel.count - rows.length)
-    for (var j = keep; j < rows.length; j++)
+    for (let j = keep; j < rows.length; j++)
       displayModel.append(rows[j])
   }
 
@@ -214,7 +214,7 @@ Item {
 
     var rows = []
     var keys = []
-    for (var j = 0; j < out.length; j++) {
+    for (let j = 0; j < out.length; j++) {
       keys.push(out[j].e)
       rows.push({
         emoji: out[j].e,
@@ -263,10 +263,10 @@ Item {
   // grid at the same column; clamps at the ends of the grid.
   function selectRow(delta) {
     if (root.inRecents) {
-      var count = root.recents.length
-      var row = Math.floor(root.recentIndex / columns)
-      var lastRow = Math.floor((count - 1) / columns)
-      var column = root.recentIndex % columns
+      let count = root.recents.length
+      let row = Math.floor(root.recentIndex / columns)
+      let lastRow = Math.floor((count - 1) / columns)
+      let column = root.recentIndex % columns
       if (delta > 0 && row >= lastRow) {
         // Down out of the last recent row enters the grid at the same column.
         if (displayModel.count === 0)
@@ -288,7 +288,7 @@ Item {
     if (newIndex < 0) {
       // Up out of the first grid row enters the last recent row.
       if (root.showRecents) {
-        var lastRowStart = Math.floor((root.recents.length - 1) / columns) * columns
+        let lastRowStart = Math.floor((root.recents.length - 1) / columns) * columns
         root.inRecents = true
         root.recentIndex = Math.min(lastRowStart + selectedIndex % columns, root.recents.length - 1)
         return
@@ -452,7 +452,7 @@ Item {
 
   Component.onCompleted: {
     if (root.windowEnabled) {
-      var windowComponent = Qt.createComponent(Qt.resolvedUrl("EmojiWindow.qml"))
+      let windowComponent = Qt.createComponent(Qt.resolvedUrl("EmojiWindow.qml"))
       if (windowComponent.status === Component.Ready)
         root.view = windowComponent.createObject(root, {
           root: root

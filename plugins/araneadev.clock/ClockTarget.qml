@@ -9,7 +9,7 @@ import QtQuick
 import "../araneadev.shared/ClickSettle.js" as ClickSettle
 
 Item {
-  id: target
+  id: targetObject
 
   // The dropdown's PointerMoveGate (qs.Ui), carrying layoutChangedAt; null
   // never lights and settles only on the target's age.
@@ -28,24 +28,24 @@ Item {
   function clickSettled() {
     return ClickSettle.clickSettled({
       now: Date.now(),
-      createdAt: target.createdAt,
-      movedAt: target.pointerMovedAt,
-      layoutChangedAt: target.pointerGate ? Number(target.pointerGate.layoutChangedAt) || 0 : 0
+      createdAt: targetObject.createdAt,
+      movedAt: targetObject.pointerMovedAt,
+      layoutChangedAt: targetObject.pointerGate ? Number(targetObject.pointerGate.layoutChangedAt) || 0 : 0
     })
   }
 
-  Component.onCompleted: target.createdAt = Date.now()
+  Component.onCompleted: targetObject.createdAt = Date.now()
 
   HoverHandler {
     id: hover
     onHoveredChanged: if (!hover.hovered)
-      target.hot = false
-    onPointChanged: if (target.pointerGate && hover.hovered && target.pointerGate.moved(target, {
+      targetObject.hot = false
+    onPointChanged: if (targetObject.pointerGate && hover.hovered && targetObject.pointerGate.moved(targetObject, {
       x: hover.point.position.x,
       y: hover.point.position.y
     })) {
-      target.pointerMovedAt = Date.now()
-      target.hot = true
+      targetObject.pointerMovedAt = Date.now()
+      targetObject.hot = true
     }
   }
 }

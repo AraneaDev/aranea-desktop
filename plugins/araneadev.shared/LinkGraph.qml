@@ -29,7 +29,7 @@ Canvas {
   // Strokes PTS as one polyline in CTX.
   function strokeLine(ctx, pts) {
     ctx.beginPath()
-    for (var i = 0; i < pts.length; i++) {
+    for (let i = 0; i < pts.length; i++) {
       if (i === 0)
         ctx.moveTo(pts[i].x, pts[i].y)
       else
@@ -61,13 +61,13 @@ Canvas {
       return
     }
     if (graph.softFill) {
-      var fill = ctx.createLinearGradient(0, 0, 0, graph.height)
+      let fill = ctx.createLinearGradient(0, 0, 0, graph.height)
       fill.addColorStop(0, String(Util.alpha(DesignTokens.accent, 0.25)))
       fill.addColorStop(1, String(Util.alpha(DesignTokens.accent, 0)))
       ctx.fillStyle = fill
       ctx.beginPath()
       ctx.moveTo(rx[0].x, graph.height)
-      for (var i = 0; i < rx.length; i++)
+      for (let i = 0; i < rx.length; i++)
         ctx.lineTo(rx[i].x, rx[i].y)
       ctx.lineTo(rx[rx.length - 1].x, graph.height)
       ctx.closePath()

@@ -284,6 +284,7 @@ else
   ((json_mode)) && json_step install running install-hooks 'install theme hooks'
   run omarchy hook install theme-set "$repo_root/hooks/theme-set"
   run omarchy hook install post-boot "$repo_root/hooks/post-boot"
+  run omarchy hook install post-update "$repo_root/hooks/post-update"
   ((json_mode)) && json_step install ok install-hooks 'theme hooks installed'
   ((json_mode)) && json_step install running activate-theme 'activate aranea theme'
   run omarchy theme set aranea

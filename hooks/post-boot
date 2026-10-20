@@ -6,6 +6,17 @@
 # Install with:
 #   omarchy hook install post-boot hooks/post-boot
 
+# Remember whether the Aranea boot splash is in use, so post-update can bring
+# it back after an Omarchy upgrade resets it. `default` says nothing: that is
+# also what an upgrade leaves behind, so the earlier record stands.
+splash_file="${XDG_STATE_HOME:-$HOME/.local/state}/aranea/boot-splash"
+splash="$(omarchy plymouth current 2>/dev/null)" || splash=""
+splash="${splash,,}"
+if [[ -n "$splash" && "$splash" != default ]]; then
+  mkdir -p "${splash_file%/*}"
+  if [[ "$splash" == aranea ]]; then printf on >"$splash_file"; else printf off >"$splash_file"; fi
+fi
+
 [[ $(omarchy theme current 2>/dev/null) == "Aranea" ]] || exit 0
 
 # Omarchy hard-codes these two locations (see omarchy-theme-set): the copy of

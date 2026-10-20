@@ -51,9 +51,9 @@ Column {
   function sync() {
     var rows = Array.isArray(grid.weeks) ? grid.weeks : []
     var flat = []
-    for (var w = 0; w < rows.length; w++) {
-      var days = rows[w] && Array.isArray(rows[w].days) ? rows[w].days : []
-      for (var d = 0; d < days.length; d++)
+    for (let w = 0; w < rows.length; w++) {
+      let days = rows[w] && Array.isArray(rows[w].days) ? rows[w].days : []
+      for (let d = 0; d < days.length; d++)
         flat.push({
           key: String(days[d].key || ""),
           day: Number(days[d].day) || 0,
@@ -61,11 +61,11 @@ Column {
         })
     }
     var same = flat.length === dayModel.count
-    for (var i = 0; same && i < flat.length; i++)
+    for (let i = 0; same && i < flat.length; i++)
       same = dayModel.get(i).key === flat[i].key
     if (same) {
-      for (var j = 0; j < flat.length; j++) {
-        var cell = dayModel.get(j)
+      for (let j = 0; j < flat.length; j++) {
+        let cell = dayModel.get(j)
         if (cell.day !== flat[j].day)
           dayModel.setProperty(j, "day", flat[j].day)
         if (cell.inMonth !== flat[j].inMonth)
@@ -73,12 +73,12 @@ Column {
       }
     } else {
       dayModel.clear()
-      for (var k = 0; k < flat.length; k++)
+      for (let k = 0; k < flat.length; k++)
         dayModel.append(flat[k])
     }
     var before = weekModel.count
-    for (var r = 0; r < rows.length; r++) {
-      var week = Number(rows[r] && rows[r].week) || 0
+    for (let r = 0; r < rows.length; r++) {
+      let week = Number(rows[r] && rows[r].week) || 0
       if (r < weekModel.count) {
         if (weekModel.get(r).week !== week)
           weekModel.setProperty(r, "week", week)

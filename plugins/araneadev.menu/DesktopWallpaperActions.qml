@@ -45,7 +45,7 @@ Item {
     var process = processFactory.createObject(owner, {
       command: argv,
       completion: done
-    })
+    }) as CommandProcess
     process.startRequested = true
     process.running = true
   }
@@ -54,36 +54,38 @@ Item {
   // Report a request outcome exactly once using its generation identity.
   signal completed(string id, bool succeeded, string message)
   // Tracked processes outlive the menu window and destroy only after completion.
-  property Component processFactory: Component {
-    Process {
-      id: process
-      property var completion
-      property bool startRequested: false
-      property bool startedSuccessfully: false
-      property bool finished: false
-      function finish(code, stdout, stderr) {
-        if (finished)
-          return
-        finished = true
-        completion(code, stdout, stderr)
-        process.destroy()
-      }
-      onStarted: startedSuccessfully = true
-      onRunningChanged: if (startRequested && !running && !startedSuccessfully)
-        finish(-1, "", "Could not start wallpaper adapter")
-      stdout: StdioCollector {
-        id: output
-      }
-      stderr: StdioCollector {
-        id: diagnostics
-      }
-      // Quickshell metadata omits the unused QProcess exit-status enum.
-      // qmllint disable signal-handler-parameters
-      onExited: function (code) {
-        finish(code, output.text, diagnostics.text)
-      }
-      // qmllint enable signal-handler-parameters
+  component CommandProcess: Process {
+    id: process
+    property var completion
+    property bool startRequested: false
+    property bool startedSuccessfully: false
+    property bool finished: false
+    function finish(code, stdout, stderr) {
+      if (finished)
+        return
+      finished = true
+      completion(code, stdout, stderr)
+      process.destroy()
     }
+    onStarted: startedSuccessfully = true
+    onRunningChanged: if (startRequested && !running && !startedSuccessfully)
+      finish(-1, "", "Could not start wallpaper adapter")
+    stdout: StdioCollector {
+      id: output
+    }
+    stderr: StdioCollector {
+      id: diagnostics
+    }
+    // Quickshell metadata omits the unused QProcess exit-status enum.
+    // qmllint disable signal-handler-parameters
+    onExited: function (code) {
+      finish(code, output.text, diagnostics.text)
+    }
+    // qmllint enable signal-handler-parameters
+  }
+  // Factory retained for the injectable wallpaper command boundary.
+  property Component processFactory: Component {
+    CommandProcess {}
   }
 
   onWallpaperStateChanged: snapshotChanged()

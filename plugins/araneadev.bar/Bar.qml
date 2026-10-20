@@ -308,8 +308,8 @@ Item {
   // The registered click targets owned by one plugin.
   function pluginClickTargets(pluginId) {
     var out = []
-    for (var i = 0; i < root.clickTargets.length; i++) {
-      var target = root.clickTargets[i]
+    for (let i = 0; i < root.clickTargets.length; i++) {
+      let target = root.clickTargets[i]
       if (root.pluginOwnsBarObject(pluginId, target))
         out.push(target)
     }
@@ -328,8 +328,8 @@ Item {
   function syncAllPluginBarApiObjects(): void {
     pluginBarApiSyncQueued = false
     var layoutSnapshot = JSON.stringify(root.layoutConfig || {})
-    for (var id in pluginBarApis) {
-      var api = pluginBarApis[id]
+    for (let id in pluginBarApis) {
+      let api = pluginBarApis[id]
       if (api)
         root.syncPluginBarApiObjects(api, layoutSnapshot)
     }
@@ -433,7 +433,7 @@ Item {
     root.bindPluginBarApi(api)
 
     var next = ({})
-    for (var id in pluginBarApis)
+    for (let id in pluginBarApis)
       next[id] = pluginBarApis[id]
     next[key] = api
     pluginBarApis = next
@@ -442,8 +442,8 @@ Item {
 
   // Whether any module slot still uses the plugin API with this id.
   function pluginBarApiUsed(pluginId: string): bool {
-    for (var i = 0; i < moduleSlots.length; i++) {
-      var slot = moduleSlots[i]
+    for (let i = 0; i < moduleSlots.length; i++) {
+      let slot = moduleSlots[i]
       if (slot && slot.pluginApiId === pluginId)
         return true
     }
@@ -453,8 +453,8 @@ Item {
   // Unregister and forget every click target and popout a plugin owns.
   function releasePluginObjects(pluginId) {
     var owned = Array.from(pluginObjectOwners.values())
-    for (var i = 0; i < owned.length; i++) {
-      var record = owned[i]
+    for (let i = 0; i < owned.length; i++) {
+      let record = owned[i]
       if (!record || record.pluginId !== pluginId)
         continue
       if (record.clickTarget)
@@ -468,8 +468,8 @@ Item {
   // Destroy plugin APIs no slot uses any more, releasing their objects.
   function prunePluginBarApis(): void {
     var next = ({})
-    for (var id in pluginBarApis) {
-      var api = pluginBarApis[id]
+    for (let id in pluginBarApis) {
+      let api = pluginBarApis[id]
       if (root.pluginBarApiUsed(id)) {
         next[id] = api
         continue
@@ -487,7 +487,7 @@ Item {
   onModuleSlotsChanged: Qt.callLater(prunePluginBarApis)
 
   Component.onDestruction: {
-    for (var id in pluginBarApis) {
+    for (let id in pluginBarApis) {
       root.releasePluginObjects(id)
       if (pluginBarApis[id] && typeof pluginBarApis[id].destroy === "function")
         pluginBarApis[id].destroy()
@@ -532,11 +532,11 @@ Item {
   // Scene geometry and visibility of every live slot, for the shell's debug IPC.
   function debugBarGeometry() {
     var out = []
-    for (var i = 0; i < moduleSlots.length; i++) {
-      var slot = moduleSlots[i]
+    for (let i = 0; i < moduleSlots.length; i++) {
+      let slot = moduleSlots[i]
       if (!slot || !slot.activeItem)
         continue
-      var point = {
+      let point = {
         x: slot.x,
         y: slot.y
       }
@@ -649,9 +649,9 @@ Item {
       return null
 
     try {
-      var slotPoint = slot.mapToItem(null, 0, 0)
-      var screenPoint = barDragScreenPoint(slotPoint)
-      var thickness = Style.spacing.xs
+      let slotPoint = slot.mapToItem(null, 0, 0)
+      let screenPoint = barDragScreenPoint(slotPoint)
+      let thickness = Style.spacing.xs
       if (vertical) {
         return {
           x: screenPoint.x,
@@ -833,15 +833,15 @@ Item {
 
   // Write settings-only changes into layoutConfig and push the new settings to matching live widgets.
   function applySettingsDelta(delta) {
-    for (var i = 0; i < delta.length; i++) {
-      var change = delta[i]
+    for (let i = 0; i < delta.length; i++) {
+      let change = delta[i]
       layoutConfig[change.region][change.index] = change.entry
-      var settings = entrySettings(change.entry)
-      for (var s = 0; s < moduleSlots.length; s++) {
-        var slot = moduleSlots[s]
+      let settings = entrySettings(change.entry)
+      for (let s = 0; s < moduleSlots.length; s++) {
+        let slot = moduleSlots[s]
         if (!slot || slot.region !== change.region || slot.moduleName !== entryId(change.entry))
           continue
-        var item = slot.activeItem
+        let item = slot.activeItem
         if (item && "settings" in item)
           item.settings = settings
       }
@@ -864,15 +864,15 @@ Item {
   function panelNavigationSlots(region, window) {
     var entries = layoutEntries(region)
     var slots = []
-    for (var i = 0; i < entries.length; i++) {
-      var id = entryId(entries[i])
-      for (var j = 0; j < moduleSlots.length; j++) {
-        var slot = moduleSlots[j]
+    for (let i = 0; i < entries.length; i++) {
+      let id = entryId(entries[i])
+      for (let j = 0; j < moduleSlots.length; j++) {
+        let slot = moduleSlots[j]
         if (!slot || slot.region !== region || slot.moduleName !== id)
           continue
         if (window && !sameWindow(slotWindow(slot), window))
           continue
-        var item = slot.activeItem
+        let item = slot.activeItem
         if (!item || item.visible !== true || slot.visible !== true || slot.width <= 0 || slot.height <= 0)
           continue
         if (typeof item.open !== "function" || typeof item.close !== "function" || item.opened === undefined)
@@ -905,8 +905,8 @@ Item {
       return false
 
     var currentSlot = null
-    for (var i = 0; i < moduleSlots.length; i++) {
-      var slot = moduleSlots[i]
+    for (let i = 0; i < moduleSlots.length; i++) {
+      let slot = moduleSlots[i]
       if (slot && slot.activeItem === owner) {
         currentSlot = slot
         break
@@ -920,7 +920,7 @@ Item {
       return false
 
     var currentIndex = -1
-    for (var j = 0; j < slots.length; j++) {
+    for (let j = 0; j < slots.length; j++) {
       if (slots[j] === currentSlot) {
         currentIndex = j
         break
@@ -945,8 +945,8 @@ Item {
     var items = []
     if (!id)
       return items
-    for (var i = 0; i < moduleSlots.length; i++) {
-      var slot = moduleSlots[i]
+    for (let i = 0; i < moduleSlots.length; i++) {
+      let slot = moduleSlots[i]
       if (!slot || !slot.activeItem || slot.moduleName !== id)
         continue
       items.push(slot.activeItem)
@@ -978,13 +978,13 @@ Item {
     if (!id)
       return null
     var candidates = []
-    for (var i = 0; i < moduleSlots.length; i++) {
-      var slot = moduleSlots[i]
+    for (let i = 0; i < moduleSlots.length; i++) {
+      let slot = moduleSlots[i]
       if (!slot || !slot.activeItem)
         continue
       if (slot.moduleName !== id)
         continue
-      var item = slot.activeItem
+      let item = slot.activeItem
       if (typeof item.open !== "function" || typeof item.close !== "function" || item.opened === undefined)
         continue
       candidates.push({
@@ -1151,7 +1151,7 @@ Item {
 
   // Index of the entry with id name in a raw entries array, or -1.
   function rawEntryIndex(entries, name) {
-    for (var i = 0; i < entries.length; i++) {
+    for (let i = 0; i < entries.length; i++) {
       if (root.entryId(entries[i]) === name)
         return i
     }
@@ -1212,19 +1212,19 @@ Item {
   function moduleDropAtScene(scenePoint, sourceSlot) {
     var sourceWindow = root.slotWindow(sourceSlot) || root.barDragWindow
     if (sourceWindow && sourceWindow.contentItem) {
-      var barPoint = sourceWindow.contentItem.mapFromItem(null, scenePoint.x, scenePoint.y)
+      let barPoint = sourceWindow.contentItem.mapFromItem(null, scenePoint.x, scenePoint.y)
       if (barPoint.x < 0 || barPoint.x > sourceWindow.contentItem.width || barPoint.y < 0 || barPoint.y > sourceWindow.contentItem.height)
         return null
     }
 
     var candidates = []
-    for (var i = 0; i < moduleSlots.length; i++) {
-      var slot = moduleSlots[i]
+    for (let i = 0; i < moduleSlots.length; i++) {
+      let slot = moduleSlots[i]
       if (!slot || slot === sourceSlot || !slot.visible || slot.width <= 0 || slot.height <= 0)
         continue
       if (sourceWindow && !root.sameWindow(root.slotWindow(slot), sourceWindow))
         continue
-      var slotPoint = {
+      let slotPoint = {
         x: slot.x,
         y: slot.y
       }
@@ -1247,8 +1247,8 @@ Item {
   // A visible slot of module name in region on the drag's bar, excluding sourceSlot; null if none.
   function visibleModuleSlot(region, name, sourceSlot) {
     var sourceWindow = root.slotWindow(sourceSlot) || root.barDragWindow
-    for (var i = 0; i < moduleSlots.length; i++) {
-      var slot = moduleSlots[i]
+    for (let i = 0; i < moduleSlots.length; i++) {
+      let slot = moduleSlots[i]
       if (!slot || slot === sourceSlot || slot.region !== region || slot.moduleName !== name || !slot.visible || slot.width <= 0 || slot.height <= 0)
         continue
       if (sourceWindow && !root.sameWindow(root.slotWindow(slot), sourceWindow))
@@ -1263,8 +1263,8 @@ Item {
   function nextVisibleModuleName(region, afterName, sourceSlot) {
     var entries = layoutEntries(region)
     var found = false
-    for (var i = 0; i < entries.length; i++) {
-      var name = entryId(entries[i])
+    for (let i = 0; i < entries.length; i++) {
+      let name = entryId(entries[i])
       if (!found) {
         found = name === afterName
         continue
@@ -1294,11 +1294,12 @@ Item {
   // Match native hit testing: a target must belong to this slot, and the
   // point must be inside the target and every clipping ancestor.
   function moduleTargetContainsPoint(slot, target, localX, localY) {
-    for (var item = target; item && item !== slot; item = item.parent) {
+    let item = target
+    for (; item && item !== slot; item = item.parent) {
       if (item.visible === false || item.opacity === 0)
         return false
       if (item === target || item.clip) {
-        var point = slot.mapToItem(item, localX, localY)
+        let point = slot.mapToItem(item, localX, localY)
         if (point.x < 0 || point.x >= item.width || point.y < 0 || point.y >= item.height)
           return false
       }
@@ -1308,8 +1309,8 @@ Item {
 
   // Topmost click target under a point in slot, else the slot's widget if clickable; null if none.
   function moduleClickTargetAt(slot, localX, localY) {
-    for (var i = clickTargets.length - 1; i >= 0; i--) {
-      var target = clickTargets[i]
+    for (let i = clickTargets.length - 1; i >= 0; i--) {
+      let target = clickTargets[i]
       if (!moduleTargetClickable(target))
         continue
       try {
@@ -1683,13 +1684,20 @@ Item {
       implicitWidth: Math.ceil(tooltipBubble.implicitWidth) + Style.space(8)
       implicitHeight: Math.ceil(tooltipBubble.implicitHeight) + Style.space(8)
 
+      // Quickshell exposes these flags as opaque C++ metatypes. Preserve
+      // their runtime flag conversion at this explicit variant boundary.
+      readonly property var anchorFlags: ({
+          adjustment: PopupAdjustment.Slide,
+          edges: Edges.Top | Edges.Left,
+          gravity: Edges.Bottom | Edges.Right
+        })
       // No id inside the grouped property (qmllint rejects it); the anchor is
       // reached through its window instead.
       anchor {
         window: barWindow
-        adjustment: PopupAdjustment.Slide
-        edges: Edges.Top | Edges.Left
-        gravity: Edges.Bottom | Edges.Right
+        adjustment: tooltipWindow.anchorFlags.adjustment
+        edges: tooltipWindow.anchorFlags.edges
+        gravity: tooltipWindow.anchorFlags.gravity
         rect.width: 1
         rect.height: 1
 

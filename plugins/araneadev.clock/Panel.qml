@@ -165,10 +165,10 @@ Panel {
       visible: false
     }
     if (sun) {
-      var polar = sun.polar
+      let polar = sun.polar
       // sunArcPosition reads a polar day as night, so a polar sun takes
       // its state from polar instead.
-      var arc = polar !== "" ? {
+      let arc = polar !== "" ? {
         t: 0,
         night: polar === "night"
       } : ClockLogic.sunArcPosition(root.skyNow.getHours() * 60 + root.skyNow.getMinutes(), sun.sunrise, sun.sunset)
@@ -267,10 +267,9 @@ Panel {
     // qmllint disable missing-property
     if (root.bar && typeof root.bar.setCenterHoverRevealSuppressed === "function")
       root.bar.setCenterHoverRevealSuppressed(value)
-    else
-    // qmllint enable missing-property
-    if (root.bar && "centerHoverRevealSuppressed" in root.bar)
+    else if (root.bar && "centerHoverRevealSuppressed" in root.bar)
       root.bar.centerHoverRevealSuppressed = value
+    // qmllint enable missing-property
   }
 
   // Re-reads today's date and snaps the grid back to it.
@@ -411,8 +410,8 @@ Panel {
     // qmllint disable missing-property
     var hosts = root.bar && typeof root.bar.moduleWidgets === "function" ? root.bar.moduleWidgets(root.entryId) : []
     var areas = []
-    for (var i = 0; i < hosts.length; i++) {
-      var peer = hosts[i] ? hosts[i].clockPanel : null
+    for (let i = 0; i < hosts.length; i++) {
+      let peer = hosts[i] ? hosts[i].clockPanel : null
       if (peer && peer !== root)
         areas.push({
           placeDay: String(peer.wttrPlaceDay || ""),
