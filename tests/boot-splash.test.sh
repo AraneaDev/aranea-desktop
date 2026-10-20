@@ -154,3 +154,18 @@ cp "$repo_root/hooks/post-update" "$hooks/post-update.d/post-update"
 printf on >"$state"
 PATH="${PATH#"$fake:"}" "$repo_root/scripts/uninstall.sh" --yes >/dev/null
 [[ ! -e "$hooks/post-update.d/post-update" && ! -e "$state" ]]
+
+# Omarchy discovers selectable/current Plymouth themes only when their native
+# preview exists. Without it, a successful custom splash reports no theme and
+# post-boot cannot remember an existing user's choice.
+native_list=/usr/share/omarchy/bin/omarchy-plymouth-list
+if [[ -x "$native_list" ]]; then
+  mkdir -p "$HOME/.config/omarchy/themes"
+  rm -rf -- "$HOME/.config/omarchy/themes/aranea"
+  ln -s "$repo_root" "$HOME/.config/omarchy/themes/aranea"
+  OMARCHY_PATH=/usr/share/omarchy "$native_list" >"$ARANEA_TEST_SANDBOX/plymouth-themes"
+  grep -Fxq aranea "$ARANEA_TEST_SANDBOX/plymouth-themes" || {
+    echo 'Aranea must be discoverable by the native Plymouth theme picker' >&2
+    exit 1
+  }
+fi
