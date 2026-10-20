@@ -293,7 +293,9 @@ for surface in network bluetooth clock worldclock audio agents; do
     printf '%s: a failed summon must exit 3 without a screenshot (status %s): %s\n' "$surface" "$status" "$errors" >&2
     exit 1
   fi
-  grep -Fq "Unable to summon popup omarchy.$surface" <<<"$errors"
+  expected_target="omarchy.$surface"
+  [[ "$surface" != worldclock ]] || expected_target=omarchy.elsewhen
+  grep -Fq "Unable to summon popup $expected_target" <<<"$errors"
 done
 
 # --- A failed vpn summon is the same scripted exit 3, with no screenshot and
