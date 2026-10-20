@@ -476,7 +476,7 @@ Panel {
       Aranea.KeyboardPanelFrame {
         id: frame
         // Exposes the standalone view through the same interface as hosted views.
-        property var dropdownView: dropdown
+        property var dropdownView: dropdownLoader.item
         objectName: "worldClockFrame"
         refined: true
         centerOnBar: true
@@ -486,7 +486,7 @@ Panel {
         open: root.opened
         blocked: root.adding
         contentWidth: frame.fittedContentWidth(Style.space(380))
-        contentHeight: frame.fittedContentHeight(dropdown.implicitHeight)
+        contentHeight: frame.fittedContentHeight(dropdownLoader.implicitHeight)
         onCloseRequested: root.close()
         onTabRequested: function (direction) {
           root.switchPanel(direction)
@@ -504,8 +504,11 @@ Panel {
           objectName: "worldContent"
           anchors.fill: parent
           contentWidth: width
-          contentHeight: dropdown.implicitHeight
-          onHeightChanged: Qt.callLater(dropdown.revealCurrent)
+          contentHeight: dropdownLoader.implicitHeight
+          onHeightChanged: Qt.callLater(function () {
+            if (dropdownLoader.item)
+              dropdownLoader.item.revealCurrent()
+          })
           boundsBehavior: Flickable.StopAtBounds
           clip: true
           // Keyboard and editor focus remain visible when the saved list grows.
@@ -515,15 +518,27 @@ Panel {
             else if (top + rowHeight > contentY + height)
               contentY = Math.max(0, Math.min(contentHeight - height, top + rowHeight - height))
           }
-          WorldClockDropdown {
-            id: dropdown
+          // Embedded controllers must not compile a second copy of the hosted
+          // view through Quickshell's qs URL interceptor.
+          Loader {
+            id: dropdownLoader
             visible: root.opened
             width: viewport.width
-            view: root.worldView
-            onRevealRequested: function (top, rowHeight) {
+            Component.onCompleted: setSource(Qt.resolvedUrl("WorldClockDropdown.qml"), {
+              width: Qt.binding(function () {
+                return dropdownLoader.width
+              }),
+              view: Qt.binding(function () {
+                return root.worldView
+              })
+            })
+          }
+          Connections {
+            target: dropdownLoader.item
+            function onRevealRequested(top, rowHeight) {
               viewport.reveal(top, rowHeight)
             }
-            onAction: function (name, arg) {
+            function onAction(name, arg) {
               root.handleAction(name, arg)
             }
           }
