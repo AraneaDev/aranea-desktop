@@ -27,7 +27,7 @@ ARANEA_SETTINGS_RENDER_WIDTH=652 ARANEA_SETTINGS_RENDER_HEIGHT=452 ARANEA_SETTIN
 # Isolated preview must never summon or mutate the active desktop owners.
 # Shared host Style probes compositor geometry read-only. With session sockets
 # removed these cannot contact the desktop; no settings owner commands may run.
-if [[ -f "$ARANEA_TEST_SANDBOX/guard.log" ]] && grep -Ev '^hyprctl -j getoption (general:gaps_out|decoration:rounding)$' "$ARANEA_TEST_SANDBOX/guard.log"; then
+if [[ -f "$ARANEA_TEST_SANDBOX/guard.log" ]] && grep -Ev '^hyprctl -j getoption (general:gaps_out|decoration:rounding|animations:enabled)$' "$ARANEA_TEST_SANDBOX/guard.log"; then
   exit 1
 fi
 rc=0

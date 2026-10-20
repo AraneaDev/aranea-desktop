@@ -115,6 +115,10 @@ if [[ "$*" == '-j getoption general:gaps_out' || "$*" == '-j getoption decoratio
   printf '{"int":0}\n'
   exit 0
 fi
+if [[ "$*" == '-j getoption animations:enabled' ]]; then
+  printf '{"int":1,"bool":true}\n'
+  exit 0
+fi
 printf 'unexpected desktop call: %s\n' "$*" >> "$ARANEA_TEST_SANDBOX/guard.log"
 exit 99
 DESKTOP

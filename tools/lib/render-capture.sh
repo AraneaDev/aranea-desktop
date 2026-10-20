@@ -13,6 +13,12 @@ if [[ "${0##*/}" == hyprctl && "$*" == '-j getoption general:gaps_out' || "${0##
   printf '{"int":0}\n'
   exit 0
 fi
+# Omarchy 4.5 Style also reads the animations toggle; report it on so shared
+# Ui keeps its pre-4.5 timing and renders stay byte-for-byte comparable.
+if [[ "${0##*/}" == hyprctl && "$*" == '-j getoption animations:enabled' ]]; then
+  printf '{"int":1,"bool":true}\n'
+  exit 0
+fi
 printf '%s %s\n' "${0##*/}" "$*" >>"$ARANEA_CAPTURE_EXECUTION_LOG"
 exit 99
 CAPTURE_TRAP
