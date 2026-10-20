@@ -9,6 +9,7 @@ import "plugins/araneadev.weather" as Weather
 
 ShellRoot {
   id: testRoot
+  // Simulated live workspace rows supplied to the production widget.
   property var rows: [
     {
       id: 1,
@@ -19,6 +20,7 @@ ShellRoot {
       windows: 2
     }
   ]
+  // Last workspace action sent through the bar transport.
   property string lastCommand: ""
   QmlTest {
     id: t
@@ -136,6 +138,7 @@ ShellRoot {
     t.equal(weather.weatherPanel.settings.fixtureRevision, 2, "production weather settings update reaches its panel")
     t.done()
   })
+  // Checks the production panel's injected properties and open/close contract.
   function checkPanel(widget, panel, name) {
     t.check(panel !== null, name + " loads its real Panel.qml")
     if (!panel)

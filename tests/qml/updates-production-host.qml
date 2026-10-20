@@ -6,6 +6,7 @@ import "plugins/araneadev.updates" as Updates
 
 ShellRoot {
   id: testRoot
+  // Last updater action sent through the production bar transport.
   property string lastCommand: ""
   QmlTest {
     id: t
