@@ -442,15 +442,16 @@ Item {
   Loader {
     id: panelLoader
     sourceComponent: root.testWorkspaces !== null ? testPanelHost : null
+    // Both WorkspacePanelHost and the inert test host expose this interface.
+    readonly property var loadedItem: item
     onLoaded: {
-      var loaded = item as TestPanelHost
-      loaded.workspaceStates = Qt.binding(function () {
+      loadedItem.workspaceStates = Qt.binding(function () {
         return root.visibleStates
       })
-      loaded.projectSnapshot = Qt.binding(function () {
+      loadedItem.projectSnapshot = Qt.binding(function () {
         return root.projectSnapshot
       })
-      loaded.open = Qt.binding(function () {
+      loadedItem.open = Qt.binding(function () {
         return root.panelOpen
       })
     }
