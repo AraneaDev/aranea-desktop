@@ -1,12 +1,6 @@
-// Aranea Clock (araneadev.clock, cloned from omarchy.clock): the calendar
-// dropdown. Stock's root logic stays (month and year stepping, Back to
-// today, the week start setting, the Memento Mori edit, persistSettings,
-// the SystemClock rollover, the hostWidget / barIdentity owner contract,
-// centerOnBar and open / close / toggle). Added here: the sun and moon
-// (the weather location file, else one wttr.in lookup a day on open), the
-// showcase stand-in place for README captures, and handleAction. The pure
-// view, ClockDropdown, draws it in the shared keyboard frame; the sun and
-// moon rules are ClockLogic.js functions, tested under Node.
+// Clock owns one anchored Calendar, World Clock and Weather keyboard popup.
+// Calendar retains its existing model and actions; optional controllers and views
+// load in embedded mode before construction and share this single native frame.
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -47,6 +41,154 @@ Panel {
   // ("araneadev.clock"), else this panel's own. moduleName itself stays
   // "omarchy.clock" for IPC.
   readonly property string entryId: hostWidget && hostWidget.moduleName ? String(hostWidget.moduleName) : root.moduleName
+
+  // Selected page; only its controller may run an open lifecycle.
+  property string activePage: "calendar"
+  // Embedded optional controllers, also exposed by the mounted clock widget.
+  readonly property var weatherPanel: weatherLoader.item
+  // Embedded world-clock controller, null when unavailable.
+  readonly property var worldClockPanel: worldLoader.item
+  // Uniform active controller interface for shared keyboard routing.
+  readonly property var activePageController: activePage === "weather" ? weatherPanel : activePage === "worldclock" ? worldClockPanel : root
+  // Optional hosted views load independently so Calendar survives missing plugins.
+  readonly property var worldDropdown: worldViewLoader.item
+  // Weather's hosted view, null until the optional plugin is ready.
+  readonly property var weatherDropdown: weatherViewLoader.item
+  // Calendar-only work must stop when another page owns the popup.
+  readonly property bool calendarActive: opened && activePage === "calendar"
+
+  // Cancel the outgoing page before selecting a valid available page.
+  function selectPage(page) {
+    if (page !== "calendar" && page !== "worldclock" && page !== "weather")
+      return false
+    if ((page === "worldclock" && !worldClockPanel) || (page === "weather" && !weatherPanel))
+      return false
+    if (page === activePage)
+      return true
+    disarmPointer()
+    if (weatherPanel)
+      weatherPanel.deactivateEmbedded()
+    if (worldClockPanel)
+      worldClockPanel.deactivateEmbedded()
+    if (editingLife)
+      cancelEditingLife()
+    activePage = page
+    viewport.contentY = 0
+    if (opened)
+      activatePage()
+    focusPage(page)
+    return true
+  }
+
+  // Start only the selected page without claiming another native surface.
+  function activatePage() {
+    if (activePage === "calendar") {
+      root.refresh()
+      root.skyNow = new Date()
+      locationFile.reload()
+      root.maybeFetchArea()
+    } else if (activePageController)
+      activePageController.activateEmbedded()
+  }
+
+  // A queued focus request belongs to the same still-open page only.
+  function focusPage(page) {
+    Qt.callLater(function () {
+      if (root.opened && root.activePage === page && panel.focusTarget)
+        panel.focusTarget.forceActiveFocus()
+    })
+  }
+
+  // Open a named section directly, without briefly activating Calendar.
+  function openSection(page) {
+    var wasOpen = opened
+    var changed = page !== activePage
+    if (!selectPage(page))
+      return false
+    if (!opened)
+      root.controller.show()
+    if (!wasOpen || !changed)
+      activatePage()
+    Qt.callLater(function () {
+      if (root.opened)
+        setCenterHoverRevealSuppressed(true)
+    })
+    return true
+  }
+
+  // Toggle only this section; another active page counts as closed.
+  function toggleSection(page) {
+    if (isSectionOpen(page))
+      close()
+    else
+      openSection(page)
+  }
+
+  // Section-specific state for trusted aliases and legacy IPC.
+  function isSectionOpen(page) {
+    return opened && activePage === page
+  }
+
+  // Merge into the latest whole own-entry settings, retaining other pages.
+  function persistSection(page, values) {
+    var key = page === "worldclock" ? "worldClock" : page === "weather" ? "weather" : ""
+    if (!key)
+      return false
+    var current = hostWidget ? hostWidget.settings : settings
+    var nested = {}, patch = {}
+    var previous = current && current[key] ? current[key] : {}
+    for (let name in previous)
+      nested[name] = previous[name]
+    for (let field in values)
+      nested[field] = values[field]
+    patch[key] = nested
+    persistSettings(patch)
+    return true
+  }
+
+  // Disarm the current page before keyboard input or a page handoff.
+  function disarmPointer() {
+    if (activePage === "calendar")
+      dropdown.disarmPointer()
+    else if (activePageController)
+      activePageController.disarmPointer()
+  }
+
+  // Calendar navigation keeps its original month/year behavior.
+  function navigateKeyboard(dx, dy) {
+    disarmPointer()
+    if (dx !== 0)
+      moveMonth(dx)
+    if (dy !== 0)
+      moveYear(dy)
+  }
+
+  // Calendar activation returns to today.
+  function activateKeyboard() {
+    disarmPointer()
+    goToToday()
+  }
+
+  // Calendar has no deletion action; other pages implement their own.
+  function deleteKeyboard() {
+  }
+
+  // Existing Calendar shortcuts, routed only while it is selected.
+  function textKeyboard(text) {
+    disarmPointer()
+    if (text === "[")
+      moveMonth(-1)
+    else if (text === "]")
+      moveMonth(1)
+    else if (text === "{")
+      moveYear(-1)
+    else if (text === "}")
+      moveYear(1)
+    else if (text === "t" || text === "T")
+      goToToday()
+    else if (text === "w" || text === "W")
+      toggleWeekStart()
+  }
 
   // ---- Today. SystemClock keeps this honest across midnight so the
   //      highlight rolls over without the panel being reopened.
@@ -221,17 +363,7 @@ Panel {
     })
   // Refreshes to today and reveals the popup.
   function open() {
-    refresh()
-    root.controller.show()
-    // Set after showing, not before: showing hands the popout coordinator
-    // over, which closes whichever panel was open, and that close clears the
-    // shared flag. Deferring means the panel taking over always wins, while
-    // a handoff to a panel that does not manage the flag still leaves it
-    // cleared rather than stuck on.
-    Qt.callLater(function () {
-      if (root.opened)
-        setCenterHoverRevealSuppressed(true)
-    })
+    openSection("calendar")
   }
 
   // Hides the popup and cancels any in-progress life-field edit.
@@ -241,6 +373,11 @@ Panel {
     // waiting behind a closed popup for the next time it opens.
     if (root.editingLife)
       root.cancelEditingLife()
+    if (weatherPanel)
+      weatherPanel.deactivateEmbedded()
+    if (worldClockPanel)
+      worldClockPanel.deactivateEmbedded()
+    root.disarmPointer()
     root.controller.hide()
   }
 
@@ -305,7 +442,7 @@ Panel {
   // The write goes under entryId (the bar entry's id): the plugin shell
   // drops a write under any other id.
   function persistSettings(values) {
-    var write = ClockLogic.persistEntry(root.entryId, root.moduleName, root.settings, values)
+    var write = ClockLogic.persistEntry(root.entryId, root.moduleName, root.hostWidget ? root.hostWidget.settings : root.settings, values)
     root.settings = write.entry
     if (root.hostWidget && "settings" in root.hostWidget)
       root.hostWidget.settings = write.entry
@@ -337,7 +474,7 @@ Panel {
   function cancelEditingLife() {
     root.editingLife = false
     Qt.callLater(function () {
-      if (panel.focusTarget)
+      if (root.calendarActive && panel.focusTarget)
         panel.focusTarget.forceActiveFocus()
     })
   }
@@ -429,7 +566,7 @@ Panel {
     var day = Model.keyForDate(new Date())
     if (areaProc.running)
       return
-    var plan = ClockLogic.areaPlan(root.configuredPlace, root.areaFetchDay, root.peerAreas(), day, root.opened)
+    var plan = ClockLogic.areaPlan(root.configuredPlace, root.areaFetchDay, root.peerAreas(), day, root.calendarActive)
     if (plan.adopt) {
       root.wttrPlace = plan.adopt
       root.wttrPlaceDay = day
@@ -481,9 +618,9 @@ Panel {
   // tries again.
   Connections {
     target: root
-    function onOpenedChanged() {
+    function onCalendarActiveChanged() {
       root.showcasePlace = null
-      if (root.opened) {
+      if (root.calendarActive) {
         root.skyNow = new Date()
         locationFile.reload()
         root.maybeFetchArea()
@@ -521,69 +658,198 @@ Panel {
   Timer {
     interval: 60000
     repeat: true
-    running: root.opened
+    running: root.calendarActive
     onTriggered: root.skyNow = new Date()
+  }
+
+  // Initial properties prevent even transient standalone windows or polling.
+  Loader {
+    id: worldLoader
+    Component.onCompleted: setSource(Qt.resolvedUrl("../araneadev.worldclock/Panel.qml"), {
+      embedded: true,
+      embeddingHost: root,
+      bar: Qt.binding(function () {
+        return root.bar
+      }),
+      hostWidget: Qt.binding(function () {
+        return root.hostWidget
+      }),
+      settings: Qt.binding(function () {
+        return root.settings.worldClock || {}
+      }),
+      hostedDropdown: Qt.binding(function () {
+        return root.worldDropdown
+      }),
+      hostedFocusTarget: Qt.binding(function () {
+        return panel.focusTarget
+      })
+    })
+  }
+  Loader {
+    id: weatherLoader
+    Component.onCompleted: setSource(Qt.resolvedUrl("../araneadev.weather/Panel.qml"), {
+      embedded: true,
+      embeddingHost: root,
+      bar: Qt.binding(function () {
+        return root.bar
+      }),
+      hostWidget: Qt.binding(function () {
+        return root.hostWidget
+      }),
+      settings: Qt.binding(function () {
+        return root.settings.weather || {}
+      }),
+      hostedDropdown: Qt.binding(function () {
+        return root.weatherDropdown
+      }),
+      hostedFocusTarget: Qt.binding(function () {
+        return panel.focusTarget
+      })
+    })
   }
 
   Aranea.KeyboardPanelFrame {
     id: panel
+    objectName: "clockFrame"
     refined: true
     anchorItem: root.anchorItem
     owner: root.barIdentity
     bar: root.bar
     open: root.opened
-    centerOnBar: true
-    blocked: root.editingLife
-    // Wider than the other dropdowns (380): the sun and moon pairs share a
-    // row, and the longest moon line ("Waxing crescent · 100%") must leave
-    // room for its "Moon" label.
+    centerOnBar: false
+    blocked: root.activePage === "calendar" ? root.editingLife : root.activePage === "worldclock" ? !!(root.worldClockPanel && root.worldClockPanel.adding) : !!(root.weatherPanel && root.weatherPanel.editingLocation && !root.weatherPanel.savingLocation) || weatherPreferences.editing
     contentWidth: panel.fittedContentWidth(Style.space(440))
-    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
+    contentHeight: panel.fittedContentHeight(tabs.implicitHeight + Style.space(12) + (root.activePage === "worldclock" ? (root.worldDropdown ? root.worldDropdown.implicitHeight : 0) : root.activePage === "weather" ? weatherPage.implicitHeight : dropdown.implicitHeight))
     onCloseRequested: root.close()
     onTabRequested: function (direction) {
-      dropdown.disarmPointer()
+      root.disarmPointer()
       root.switchPanel(direction)
     }
     onMoveRequested: function (dx, dy) {
-      dropdown.disarmPointer()
-      if (dx !== 0)
-        root.moveMonth(dx)
-      if (dy !== 0)
-        root.moveYear(dy)
+      if (root.activePageController)
+        root.activePageController.navigateKeyboard(dx, dy)
     }
-    onActivateRequested: {
-      dropdown.disarmPointer()
-      root.goToToday()
-    }
-    onTextKey: function (t) {
-      dropdown.disarmPointer()
-      if (t === "[")
-        root.moveMonth(-1)
-      else if (t === "]")
-        root.moveMonth(1)
-      else if (t === "{")
-        root.moveYear(-1)
-      else if (t === "}")
-        root.moveYear(1)
-      else if (t === "t" || t === "T")
-        root.goToToday()
-      else if (t === "w" || t === "W")
-        root.toggleWeekStart()
+    onActivateRequested: if (root.activePageController)
+      root.activePageController.activateKeyboard()
+    onDeleteRequested: if (root.activePageController)
+      root.activePageController.deleteKeyboard()
+    onTextKey: function (text) {
+      if (root.activePageController)
+        root.activePageController.textKeyboard(text)
     }
 
     Item {
       anchors.fill: parent
       clip: true
-
-      ClockDropdown {
-        id: dropdown
+      ClockTabs {
+        id: tabs
         width: parent.width
-        view: root.clockView
-        todayKey: root.todayKey
-        bornText: root.lifeBornText
-        liveToText: root.lifeLiveToText
-        onAction: function (name, arg) {
-          root.handleAction(name, arg)
+        page: root.activePage
+        worldClockAvailable: root.worldClockPanel !== null
+        weatherAvailable: root.weatherPanel !== null
+        onPageRequested: function (page) {
+          root.selectPage(page)
+        }
+      }
+      Flickable {
+        id: viewport
+        anchors.top: tabs.bottom
+        anchors.topMargin: Style.space(12)
+        anchors.bottom: parent.bottom
+        width: parent.width
+        contentWidth: width
+        contentHeight: root.activePage === "worldclock" ? (root.worldDropdown ? root.worldDropdown.implicitHeight : 0) : root.activePage === "weather" ? weatherPage.implicitHeight : dropdown.implicitHeight
+        boundsBehavior: Flickable.StopAtBounds
+        clip: true
+        // Keep long lists and the inline city editor within the fitted viewport.
+        function reveal(top, rowHeight) {
+          if (top < contentY)
+            contentY = Math.max(0, top)
+          else if (top + rowHeight > contentY + height)
+            contentY = Math.max(0, Math.min(contentHeight - height, top + rowHeight - height))
+        }
+        onHeightChanged: Qt.callLater(function () {
+          if (root.isSectionOpen("worldclock") && root.worldDropdown)
+            root.worldDropdown.revealCurrent()
+        })
+        ClockDropdown {
+          id: dropdown
+          visible: root.calendarActive
+          width: viewport.width
+          view: root.clockView
+          todayKey: root.todayKey
+          bornText: root.lifeBornText
+          liveToText: root.lifeLiveToText
+          onAction: function (name, arg) {
+            root.handleAction(name, arg)
+          }
+        }
+        Loader {
+          id: worldViewLoader
+          width: viewport.width
+          visible: root.isSectionOpen("worldclock")
+          Component.onCompleted: setSource(Qt.resolvedUrl("../araneadev.worldclock/WorldClockDropdown.qml"), {
+            width: Qt.binding(function () {
+              return worldViewLoader.width
+            }),
+            view: Qt.binding(function () {
+              return root.worldClockPanel ? root.worldClockPanel.worldView : {}
+            })
+          })
+        }
+        Connections {
+          target: root.worldDropdown
+          function onRevealRequested(top, rowHeight) {
+            viewport.reveal(top, rowHeight)
+          }
+          function onAction(name, arg) {
+            if (root.worldClockPanel)
+              root.worldClockPanel.handleAction(name, arg)
+          }
+        }
+        Column {
+          id: weatherPage
+          width: viewport.width
+          visible: root.isSectionOpen("weather")
+          spacing: Style.space(12)
+          Loader {
+            id: weatherViewLoader
+            width: viewport.width
+            visible: root.isSectionOpen("weather")
+            Component.onCompleted: setSource(Qt.resolvedUrl("../araneadev.weather/WeatherDropdown.qml"), {
+              width: Qt.binding(function () {
+                return weatherViewLoader.width
+              }),
+              view: Qt.binding(function () {
+                return root.weatherPanel ? root.weatherPanel.weatherView : {}
+              }),
+              hourlyPoints: Qt.binding(function () {
+                return root.weatherPanel ? root.weatherPanel.hourlyPoints : null
+              }),
+              editText: Qt.binding(function () {
+                return root.weatherPanel ? root.weatherPanel.editText : ""
+              })
+            })
+          }
+          ClockWeatherPreferences {
+            id: weatherPreferences
+            objectName: "clockWeatherPreferences"
+            width: parent.width
+            visible: root.isSectionOpen("weather")
+            unit: root.weatherPanel ? String(root.weatherPanel.setting("unit", "")) : ""
+            refreshMinutes: root.weatherPanel ? root.weatherPanel.refreshMinutes : 15
+            focusTarget: panel.focusTarget
+            onSettingsRequested: function (values) {
+              root.persistSection("weather", values)
+            }
+          }
+        }
+        Connections {
+          target: root.weatherDropdown
+          function onAction(name, arg) {
+            if (root.weatherPanel)
+              root.weatherPanel.handleAction(name, arg)
+          }
         }
       }
     }

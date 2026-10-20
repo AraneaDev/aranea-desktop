@@ -14,6 +14,7 @@
 // pure view, WeatherDropdown, draws it in the shared keyboard frame; the
 // rules are Model.js (stock) and WeatherLogic.js functions, tested under
 // Node.
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -35,6 +36,29 @@ Panel {
   moduleName: "omarchy.weather"
   ipcTarget: "omarchy.weather"
   manageIpc: false
+
+  // Clock owns the only native popup when this controller is embedded.
+  property bool embedded: false
+  // Owning Clock panel; page tokens are weather and worldclock.
+  property var embeddingHost: null
+  // Pure page view owned by the Clock popup.
+  property var hostedDropdown: null
+  // Clock's shared keyboard catcher, used after editor cancellation.
+  property var hostedFocusTarget: null
+  // Dynamic frame interface keeps Loader QObject metadata out of page bindings.
+  readonly property var standaloneFrameItem: standaloneFrame.item
+  // View targeted by keyboard and pointer operations in either mode.
+  readonly property var activeDropdown: embedded ? hostedDropdown : standaloneFrameItem ? standaloneFrameItem.dropdownView : null
+  // Focus remains with the owner of the currently visible section.
+  readonly property var activeFocusTarget: embedded ? hostedFocusTarget : standaloneFrameItem ? standaloneFrameItem.focusTarget : null
+  // Delayed work may only target this section while its owner is open.
+  readonly property bool sectionActive: !embedded || (opened && embeddingHost && embeddingHost.opened && embeddingHost.activePage === "weather")
+
+  // Reset the pointer state of whichever pure view is currently hosted.
+  function disarmPointer() {
+    if (root.activeDropdown)
+      root.activeDropdown.disarmPointer()
+  }
 
   // The bar button to anchor the popup against, set by BarWidget.qml.
   property var anchorItem: null
@@ -61,6 +85,12 @@ Panel {
   // Reveals the popup from a pointer click: no center-hover suppression,
   // since a click already carries its own hover state.
   function open() {
+    if (root.embedded) {
+      if (!root.embeddingHost)
+        return
+      root.embeddingHost.openSection("weather")
+      return
+    }
     openedFromHotkey = false
     setCenterHoverRevealSuppressed(false)
     root.controller.show()
@@ -71,6 +101,10 @@ Panel {
   // Reveals the popup from the IPC/hotkey path, suppressing the center
   // hover reveal while it is up (summoning moves no pointer).
   function openFromHotkey() {
+    if (root.embedded) {
+      root.open()
+      return
+    }
     openedFromHotkey = true
     root.controller.show()
     locationFile.reload()
@@ -86,8 +120,95 @@ Panel {
     })
   }
 
+  // Begin refresh only after Clock has selected this page.
+  function activateEmbedded() {
+    if (!root.embedded || !root.embeddingHost || !root.embeddingHost.opened || root.embeddingHost.activePage !== "weather")
+      return
+    root.controller.show()
+    locationFile.reload()
+    root.autoRefresh()
+    root.resumeCanceledWeatherRequests()
+  }
+
+  // Cancel page work without closing Clock or allowing deferred focus to escape.
+  function deactivateEmbedded() {
+    if (root.opened) {
+      let requests = []
+      if (forecastProc.running || forecastRetryTimer.running)
+        requests.push({
+          process: forecastProc,
+          dataKey: "report",
+          data: root.report
+        })
+      if (dailyForecastProc.running || dailyForecastRetryTimer.running)
+        requests.push({
+          process: dailyForecastProc,
+          dataKey: "dailyForecastReport",
+          data: root.dailyForecastReport
+        })
+      if (airProc.running)
+        requests.push({
+          process: airProc,
+          dataKey: "air",
+          data: root.air
+        })
+      if (locationProc.running)
+        requests.push({
+          process: locationProc,
+          dataKey: "wttrLocation",
+          data: root.wttrLocation
+        })
+      root.canceledWeatherRequests = {
+        query: root.locationQuery,
+        cycle: root.refreshCycle,
+        requests: requests
+      }
+    }
+    root.controller.hide()
+    root.cancelEditingLocation()
+    root.editQuery = ""
+    root.editText = ""
+    root.geocodePendingQuery = ""
+    root.geocodeActiveQuery = ""
+    forecastRetryTimer.stop()
+    dailyForecastRetryTimer.stop()
+    readyTimer.stop()
+    peerWaitTimer.stop()
+    forecastProc.running = false
+    dailyForecastProc.running = false
+    airProc.running = false
+    locationProc.running = false
+    geocodeProc.running = false
+    root.awaitingPeer = false
+    root.fetchClaimMs = 0
+    root.disarmPointer()
+  }
+
+  // Resume only requests canceled by a page switch, retaining fresh primary data.
+  function resumeCanceledWeatherRequests() {
+    if (!root.sectionActive || !root.canceledWeatherRequests)
+      return
+    var canceled = root.canceledWeatherRequests
+    root.canceledWeatherRequests = null
+    // A new location or full refresh already supersedes the canceled work.
+    if (canceled.query !== root.locationQuery || canceled.cycle !== root.refreshCycle)
+      return
+    canceled.requests.forEach(function (request) {
+      // A peer may have supplied this response while the page was hidden.
+      // An interrupted air collector can clear its old value on cancellation.
+      if (root[request.dataKey] === request.data || (request.dataKey === "air" && root.air === null))
+        request.process.running = true
+    })
+  }
+
   // Hides the popup and cancels any in-progress location edit.
   function close() {
+    if (root.embedded) {
+      if (!root.embeddingHost)
+        return
+      root.embeddingHost.close()
+      return
+    }
     setCenterHoverRevealSuppressed(false)
     if (root.editingLocation)
       root.cancelEditingLocation()
@@ -96,6 +217,15 @@ Panel {
 
   // Opens the popup if closed, closes it if open.
   function toggle() {
+    if (root.embedded) {
+      if (!root.embeddingHost)
+        return
+      if (root.opened)
+        root.embeddingHost.close()
+      else
+        root.embeddingHost.openSection("weather")
+      return
+    }
     if (root.opened)
       root.close()
     else
@@ -277,6 +407,8 @@ Panel {
   // instances: {locationQuery, fetchedAtMs, publishedAtMs, report, daily, forecast, air,
   // autoCoords, wttrLocation, label}; null before any.
   property var sharedWeather: null
+  // Same-location requests interrupted when an embedded page becomes inactive.
+  property var canceledWeatherRequests: null
   // True while an automatic refresh waits for another instance's fetch.
   property bool awaitingPeer: false
   // When this instance last started a fetch (Date.now()), so another
@@ -396,6 +528,8 @@ Panel {
   // when coordinates are configured (otherwise once wttr reports the
   // auto-detected area), and the auto-detect place name when unset.
   function refresh() {
+    if (root.embedded && !root.sectionActive)
+      return
     awaitingPeer = false
     peerWaitTimer.stop()
     root.fetchClaimMs = Date.now()
@@ -422,6 +556,8 @@ Panel {
   // than the refresh interval, so a timer firing on schedule still finds
   // its own last report stale.
   function autoRefresh() {
+    if (root.embedded && !root.sectionActive)
+      return
     var hosts = root.instancePanels()
     var bundles = []
     var peerFetching = false
@@ -537,6 +673,8 @@ Panel {
   // or the last-known automatic coordinates when unconfigured. Once per
   // refresh and coordinates: automatic mode asks before and after wttr.
   function refreshDailyForecast(sourceCoords) {
+    if (root.embedded && !root.sectionActive)
+      return
     if (dailyForecastProc.running)
       return
     var lat = parseFloat(String(root.configuredLocationState.latitude))
@@ -567,6 +705,8 @@ Panel {
   //      field; picking a geocoded suggestion persists name + coordinates
   //      through omarchy-weather-location. An empty commit returns to auto.
   function startEditingLocation() {
+    if (root.embedded && !root.sectionActive)
+      return
     if (savingLocation)
       return
     editingLocation = true
@@ -595,8 +735,8 @@ Panel {
   // Hands keyboard focus back to the frame's key catcher.
   function focusPanel() {
     Qt.callLater(function () {
-      if (panel.focusTarget)
-        panel.focusTarget.forceActiveFocus()
+      if (root.opened && root.sectionActive && root.activeFocusTarget)
+        root.activeFocusTarget.forceActiveFocus()
     })
   }
 
@@ -666,6 +806,8 @@ Panel {
   // Writes the location to weather.json via omarchy-weather-location: a
   // name with coordinates, a name alone, or a clear back to auto-detect.
   function persistLocation(name, latitude, longitude) {
+    if (root.embedded && !root.sectionActive)
+      return
     if (name && latitude !== null && longitude !== null)
       locationSaveProc.command = ["omarchy-weather-location", "--set", name, latitude + "," + longitude]
     else if (name)
@@ -697,6 +839,8 @@ Panel {
   // Debounced geocoding. Only one curl runs at a time; if the query moved on
   // while a fetch was in flight, the latest query is fetched right after.
   function requestGeocode() {
+    if (root.embedded && !root.sectionActive)
+      return
     var query = root.editQuery.trim()
     if (query.length < 2) {
       locationSuggestions = []
@@ -709,6 +853,8 @@ Panel {
 
   // Starts the geocoding curl for geocodePendingQuery.
   function startGeocode() {
+    if (root.embedded && !root.sectionActive)
+      return
     geocodeActiveQuery = geocodePendingQuery
     geocodeProc.command = ["curl", "-fsS", "--max-time", "5", "https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(geocodeActiveQuery) + "&count=5&language=en&format=json"]
     geocodeProc.running = true
@@ -731,6 +877,8 @@ Panel {
   // changed under it is refused; the rest map onto stock's location
   // functions.
   function handleAction(name, arg) {
+    if (root.embedded && !root.sectionActive)
+      return
     var a = arg || ({})
     if (name === "query") {
       root.editQuery = String(a.text || "")
@@ -813,6 +961,36 @@ Panel {
       root.refresh()
   }
 
+  // Forward first-key cursor reveal and subsequent moves from either host.
+  function navigateKeyboard(dx, dy) {
+    root.disarmPointer()
+    if (!root.cursorActive || !root.keyboardCursor) {
+      root.revealCursor()
+      return
+    }
+    root.clampCursor()
+    root.moveCursor(dy !== 0 ? dy : dx)
+  }
+  // Enter preserves the standalone cursor confirmation policy.
+  function activateKeyboard() {
+    root.disarmPointer()
+    root.activateCursor()
+  }
+  // Weather has no destructive row shortcut.
+  function deleteKeyboard() {
+    root.disarmPointer()
+  }
+  // Printable shortcuts keep edits and refreshes in their existing actions.
+  function textKeyboard(text) {
+    root.disarmPointer()
+    if (root.editingLocation)
+      return
+    if (text === "r" || text === "R")
+      root.refresh()
+    else if (text === "e" || text === "E")
+      root.startEditingLocation()
+  }
+
   // The short English day name for an ISO date ("Sat").
   function shortDayName(dateString) {
     return Model.dayName(dateString, function (date) {
@@ -870,6 +1048,8 @@ Panel {
   // wttr.in can be slow or flaky, especially for a location it hasn't
   // cached yet. Retry a few times before leaving it to the refresh timer.
   function scheduleForecastRetry() {
+    if (root.embedded && !root.sectionActive)
+      return
     if (forecastRetries >= 3)
       return
     forecastRetries++
@@ -879,7 +1059,7 @@ Panel {
   Timer {
     id: forecastRetryTimer
     interval: 2500
-    onTriggered: if (!forecastProc.running)
+    onTriggered: if ((!root.embedded || root.sectionActive) && !forecastProc.running)
       forecastProc.running = true
   }
 
@@ -887,6 +1067,8 @@ Panel {
   // bar icon, so a dropped response (e.g. waking before the network is back)
   // must retry rather than wait out the refresh timer with a stale icon.
   function scheduleDailyForecastRetry() {
+    if (root.embedded && !root.sectionActive)
+      return
     if (dailyForecastRetries >= 3)
       return
     dailyForecastRetries++
@@ -991,7 +1173,7 @@ Panel {
   Timer {
     id: refreshTimer
     interval: root.refreshMinutes * 60 * 1000
-    running: true
+    running: !root.embedded || root.sectionActive
     repeat: true
     triggeredOnStart: true
     onTriggered: root.autoRefresh()
@@ -1025,87 +1207,83 @@ Panel {
     onTriggered: root.nowMs = Date.now()
   }
 
-  IpcHandler {
-    target: root.ipcTarget
+  Loader {
+    active: !root.embedded
+    sourceComponent: Component {
+      IpcHandler {
+        target: root.ipcTarget
 
-    function open(): void {
-      root.openFromHotkey()
-    }
-    function close(): void {
-      root.close()
-    }
-    function show(): void {
-      root.openFromHotkey()
-    }
-    function hide(): void {
-      root.close()
-    }
-    function toggle(): void {
-      root.toggle()
-    }
-    function edit(): void {
-      root.openFromHotkey()
-      root.startEditingLocation()
+        function open(): void {
+          root.openFromHotkey()
+        }
+        function close(): void {
+          root.close()
+        }
+        function show(): void {
+          root.openFromHotkey()
+        }
+        function hide(): void {
+          root.close()
+        }
+        function toggle(): void {
+          root.toggle()
+        }
+        function edit(): void {
+          root.openFromHotkey()
+          root.startEditingLocation()
+        }
+      }
     }
   }
 
-  Aranea.KeyboardPanelFrame {
-    id: panel
-    refined: true
-    anchorItem: root.anchorItem
-    owner: root.barIdentity
-    bar: root.bar
-    open: root.opened
-    centerOnBar: true
-    // The place field takes its own keys (Up and Down come back as the
-    // view's step action); while a place saves the field is gone and the
-    // frame has the keys again.
-    blocked: root.editingLocation && !root.savingLocation
-    contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
-    onCloseRequested: root.close()
-    onTabRequested: function (direction) {
-      dropdown.disarmPointer()
-      root.keyboardCursor = true
-      root.switchPanel(direction)
-    }
-    onMoveRequested: function (dx, dy) {
-      dropdown.disarmPointer()
-      // The first key after opening or after pointer use only reveals the
-      // cursor where it is.
-      if (!root.cursorActive || !root.keyboardCursor) {
-        root.revealCursor()
-        return
-      }
-      root.clampCursor()
-      root.moveCursor(dy !== 0 ? dy : dx)
-    }
-    onActivateRequested: {
-      dropdown.disarmPointer()
-      root.activateCursor()
-    }
-    onTextKey: function (t) {
-      dropdown.disarmPointer()
-      if (root.editingLocation)
-        return
-      if (t === "r" || t === "R")
-        root.refresh()
-      else if (t === "e" || t === "E")
-        root.startEditingLocation()
-    }
+  Loader {
+    id: standaloneFrame
+    active: !root.embedded
+    sourceComponent: Component {
+      Aranea.KeyboardPanelFrame {
+        id: panel
+        // Exposes the standalone view through the same interface as hosted views.
+        property var dropdownView: dropdown
+        refined: true
+        anchorItem: root.anchorItem
+        owner: root.barIdentity
+        bar: root.bar
+        open: root.opened
+        centerOnBar: true
+        // The place field takes its own keys (Up and Down come back as the
+        // view's step action); while a place saves the field is gone and the
+        // frame has the keys again.
+        blocked: root.editingLocation && !root.savingLocation
+        contentWidth: panel.fittedContentWidth(Style.space(380))
+        contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
+        onCloseRequested: root.close()
+        onTabRequested: function (direction) {
+          root.disarmPointer()
+          root.keyboardCursor = true
+          root.switchPanel(direction)
+        }
+        onMoveRequested: function (dx, dy) {
+          root.navigateKeyboard(dx, dy)
+        }
+        onActivateRequested: root.activateKeyboard()
+        onDeleteRequested: root.deleteKeyboard()
+        onTextKey: function (text) {
+          root.textKeyboard(text)
+        }
+        Item {
+          anchors.fill: parent
+          clip: true
 
-    Item {
-      anchors.fill: parent
-      clip: true
-
-      WeatherDropdown {
-        id: dropdown
-        width: parent.width
-        view: root.weatherView
-        hourlyPoints: root.hourlyPoints
-        editText: root.editText
-        onAction: function (name, arg) {
-          root.handleAction(name, arg)
+          WeatherDropdown {
+            id: dropdown
+            width: parent.width
+            view: root.weatherView
+            hourlyPoints: root.hourlyPoints
+            editText: root.editText
+            onAction: function (name, arg) {
+              root.handleAction(name, arg)
+            }
+          }
         }
       }
     }

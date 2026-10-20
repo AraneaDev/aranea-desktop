@@ -66,6 +66,10 @@ ShellRoot {
     property bool vertical: false
     property int barSize: 32
     property color barForeground: "white"
+    property bool centerHoverRevealSuppressed: false
+    function setCenterHoverRevealSuppressed(value) {
+      centerHoverRevealSuppressed = value
+    }
   }
   Item {
     id: host
@@ -124,7 +128,9 @@ ShellRoot {
     t.equal(names(panel.cities), names(Cities.SEED), "empty settings seed five zones")
     t.equal(writes.length, 1, "seed persists once")
     t.equal(writes[0].id, "araneadev.worldclock", "write uses host entry id")
-    panel.close()
+    bar.centerHoverRevealSuppressed = true
+    panel.controller.hide()
+    t.check(!bar.centerHoverRevealSuppressed, "standalone lifecycle close clears its own hover suppression")
     panel.open()
     t.equal(writes.length, 1, "reopening does not rewrite normalized settings")
     reset([

@@ -1,7 +1,13 @@
 # Aranea Weather
 
-`araneadev.weather` replaces Omarchy's `omarchy.weather` bar entry (the weather pill and its
-detail popup) with an Aranea-native one.
+Weather normally lives in the time dropdown's **Weather** tab. Its controller and
+pure view are embedded in Clock's single popup, and unit/refresh preferences live
+under the Clock entry's `weather` key. The location file remains unchanged. Requests
+run only while the embedded Weather page is active, with reports shared across
+clock instances. Existing `omarchy.weather` shortcuts select this page.
+
+When Clock is absent, `araneadev.weather` retains its standalone bar pill and
+popup. Its existing settings form and inline preferences remain available.
 
 `BarWidget.qml` keeps stock's pill, click handling and popup host. `Panel.qml` keeps stock's
 root logic (the wttr.in and open-meteo fetches, the refresh timer and retry schedule, the

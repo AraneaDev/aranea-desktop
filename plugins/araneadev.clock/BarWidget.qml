@@ -1,15 +1,11 @@
-// Aranea Clock (araneadev.clock, cloned from omarchy.clock): the bar's
-// date/time label and the host for the calendar dropdown. Stock's root
-// logic, label markup and IPC target stay. Added: the showcase IPC method,
-// relayed to whichever instance's dropdown is open for README captures,
-// and clockPanel, through which the instances share one wttr.in lookup.
+// Clock label and mounted owner for the shared Calendar/World Clock/Weather popup.
+// Label formats, timezone action and Clock IPC retain their existing behavior.
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
-import "." as Local
 import "../araneadev.shared" as Aranea
 import "Model.js" as Model
 import "ClockLogic.js" as ClockLogic
@@ -111,6 +107,26 @@ BarWidget {
   // This instance's loaded Panel.qml, or null; the other monitors'
   // panels read its wttr.in place through it (Panel.peerAreas).
   readonly property var clockPanel: panelLoader.item
+  // Own-entry peer aliases for the embedded optional controllers.
+  readonly property var weatherPanel: clockPanel ? clockPanel.weatherPanel : null
+  // World-clock peer alias used by legacy showcase routing.
+  readonly property var worldClockPanel: clockPanel ? clockPanel.worldClockPanel : null
+
+  // Select a named page in the single mounted-clock popup.
+  function openSection(page) {
+    return clockPanel ? clockPanel.openSection(page) : false
+  }
+
+  // Toggle the requested section, treating other pages as closed.
+  function toggleSection(page) {
+    if (clockPanel)
+      clockPanel.toggleSection(page)
+  }
+
+  // Expose section state to trusted bar aliases.
+  function isSectionOpen(page) {
+    return clockPanel ? clockPanel.isSectionOpen(page) : false
+  }
 
   // The showcase IPC method: the IPC target lands on one instance, while
   // the dropdown may be open on another monitor's, so the stand-in place
@@ -178,7 +194,7 @@ BarWidget {
   // needs; called again after load since the loader's onLoaded can race the
   // bindings below.
   function injectPanel() {
-    var target = panelLoader.item as Local.Panel
+    var target = root.clockPanel
     if (!target)
       return
     if ("bar" in target)
@@ -212,6 +228,11 @@ BarWidget {
       root.injectPanel()
       Qt.callLater(root.injectPanel)
     }
+  }
+
+  ClockCompatIpc {
+    objectName: "clockCompatIpc"
+    host: root
   }
 
   IpcHandler {

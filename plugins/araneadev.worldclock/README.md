@@ -1,6 +1,11 @@
 # Aranea World Clock
 
-Replaces Omarchy's Elsewhen bar widget with a sun-lit globe, city markers and local-day daylight strips. The existing `omarchy.elsewhen` IPC target and desktop shortcut continue to open it.
+World Clock normally lives in the time dropdown's **World Clock** tab, with a
+sun-lit globe, city markers and local-day daylight strips. Existing
+`omarchy.elsewhen` IPC and the desktop shortcut select that page. Clock stores its
+preferences under `worldClock` and owns the only popup; the controller runs only
+while that section is active. Without a mounted Clock, the standalone globe
+button and inline preferences remain available.
 
 The first list is Amsterdam (home), London, UTC, New York and Los Angeles. Only Elsewhen's untouched automatic starter list is replaced. Edited lists are kept. Saved cities contain names, IANA zones, optional coordinates and one home flag; zone abbreviations and DST offsets come from the system timezone database when the panel opens and each open minute.
 

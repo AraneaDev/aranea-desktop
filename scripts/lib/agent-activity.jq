@@ -7,8 +7,8 @@ def id: text(256) and length > 0;
 # Check individual bounds before joining for one character-class scan. Histories
 # can hold thousands of IDs/digests; compiling a regex for each entry delays
 # durable native delivery beyond its deadline without adding validation.
-def ids: all(.[];type == "string" and length > 0 and length <= 256) and (join("")|test("[\\x00-\\x1f\\x7f]")|not);
-def digests: all(.[];type == "string" and length == 64) and (join("")|test("[^a-f0-9]")|not);
+def ids: all(.[];type == "string" and length > 0 and length <= 256) and ((add // "")|test("[\\x00-\\x1f\\x7f]")|not);
+def digests: all(.[];type == "string" and length == 64) and ((add // "")|test("[^a-f0-9]")|not);
 def path: text(4096) and startswith("/");
 def unique_values: length == (unique|length);
 def provider: . == "claude" or . == "codex";

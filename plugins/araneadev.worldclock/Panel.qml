@@ -1,4 +1,5 @@
 // The World Clock owns its saved city list; the dropdown is a plain view.
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -13,6 +14,29 @@ Panel {
   moduleName: "omarchy.elsewhen"
   ipcTarget: "omarchy.elsewhen"
   manageIpc: false
+
+  // Clock owns the only native popup when this controller is embedded.
+  property bool embedded: false
+  // Owning Clock panel; page tokens are weather and worldclock.
+  property var embeddingHost: null
+  // Pure page view owned by the Clock popup.
+  property var hostedDropdown: null
+  // Clock's shared keyboard catcher, used after editor cancellation.
+  property var hostedFocusTarget: null
+  // Dynamic frame interface keeps Loader QObject metadata out of page bindings.
+  readonly property var standaloneFrameItem: standaloneFrame.item
+  // View targeted by keyboard and pointer operations in either mode.
+  readonly property var activeDropdown: embedded ? hostedDropdown : standaloneFrameItem ? standaloneFrameItem.dropdownView : null
+  // Focus remains with the owner of the currently visible section.
+  readonly property var activeFocusTarget: embedded ? hostedFocusTarget : standaloneFrameItem ? standaloneFrameItem.focusTarget : null
+  // Delayed work may only target this section while its owner is open.
+  readonly property bool sectionActive: !embedded || (opened && embeddingHost && embeddingHost.opened && embeddingHost.activePage === "worldclock")
+
+  // Reset the pointer state of whichever pure view is currently hosted.
+  function disarmPointer() {
+    if (root.activeDropdown && typeof root.activeDropdown.disarmPointer === "function")
+      root.activeDropdown.disarmPointer()
+  }
   // Host identity and entry id follow the bar slot, while IPC stays Elsewhen.
   property var anchorItem: null
   // The bar widget owning this panel and its inline entry.
@@ -130,26 +154,58 @@ Panel {
   }
   // Refreshes host settings and zone observations before showing the panel.
   function open() {
+    if (root.embedded) {
+      if (!root.embeddingHost)
+        return
+      root.embeddingHost.openSection("worldclock")
+      return
+    }
+    root.activateEmbedded()
+  }
+  // Start the selected page lifecycle without claiming a second native popup.
+  function activateEmbedded() {
+    if (root.embedded && (!root.embeddingHost || !root.embeddingHost.opened || root.embeddingHost.activePage !== "worldclock"))
+      return
     root.showcaseState = null
     root.cancelAdd()
-    if (root.hostWidget && "settings" in root.hostWidget)
+    if (!root.embedded && root.hostWidget && "settings" in root.hostWidget)
       root.settings = root.hostWidget.settings
     root.awaitingLoad = true
     root.sampleMs = Date.now()
     root.controller.show()
     root.requestProbe()
     Qt.callLater(function () {
-      if (root.opened)
+      if (root.opened && !root.embedded)
         root.setCenterHoverRevealSuppressed(true)
     })
   }
   // Closes through the shared controller; lifecycle cleanup discards search.
   function close() {
+    if (root.embedded) {
+      if (!root.embeddingHost)
+        return
+      root.embeddingHost.close()
+      return
+    }
     root.setCenterHoverRevealSuppressed(false)
     root.controller.hide()
   }
+  // Stop only this page and discard unsubmitted search state.
+  function deactivateEmbedded() {
+    root.controller.hide()
+    root.disarmPointer()
+  }
   // Toggles the shared popup lifecycle.
   function toggle() {
+    if (root.embedded) {
+      if (!root.embeddingHost)
+        return
+      if (root.opened)
+        root.embeddingHost.close()
+      else
+        root.embeddingHost.openSection("worldclock")
+      return
+    }
     if (root.opened)
       root.close()
     else
@@ -180,6 +236,13 @@ Panel {
   }
   // Preserves other inline keys and writes through the owning bar entry.
   function writeCities(saved) {
+    if (root.embedded) {
+      if (root.embeddingHost)
+        root.embeddingHost.persistSection("worldclock", {
+          cities: saved
+        })
+      return
+    }
     let entry = {
       id: root.entryId
     }
@@ -212,7 +275,7 @@ Panel {
   }
   // Samples the current relevant zones, discovering the system zone once.
   function requestProbe() {
-    if (!root.opened)
+    if (!root.opened || !root.sectionActive)
       return
     if (root.probeData !== null) {
       root.zoneData = root.probeData
@@ -245,7 +308,7 @@ Panel {
   }
   // Merges completed timezone observations and finishes initial normalization.
   function applyProbe(text) {
-    if (!root.opened)
+    if (!root.opened || !root.sectionActive)
       return
     let parsed = Logic.parseProbe(text), next = {}
     for (let old in root.zoneData)
@@ -265,13 +328,13 @@ Panel {
     root.query = ""
     root.matchIndex = 0
     Qt.callLater(function () {
-      if (root.opened && !root.adding && frame.focusTarget)
-        frame.focusTarget.forceActiveFocus()
+      if (root.opened && root.sectionActive && !root.adding && root.activeFocusTarget)
+        root.activeFocusTarget.forceActiveFocus()
     })
   }
   // Routes view actions through the pure city list operations.
   function handleAction(name, arg) {
-    if (!root.opened || ((root.awaitingLoad || root.showcaseState) && name !== "select"))
+    if (!root.opened || !root.sectionActive || ((root.awaitingLoad || root.showcaseState) && name !== "select"))
       return
     if (name === "cancelAdd") {
       root.cancelAdd()
@@ -281,7 +344,10 @@ Panel {
       root.adding = true
       root.query = ""
       root.matchIndex = 0
-      Qt.callLater(dropdown.focusQuery)
+      Qt.callLater(function () {
+        if (root.opened && root.sectionActive && root.adding && root.activeDropdown)
+          root.activeDropdown.focusQuery()
+      })
     } else if (name === "queryChanged") {
       root.query = String(arg)
       root.matchIndex = 0
@@ -311,9 +377,39 @@ Panel {
         root.persistCities(Cities.setHome(root.cities, root.selected))
     }
   }
+  // Forward the existing row navigation policy from either keyboard owner.
+  function navigateKeyboard(dx, dy) {
+    root.disarmPointer()
+    // The stock catcher reserves h as Left; world clock uses it for home.
+    if (dx < 0)
+      root.handleAction("setHome", null)
+    if (dy !== 0)
+      root.handleAction("select", root.selected + dy)
+  }
+  // Saved rows do not have an Enter action; the search field owns its Enter.
+  function activateKeyboard() {
+    root.disarmPointer()
+  }
+  // Remove follows the same selected-row action as the standalone frame.
+  function deleteKeyboard() {
+    root.disarmPointer()
+    root.handleAction("remove", null)
+  }
+  // Shared printable shortcuts keep city edits in the authoritative actions.
+  function textKeyboard(text) {
+    root.disarmPointer()
+    if (text === "a" || text === "A")
+      root.handleAction("addStart", null)
+    else if (text === "[")
+      root.handleAction("moveUp", null)
+    else if (text === "]")
+      root.handleAction("moveDown", null)
+    else if (text === "h" || text === "H")
+      root.handleAction("setHome", null)
+  }
   // Display only; the normal open/close lifecycle clears every override.
   function showcase(payload) {
-    if (!root.opened)
+    if (!root.opened || !root.sectionActive)
       return "closed"
     try {
       let v = JSON.parse(payload)
@@ -335,7 +431,8 @@ Panel {
     zoneProbe.running = false
     root.showcaseState = null
     root.cancelAdd()
-    root.setCenterHoverRevealSuppressed(false)
+    if (!root.embedded)
+      root.setCenterHoverRevealSuppressed(false)
   }
   FileView {
     id: catalogFile
@@ -372,67 +469,64 @@ Panel {
       root.requestProbe()
     }
   }
-  Aranea.KeyboardPanelFrame {
-    id: frame
-    objectName: "worldClockFrame"
-    refined: true
-    centerOnBar: true
-    anchorItem: root.anchorItem
-    owner: root.barIdentity
-    bar: root.bar
-    open: root.opened
-    blocked: root.adding
-    contentWidth: frame.fittedContentWidth(Style.space(380))
-    contentHeight: frame.fittedContentHeight(dropdown.implicitHeight)
-    onCloseRequested: root.close()
-    onTabRequested: function (direction) {
-      root.switchPanel(direction)
-    }
-    onMoveRequested: function (dx, dy) {
-      // Upstream reserves h as its Left shortcut; world clock uses that
-      // signal for set-home, while vertical movement selects rows.
-      if (dx < 0)
-        root.handleAction("setHome", null)
-      if (dy !== 0)
-        root.handleAction("select", root.selected + dy)
-    }
-    onDeleteRequested: root.handleAction("remove", null)
-    onTextKey: function (text) {
-      if (text === "a" || text === "A")
-        root.handleAction("addStart", null)
-      else if (text === "[")
-        root.handleAction("moveUp", null)
-      else if (text === "]")
-        root.handleAction("moveDown", null)
-      else if (text === "h" || text === "H")
-        root.handleAction("setHome", null)
-    }
-    Flickable {
-      id: viewport
-      objectName: "worldContent"
-      anchors.fill: parent
-      contentWidth: width
-      contentHeight: dropdown.implicitHeight
-      onHeightChanged: Qt.callLater(dropdown.revealCurrent)
-      boundsBehavior: Flickable.StopAtBounds
-      clip: true
-      // Keyboard and editor focus remain visible when the saved list grows.
-      function reveal(top, rowHeight) {
-        if (top < contentY)
-          contentY = Math.max(0, top)
-        else if (top + rowHeight > contentY + height)
-          contentY = Math.max(0, Math.min(contentHeight - height, top + rowHeight - height))
-      }
-      WorldClockDropdown {
-        id: dropdown
-        visible: root.opened
-        width: viewport.width
-        view: root.worldView
-        onRevealRequested: function (top, rowHeight) {
-          viewport.reveal(top, rowHeight)
+  Loader {
+    id: standaloneFrame
+    active: !root.embedded
+    sourceComponent: Component {
+      Aranea.KeyboardPanelFrame {
+        id: frame
+        // Exposes the standalone view through the same interface as hosted views.
+        property var dropdownView: dropdown
+        objectName: "worldClockFrame"
+        refined: true
+        centerOnBar: true
+        anchorItem: root.anchorItem
+        owner: root.barIdentity
+        bar: root.bar
+        open: root.opened
+        blocked: root.adding
+        contentWidth: frame.fittedContentWidth(Style.space(380))
+        contentHeight: frame.fittedContentHeight(dropdown.implicitHeight)
+        onCloseRequested: root.close()
+        onTabRequested: function (direction) {
+          root.switchPanel(direction)
         }
-        onAction: function (name, arg) {
-          root.handleAction(name, arg)
+        onMoveRequested: function (dx, dy) {
+          root.navigateKeyboard(dx, dy)
+        }
+        onActivateRequested: root.activateKeyboard()
+        onDeleteRequested: root.deleteKeyboard()
+        onTextKey: function (text) {
+          root.textKeyboard(text)
+        }
+        Flickable {
+          id: viewport
+          objectName: "worldContent"
+          anchors.fill: parent
+          contentWidth: width
+          contentHeight: dropdown.implicitHeight
+          onHeightChanged: Qt.callLater(dropdown.revealCurrent)
+          boundsBehavior: Flickable.StopAtBounds
+          clip: true
+          // Keyboard and editor focus remain visible when the saved list grows.
+          function reveal(top, rowHeight) {
+            if (top < contentY)
+              contentY = Math.max(0, top)
+            else if (top + rowHeight > contentY + height)
+              contentY = Math.max(0, Math.min(contentHeight - height, top + rowHeight - height))
+          }
+          WorldClockDropdown {
+            id: dropdown
+            visible: root.opened
+            width: viewport.width
+            view: root.worldView
+            onRevealRequested: function (top, rowHeight) {
+              viewport.reveal(top, rowHeight)
+            }
+            onAction: function (name, arg) {
+              root.handleAction(name, arg)
+            }
+          }
         }
       }
     }

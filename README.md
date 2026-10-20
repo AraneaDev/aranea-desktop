@@ -122,9 +122,10 @@ The passwordless sudo control stays visible: white while enabled and dimmed
 while disabled. Click to turn it off, or choose a duration and authenticate
 to turn it on. See [Passwordless sudo](docs/features.md#passwordless-sudo).
 
-### World clock
+### Clock
 
-The globe button opens a separate world clock with live daylight, a sun-lit Earth,
+Click the time to open one dropdown below the clock, with **Calendar**, **World Clock**,
+and **Weather** tabs. The world clock includes live daylight, a sun-lit Earth,
 and offline city search. Start with Amsterdam, London, UTC, New York, and Los Angeles;
 add, reorder, or choose a home city from the dropdown. Existing custom Elsewhen city
 lists are preserved. See [World clock](docs/features.md#world-clock) for the keys.

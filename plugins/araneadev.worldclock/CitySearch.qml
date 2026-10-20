@@ -16,7 +16,8 @@ Column {
   signal action(string name, var arg)
   // Hands keyboard focus to the city editor after its layout is visible.
   function focusQuery() {
-    editor.forceActiveFocus()
+    if (search.visible)
+      editor.forceActiveFocus()
   }
   onVisibleChanged: if (visible)
     Qt.callLater(focusQuery)

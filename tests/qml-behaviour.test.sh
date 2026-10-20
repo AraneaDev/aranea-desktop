@@ -63,7 +63,7 @@ run_test() {
   ln -s "$repo_root/tests/qml/fixtures" "$run_dir/cfg/fixtures"
   for plugin in "$repo_root"/plugins/araneadev.*; do
     [[ -d "$plugin" ]] || continue
-    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == health-alerts || "$name" == clock-civil-dates || "$name" == worldclock-panel || "$name" == updates-production-host || "$name" == production-widget-panels) ]]; then
+    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == health-alerts || "$name" == clock-civil-dates || "$name" == worldclock-panel || ("$name" == clock-embedded-controllers || "$name" == unified-clock) || "$name" == updates-production-host || "$name" == production-widget-panels) ]]; then
       # Adapt only native windows/attached layer-shell state. Placement, mask,
       # motion, coordinator, focus timer and production panel content stay real.
       mkdir -p "$run_dir/cfg/plugins/araneadev.shared"
@@ -81,6 +81,14 @@ source = source.replace('WlrLayershell.', 'nativeLayer.')
 source = re.sub(r'(?m)^(  |        )anchors \{', r'\1nativeAnchors {', source)
 pathlib.Path(sys.argv[2]).write_text(source)
 PYBOUNDARY
+    elif [[ "$plugin" == */araneadev.clock && "$name" == unified-clock ]]; then
+      # Native windows ignore ancestor Item visibility; the Item boundary must too.
+      mkdir -p "$run_dir/cfg/plugins/araneadev.clock"
+      for source in "$plugin"/*; do
+        [[ "${source##*/}" == BarWidget.qml ]] && continue
+        ln -s "$source" "$run_dir/cfg/plugins/araneadev.clock/${source##*/}"
+      done
+      sed 's/visible: false/visible: true/' "$plugin/BarWidget.qml" >"$run_dir/cfg/plugins/araneadev.clock/BarWidget.qml"
     elif [[ "$plugin" == */araneadev.osd && "$name" == osd-messages ]]; then
       # Keep OSD state, layout and real presentation; replace only its native
       # layer-shell window so session-message checks never need a compositor.
@@ -98,7 +106,7 @@ source = source.replace('WlrLayershell.', 'nativeLayer.')
 source = source.replace('    anchors {', '    nativeAnchors {')
 pathlib.Path(sys.argv[2]).write_text(source)
 PYOSDWINDOW
-    elif [[ "$plugin" == */araneadev.bar && "$name" == sudo-relay ]]; then
+    elif [[ "$plugin" == */araneadev.bar && ("$name" == sudo-relay || "$name" == clock-aliases) ]]; then
       mkdir -p "$run_dir/cfg/plugins/araneadev.bar"
       for source in "$plugin"/*; do
         [[ "${source##*/}" == Bar.qml ]] && continue
@@ -131,6 +139,11 @@ PYBARWINDOW
       ln -s "$plugin" "$run_dir/cfg/plugins/${plugin##*/}"
     fi
   done
+  if [[ ("$name" == clock-embedded-controllers || "$name" == unified-clock) ]]; then
+    # Count every main frame, including transient standalone construction.
+    # SpringPanel also creates legitimate per-output dismissal surfaces on open.
+    sed -i '/^  id: root$/a\  Component.onCompleted: console.log("QMLTEST CLOCK NATIVE FRAME")' "$run_dir/cfg/plugins/araneadev.shared/SpringPanel.qml"
+  fi
   ln -s "$repo_root/shell.toml" "$run_dir/cfg/theme-shell.toml"
   cp "$test_file" "$run_dir/cfg/shell.qml"
   # Fixed Display command boundary: controllers and hosted System tests never
@@ -140,6 +153,18 @@ PYBARWINDOW
   for display_command in display-fixture omarchy-display-text-size omarchy-toggle-nightlight brightnessctl omarchy-brightness-keyboard omarchy-monitor-state omarchy-battery-status omarchy-powerprofiles-list upower ls; do
     ln -s "$repo_root/tests/qml/fixtures/display-command.py" "$run_dir/display-bin/$display_command"
   done
+  if [[ ("$name" == clock-embedded-controllers || "$name" == unified-clock) ]]; then
+    # Record only controller commands; Commons Style has unrelated startup probes.
+    : >"${ARANEA_TEST_SANDBOX:?}/clock-calls.log"
+    cat >"$run_dir/display-bin/clock-command" <<'CLOCKCOMMAND'
+#!/usr/bin/env bash
+printf '%s\n' "$(basename "$0")${*:+ $*}" >>"${ARANEA_TEST_SANDBOX:?}/clock-calls.log"
+CLOCKCOMMAND
+    chmod +x "$run_dir/display-bin/clock-command"
+    for display_command in curl omarchy-weather-location timedatectl; do
+      ln -s "$run_dir/display-bin/clock-command" "$run_dir/display-bin/$display_command"
+    done
+  fi
   # Replace the entire native sudo helper; never execute a grant or policy command.
   mkdir -p "$run_dir/sudo-bin" "$run_dir/sudo-state"
   if [[ "$name" == sudo-widget || "$name" == sudo-relay ]]; then
@@ -168,6 +193,14 @@ PYBARWINDOW
   local log
   log="$(sed 's/\x1b\[[0-9;]*m//g' "$run_dir/log")"
   cleanup
+  if [[ "$name" == clock-embedded-controllers ]] && grep -q 'QMLTEST CLOCK NATIVE FRAME' <<<"$log"; then
+    echo "  QMLTEST FAIL embedded construction created a native frame"
+    status=1
+  fi
+  if [[ "$name" == unified-clock ]] && [[ "$(grep -c 'QMLTEST CLOCK NATIVE FRAME' <<<"$log")" != 2 ]]; then
+    echo "  QMLTEST FAIL unified clock must construct exactly two cumulative native frames for two clocks"
+    status=1
+  fi
   if grep -q 'Failed to load configuration' <<<"$log"; then
     echo "qmltest: $name FAILED (did not load)"
     grep -E 'ERROR' <<<"$log" | grep -v 'quickshell.ipc' | sed 's/^/  /'
