@@ -85,11 +85,12 @@ Panel {
       embedded: true,
       embeddingHost: root
     })
+    readonly property var loadedItem: item
     onLoaded: {
-      item.bar = Qt.binding(function () {
+      loadedItem.bar = Qt.binding(function () {
         return root.bar
       })
-      item.hostedDropdown = Qt.binding(function () {
+      loadedItem.hostedDropdown = Qt.binding(function () {
         return vpnPage.item
       })
       root.syncVpnPage()
@@ -104,11 +105,12 @@ Panel {
       embedded: true,
       embeddingHost: root
     })
+    readonly property var loadedItem: item
     onLoaded: {
-      item.bar = Qt.binding(function () {
+      loadedItem.bar = Qt.binding(function () {
         return root.bar
       })
-      item.hostedDropdown = Qt.binding(function () {
+      loadedItem.hostedDropdown = Qt.binding(function () {
         return bluetoothPage.item
       })
       root.syncBluetoothPage()
@@ -548,7 +550,7 @@ Panel {
       selectedIndex = wifiNetworks.length > 0 ? 0 : -1
       wifiActionFocused = false
       focusSection = wifiNetworks.length > 0 ? "wifi" : "dns"
-      var idx = dnsProviders.indexOf(dnsProvider)
+      let idx = dnsProviders.indexOf(dnsProvider)
       dnsIndex = idx >= 0 ? idx : 0
       syncBandIndex()
       cursorActive = false
@@ -596,7 +598,7 @@ Panel {
       if (focusSection === "wifi")
         focusSection = "dns"
     } else if (passwordSsid !== "") {
-      var passwordIndex = wifiIndexForSsid(passwordSsid)
+      let passwordIndex = wifiIndexForSsid(passwordSsid)
       if (passwordIndex >= 0) {
         selectedIndex = passwordIndex
         focusSection = "wifi"
@@ -837,8 +839,8 @@ Panel {
   function findDevice(type) {
     var devices = networkDevices || []
     var fallback = null
-    for (var i = 0; i < devices.length; i++) {
-      var device = devices[i]
+    for (let i = 0; i < devices.length; i++) {
+      let device = devices[i]
       if (!device || device.type !== type)
         continue
       if (device.connected)
@@ -852,7 +854,7 @@ Panel {
   // The Wi-Fi network object NetworkManager reports as connected, or null.
   function findConnectedWifiNetwork() {
     var networks = wifiNetworkObjects || []
-    for (var i = 0; i < networks.length; i++) {
+    for (let i = 0; i < networks.length; i++) {
       if (networks[i] && networks[i].connected)
         return networks[i]
     }
@@ -864,12 +866,12 @@ Panel {
     var nets = []
     var networks = wifiNetworkObjects || []
 
-    for (var i = 0; i < networks.length; i++) {
-      var network = networks[i]
+    for (let i = 0; i < networks.length; i++) {
+      let network = networks[i]
       if (!network)
         continue
       checkActionCompletion(network)
-      var row = Model.wifiRow(network)
+      let row = Model.wifiRow(network)
       if (row)
         nets.push(row)
     }
@@ -973,7 +975,7 @@ Panel {
     if (!root.bar || !provider)
       return
     if (provider === "Custom") {
-      var launcher = "omarchy-launch-floating-terminal-with-presentation"
+      let launcher = "omarchy-launch-floating-terminal-with-presentation"
       // qmllint disable missing-property
       root.bar.run(launcher + " " + Util.shellQuote(root.dnsCommand(provider)))
       // qmllint enable missing-property
@@ -1013,7 +1015,7 @@ Panel {
   // The live WifiNetwork object for ssid, or null.
   function networkForSsid(ssid) {
     var networks = wifiNetworkObjects || []
-    for (var i = 0; i < networks.length; i++) {
+    for (let i = 0; i < networks.length; i++) {
       if (networks[i] && networks[i].name === ssid)
         return networks[i]
     }
@@ -1022,7 +1024,7 @@ Panel {
 
   // Index into wifiNetworks for ssid, or -1.
   function wifiIndexForSsid(ssid) {
-    for (var i = 0; i < wifiNetworks.length; i++) {
+    for (let i = 0; i < wifiNetworks.length; i++) {
       if (wifiNetworks[i] && wifiNetworks[i].ssid === ssid)
         return i
     }
@@ -1256,7 +1258,7 @@ Panel {
       // above rather than wrongly applied to the newer pick's
       // pendingDnsProvider.
       if (root.queuedDnsProvider !== "") {
-        var next = root.queuedDnsProvider
+        let next = root.queuedDnsProvider
         root.queuedDnsProvider = ""
         root.runDnsCommand(next)
       }
@@ -1625,7 +1627,7 @@ Panel {
     var addrs = {}
     var links = []
     try {
-      var parts = NetworkLogic.splitSections(raw)
+      let parts = NetworkLogic.splitSections(raw)
       devices = NetworkLogic.parseDevices(parts[0])
       connections = NetworkLogic.parseConnections(parts[1])
       addrs = NetworkLogic.parseAddrs(parts[2])
@@ -1664,8 +1666,8 @@ Panel {
     if (ssidProc.running)
       return
     var uuids = []
-    for (var i = 0; i < extraConnections.length; i++) {
-      var c = extraConnections[i]
+    for (let i = 0; i < extraConnections.length; i++) {
+      let c = extraConnections[i]
       if (c && c.type === "802-11-wireless" && c.uuid)
         uuids.push(c.uuid)
     }
@@ -1969,8 +1971,8 @@ Panel {
   // SSID -> {text, failed, busy} for every Wi-Fi row (NetworkDropdown.wifiStatus).
   readonly property var wifiStatusView: {
     var out = {}
-    for (var i = 0; i < wifiNetworks.length; i++) {
-      var net = wifiNetworks[i]
+    for (let i = 0; i < wifiNetworks.length; i++) {
+      let net = wifiNetworks[i]
       if (net)
         out[net.ssid] = wifiStatusFor(net)
     }
@@ -2059,7 +2061,7 @@ Panel {
     if (!cursorRowConfirmed(focusSection))
       return
     if (focusSection === "wifi") {
-      var wifiDecision = NetworkLogic.enterDecision("wifi", wifiActionFocused, canForgetNetwork(wifiNetworks[selectedIndex]))
+      let wifiDecision = NetworkLogic.enterDecision("wifi", wifiActionFocused, canForgetNetwork(wifiNetworks[selectedIndex]))
       if (wifiDecision === "forget")
         wifiForget(selectedIndex)
       else if (wifiDecision === "activate")
@@ -2169,7 +2171,7 @@ Panel {
         // the outline (which chooses what it shows). Saved starts on its first row
         // too, followed until the user picks; the header and band take
         // theirs on a move or click.
-        var open = NetworkLogic.openChoice(root.wifiKeyRows())
+        let open = NetworkLogic.openChoice(root.wifiKeyRows())
         root.cursorChosenSection = open.chosen
         root.wifiCursorSsid = open.key
         root.savedIndex = 0
@@ -2212,7 +2214,7 @@ Panel {
         root.keyboardCursor = next.keyboard
       if (root.focusSection === "saved" && root.savedRows.length === 0) {
         // An automatic move: the outline hides until the next key.
-        var fallback = NetworkLogic.savedEmptyFallback(root.wifiNetworks.length)
+        let fallback = NetworkLogic.savedEmptyFallback(root.wifiNetworks.length)
         root.keyboardCursor = false
         root.focusSection = fallback.section
         if (fallback.section === "wifi") {
@@ -2407,7 +2409,7 @@ Panel {
     bar: root.bar
     open: root.opened
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(panelContent.implicitHeight)
+    contentHeight: panel.fittedContentHeight(panelContentObject.implicitHeight)
     // Freeze the cursor model while the inline passphrase prompt is open;
     // its fields own input until Esc or Enter.
     blocked: root.vpnPageActive ? root.vpnController.promptKey !== "" && !root.vpnController.promptBusy : !root.bluetoothPageActive && root.passwordSsid !== ""
@@ -2523,7 +2525,7 @@ Panel {
       clip: true
 
       Column {
-        id: panelContent
+        id: panelContentObject
         width: parent.width
         spacing: Style.space(14)
         NetworkTabs {
@@ -2557,23 +2559,24 @@ Panel {
           active: root.vpnController !== null
           visible: root.vpnPageActive
           source: Qt.resolvedUrl("../araneadev.vpn/VpnDropdown.qml")
+          readonly property var loadedItem: item
           onLoaded: {
-            item.view = Qt.binding(function () {
+            loadedItem.view = Qt.binding(function () {
               return root.vpnController ? root.vpnController.vpnView : ({})
             })
-            item.status = Qt.binding(function () {
+            loadedItem.status = Qt.binding(function () {
               return root.vpnController ? root.vpnController.statusView : ({})
             })
-            item.sessions = Qt.binding(function () {
+            loadedItem.sessions = Qt.binding(function () {
               return root.vpnController ? root.vpnController.sessionsView : ({})
             })
-            item.graphs = Qt.binding(function () {
+            loadedItem.graphs = Qt.binding(function () {
               return root.vpnController && !root.vpnController.fixture ? root.vpnController.graphs : ({})
             })
-            item.prompt = Qt.binding(function () {
+            loadedItem.prompt = Qt.binding(function () {
               return root.vpnController ? root.vpnController.promptView : ({})
             })
-            item.showcaseNames = Qt.binding(function () {
+            loadedItem.showcaseNames = Qt.binding(function () {
               return root.vpnController ? root.vpnController.showcaseNames : []
             })
           }
@@ -2591,15 +2594,16 @@ Panel {
           active: root.bluetoothController !== null
           visible: root.bluetoothPageActive
           source: Qt.resolvedUrl("../araneadev.bluetooth/BluetoothDropdown.qml")
+          readonly property var loadedItem: item
           onLoaded: {
-            item.view = Qt.binding(function () {
+            loadedItem.view = Qt.binding(function () {
               return root.bluetoothController ? root.bluetoothController.bluetoothView : ({})
             })
-            item.captionOpacity = Qt.binding(function () {
+            loadedItem.captionOpacity = Qt.binding(function () {
               return root.bluetoothController ? root.bluetoothController.captionOpacity : 1
             })
-            item.maxScrollHeight = Style.space(400)
-            item.powerShortcut = "t"
+            loadedItem.maxScrollHeight = Style.space(400)
+            loadedItem.powerShortcut = "t"
           }
         }
         Connections {

@@ -31,11 +31,11 @@ QtObject {
     var needle = String(query || "").trim().toLowerCase()
     var values = DesktopEntries.applications.values || []
     var rows = []
-    for (var i = 0; i < values.length; i++) {
-      var entry = values[i]
+    for (let i = 0; i < values.length; i++) {
+      let entry = values[i]
       if (!entry || entry.noDisplay || !entryName(entry))
         continue
-      var text = [entryName(entry), entrySubtext(entry), entry.comment, entry.id].join(" ").toLowerCase()
+      let text = [entryName(entry), entrySubtext(entry), entry.comment, entry.id].join(" ").toLowerCase()
       if (needle && text.indexOf(needle) < 0)
         continue
       rows.push({

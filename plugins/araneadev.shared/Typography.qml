@@ -23,7 +23,7 @@ Item {
   // Reject malformed file contents without disrupting text rendering.
   function readPreferences(contents) {
     try {
-      var parsed = JSON.parse(contents)
+      let parsed = JSON.parse(contents)
       preferences = parsed && typeof parsed.uiFamily === "string" && typeof parsed.technicalFamily === "string" ? parsed : ({})
     } catch (error) {
       preferences = ({})

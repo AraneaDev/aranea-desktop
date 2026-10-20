@@ -29,21 +29,21 @@ Item {
   // Open state exposed to the panel host.
   readonly property bool opened: panelOpen
   // Visible bar and overview share a read-only owner projection.
-  readonly property var projectSnapshot: visible && !captureActive && projectClient.available ? projectClient.snapshot : null
+  readonly property var projectSnapshot: visible && !captureActive && projectClientObject.available ? projectClientObject.snapshot : null
   // Project context requires windows on the focused workspace, even for retained launches.
   readonly property var activeProjectContext: {
-    for (var i = 0; i < workspaceStates.length; i++) {
-      var workspace = workspaceStates[i]
+    for (let i = 0; i < workspaceStates.length; i++) {
+      let workspace = workspaceStates[i]
       if (workspace.id === activeWorkspaceId)
         return workspace.occupied ? WorkspaceModel.barContext(activeWorkspaceId, projectSnapshot) : null
     }
     return null
   }
   // Read-only boundary exposed to inert fixtures for transport replacement.
-  readonly property alias projectClient: projectClient
+  readonly property alias projectClient: projectClientObject
 
   Projects.ProjectClient {
-    id: projectClient
+    id: projectClientObject
     captureActive: root.captureActive || !root.visible
     serializeSnapshotReads: true
     onCaptureActiveChanged: if (!captureActive)
@@ -52,7 +52,7 @@ Item {
   // Observe workspace context without launching or focusing project tools.
   function refreshProjects() {
     if (root.visible && !root.captureActive)
-      projectClient.refresh()
+      projectClientObject.refresh()
   }
   Timer {
     interval: 5000
@@ -65,10 +65,10 @@ Item {
   function liveWorkspaceRows() {
     var values = Hyprland.workspaces ? Hyprland.workspaces.values : []
     var rows = []
-    for (var index = 0; index < values.length; index++) {
-      var workspace = values[index]
-      var toplevels = workspace.toplevels ? workspace.toplevels.values : []
-      var windows = Number(toplevels.length || 0) > 0 ? Number(toplevels.length) : workspace.windows
+    for (let index = 0; index < values.length; index++) {
+      let workspace = values[index]
+      let toplevels = workspace.toplevels ? workspace.toplevels.values : []
+      let windows = Number(toplevels.length || 0) > 0 ? Number(toplevels.length) : workspace.windows
       rows.push({
         id: workspace.id,
         name: workspace.name,
@@ -99,7 +99,7 @@ Item {
   readonly property bool vertical: !!root.bar && root.bar.vertical
   // Index of the focused workspace among the fixed bar slots, -1 when absent.
   readonly property int activeIndicatorIndex: {
-    for (var i = 0; i < root.indicatorDots.length; i++)
+    for (let i = 0; i < root.indicatorDots.length; i++)
       if (root.indicatorDots[i].active)
         return i
     return -1
@@ -333,15 +333,15 @@ Item {
     signal focusWorkspace(int id)
     // Emitted when a real pointer move lands on row INDEX.
     signal rowHovered(int index)
-    implicitWidth: content.implicitWidth
-    implicitHeight: content.implicitHeight
+    implicitWidth: contentObject.implicitWidth
+    implicitHeight: contentObject.implicitHeight
     // Resets the inner panel's pointer gate; forwarded so a host's key
     // handling can disarm it without reaching into the panel directly.
     function disarmPointer() {
-      content.disarmPointer()
+      contentObject.disarmPointer()
     }
     WorkspacePanel {
-      id: content
+      id: contentObject
       anchors.fill: parent
       workspaceStates: parent.workspaceStates
       projectSnapshot: parent.projectSnapshot
@@ -388,11 +388,11 @@ Item {
     property bool open: false
     // Emitted to focus a workspace.
     signal focusWorkspace(int id)
-    implicitWidth: content.implicitWidth
-    implicitHeight: content.implicitHeight
+    implicitWidth: contentObject.implicitWidth
+    implicitHeight: contentObject.implicitHeight
     // A fresh open starts with the cursor hidden; the first key reveals it.
     onOpenChanged: {
-      content.disarmPointer()
+      contentObject.disarmPointer()
       testHost.cursorKey = ""
       testHost.keyboardCursor = false
     }
@@ -401,19 +401,19 @@ Item {
       anchors.fill: parent
       onCloseRequested: root.close()
       onTabRequested: function (direction) {
-        content.disarmPointer()
+        contentObject.disarmPointer()
         root.switchPanel(direction)
       }
       onMoveRequested: function (dx, dy) {
-        content.disarmPointer()
+        contentObject.disarmPointer()
         if (dy !== 0) {
-          var next = WorkspaceModel.cursorMove(testHost.workspaceStates, testHost.cursorKey, testHost.keyboardCursor, dy)
+          let next = WorkspaceModel.cursorMove(testHost.workspaceStates, testHost.cursorKey, testHost.keyboardCursor, dy)
           testHost.cursorKey = next.key
           testHost.keyboardCursor = next.keyboard
         }
       }
       onActivateRequested: {
-        content.disarmPointer()
+        contentObject.disarmPointer()
         var press = WorkspaceModel.cursorPress(testHost.workspaceStates, testHost.cursorKey, testHost.keyboardCursor)
         testHost.cursorKey = press.key
         testHost.keyboardCursor = press.keyboard
@@ -421,7 +421,7 @@ Item {
           testHost.focusWorkspace(press.row.id)
       }
       PanelContent {
-        id: content
+        id: contentObject
         anchors.fill: parent
         workspaceStates: testHost.workspaceStates
         projectSnapshot: testHost.projectSnapshot
@@ -443,13 +443,14 @@ Item {
     id: panelLoader
     sourceComponent: root.testWorkspaces !== null ? testPanelHost : null
     onLoaded: {
-      item.workspaceStates = Qt.binding(function () {
+      var loaded = item as TestPanelHost
+      loaded.workspaceStates = Qt.binding(function () {
         return root.visibleStates
       })
-      item.projectSnapshot = Qt.binding(function () {
+      loaded.projectSnapshot = Qt.binding(function () {
         return root.projectSnapshot
       })
-      item.open = Qt.binding(function () {
+      loaded.open = Qt.binding(function () {
         return root.panelOpen
       })
     }

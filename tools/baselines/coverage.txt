@@ -38,3 +38,5 @@ plugins/araneadev.shared/VpnApps.js 100
 plugins/araneadev.tray/TrayLogic.js 100
 plugins/araneadev.vpn/VpnLogic.js 100
 plugins/araneadev.weather/WeatherLogic.js 100
+plugins/araneadev.worldclock/WorldClockLogic.js 100
+plugins/araneadev.worldclock/WorldCities.js 100

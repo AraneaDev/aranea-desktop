@@ -62,7 +62,7 @@ Item {
   // Returns a copy of map with key set (or removed); maps are replaced, not mutated, so bindings update.
   function withFlag(map: var, key: string, value: bool): var {
     var next = ({})
-    for (var k in map)
+    for (let k in map)
       next[k] = map[k]
     if (value)
       next[key] = true
@@ -109,8 +109,8 @@ Item {
     if (providerProc.running)
       return
     while (providers.queue.length > 0) {
-      var id = providers.queue.shift()
-      var entry = providers.entry(id)
+      let id = providers.queue.shift()
+      let entry = providers.entry(id)
       if (!entry || !entry.provider || providers.loaded[id])
         continue
       providers.start(id)
@@ -153,8 +153,8 @@ Item {
   function loadForSearch(activeMenu: string): void {
     var active = providers.entry(activeMenu) ? activeMenu : "root"
 
-    for (var i = 0; i < providers.itemOrder.length; i++) {
-      var entry = providers.entry(providers.itemOrder[i])
+    for (let i = 0; i < providers.itemOrder.length; i++) {
+      let entry = providers.entry(providers.itemOrder[i])
       if (!entry || !entry.provider || providers.loaded[entry.id])
         continue
       if (active !== "root" && entry.id !== active && !MenuModel.isDescendantOf(providers.items, entry.id, active))
@@ -171,20 +171,20 @@ Item {
     var lines = String(output || "").split("\n")
     var providerRows = []
     var takenIds = ({})
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i].trim()
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i].trim()
       if (!line)
         continue
-      var parts = line.split("\t")
-      var label = parts[0] || ""
-      var value = parts[1] || parts[0] || ""
-      var current = parts[2] || ""
+      let parts = line.split("\t")
+      let label = parts[0] || ""
+      let value = parts[1] || parts[0] || ""
+      let current = parts[2] || ""
       if (!label)
         continue
       // Distinct values can slugify alike: Fira Code and Fira-Code both give
       // fira-code, and a repeated id is dropped, which would silently lose a
       // row from the list. Nudge it until it is the row's own.
-      var rowId = menuId + "." + MenuModel.slugify(value)
+      let rowId = menuId + "." + MenuModel.slugify(value)
       while (takenIds[rowId])
         rowId += "-"
       takenIds[rowId] = true

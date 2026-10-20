@@ -97,7 +97,7 @@ Item {
     onExited: function (code) {
       monitor.acknowledgmentChecking = false
       if (acknowledgmentsProc.revision === monitor.acknowledgmentRevision) {
-        var keys = []
+        let keys = []
         if (code === 0) {
           try {
             keys = JSON.parse(acknowledgmentsOut.text).acknowledged
@@ -175,7 +175,7 @@ Item {
   // Rebuilds openProblems from all checks' problems and the current tools.
   function reconcileNow(): void {
     var open = []
-    for (var check in problems)
+    for (let check in problems)
       open = open.concat(problems[check])
     openProblems = HealthLogic.filterAcknowledged(HealthLogic.annotateProblems(open, tools), acknowledgedContainerKeys)
   }
@@ -423,7 +423,7 @@ Item {
       monitor.checkUnits()
       // Restart-loop windows drain with time, not only with events.
       if (monitor.known.container === true) {
-        var now = Date.now()
+        let now = Date.now()
         monitor.dockerHistory = HealthLogic.pruneDockerHistory(monitor.dockerHistory, now)
         monitor.setProblems("container", HealthLogic.containerProblems(monitor.dockerHistory, now))
         monitor.refreshAcknowledgments()

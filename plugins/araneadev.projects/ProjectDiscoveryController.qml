@@ -57,7 +57,7 @@ Item {
     }
     var data = event.data || {}
     if (event.event === 'step' && data.event === 'candidate' && data.candidate && typeof data.candidate.path === 'string') {
-      var candidate = data.candidate
+      let candidate = data.candidate
       if (!candidates.some(function (c) {
         return c.path === candidate.path
       }))

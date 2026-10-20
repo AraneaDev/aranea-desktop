@@ -70,7 +70,7 @@ Item {
       completion: function (code, output) {
         done(code === 0 ? String(output).trim() : '')
       }
-    })
+    }) as CommandProcess
     process.startRequested = true
     process.running = true
   }
@@ -93,43 +93,45 @@ Item {
     var process = processComponent.createObject(client, {
       command: argv,
       completion: done
-    })
+    }) as CommandProcess
     process.startRequested = true
     process.running = true
   }
   // Consumers receive owner state unchanged, including partial outcomes.
   signal operationChanged(var operation)
   // Ordinary process completion waits for collectors; failed spawn also completes.
-  property Component processComponent: Component {
-    Process {
-      id: process
-      property var completion
-      property bool startRequested: false
-      property bool startedSuccessfully: false
-      property bool completed: false
-      function finish(code, output, diagnostics) {
-        if (completed)
-          return
-        completed = true
-        completion(code, output, diagnostics)
-        process.destroy()
-      }
-      onStarted: startedSuccessfully = true
-      onRunningChanged: if (startRequested && !running && !startedSuccessfully)
-        finish(-1, '', 'The project helper is not available.')
-      stdout: StdioCollector {
-        id: output
-      }
-      stderr: StdioCollector {
-        id: diagnostics
-      }
-      // Quickshell metadata omits the unused exit-status enum.
-      // qmllint disable signal-handler-parameters
-      onExited: function (exitCode) {
-        process.finish(exitCode, output.text, diagnostics.text)
-      }
-      // qmllint enable signal-handler-parameters
+  component CommandProcess: Process {
+    id: process
+    property var completion
+    property bool startRequested: false
+    property bool startedSuccessfully: false
+    property bool completed: false
+    function finish(code, output, diagnostics) {
+      if (completed)
+        return
+      completed = true
+      completion(code, output, diagnostics)
+      process.destroy()
     }
+    onStarted: startedSuccessfully = true
+    onRunningChanged: if (startRequested && !running && !startedSuccessfully)
+      finish(-1, '', 'The project helper is not available.')
+    stdout: StdioCollector {
+      id: output
+    }
+    stderr: StdioCollector {
+      id: diagnostics
+    }
+    // Quickshell metadata omits the unused exit-status enum.
+    // qmllint disable signal-handler-parameters
+    onExited: function (exitCode) {
+      process.finish(exitCode, output.text, diagnostics.text)
+    }
+    // qmllint enable signal-handler-parameters
+  }
+  // Factory retained for the injectable command process boundary.
+  property Component processComponent: Component {
+    CommandProcess {}
   }
   // How many automatic lookups have run for the current uncertainty, 0 to 3.
   property int autoChecksDone: 0

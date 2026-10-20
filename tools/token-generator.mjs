@@ -131,6 +131,8 @@ QtObject {
   // Aranea's violet from design/tokens.toml (Omarchy's Color has none): the
   // far end of the Filament's lit strand and the Now playing progress.
   readonly property color strandEnd: ${JSON.stringify(tokens.colors.accent_secondary)}
+  // Aranea ceremony gold from design/tokens.toml; independent of countdowns.
+  readonly property color ceremonyGold: ${JSON.stringify(tokens.colors.ceremony)}
   // Base background colour.
   readonly property color background: Commons.Color.background
   // Default foreground colour.

@@ -115,7 +115,7 @@ Item {
     cores = MetricsLogic.countCores(statText)
     var stat = MetricsLogic.parseCpuStat(statText)
     if (stat) {
-      var pct = MetricsLogic.cpuPercent(lastCpu, stat)
+      let pct = MetricsLogic.cpuPercent(lastCpu, stat)
       lastCpu = stat
       if (pct !== null) {
         cpu = pct

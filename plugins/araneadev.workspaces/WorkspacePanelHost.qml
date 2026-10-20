@@ -58,7 +58,7 @@ Aranea.KeyboardPanelFrame {
   onMoveRequested: function (dx, dy) {
     panel.disarmPointer()
     if (dy !== 0) {
-      var next = WorkspaceModel.cursorMove(host.workspaceStates, host.cursorKey, host.keyboardCursor, dy)
+      let next = WorkspaceModel.cursorMove(host.workspaceStates, host.cursorKey, host.keyboardCursor, dy)
       host.cursorKey = next.key
       host.keyboardCursor = next.keyboard
     }

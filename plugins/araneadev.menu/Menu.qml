@@ -112,7 +112,7 @@ Item {
       event.accepted = true
     } else if (event.key === Qt.Key_P && (event.modifiers & Qt.ControlModifier) && !root.dmenuActive) {
       if (root.cursorActive && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count) {
-        var pinRow = displayModel.get(root.selectedIndex)
+        let pinRow = displayModel.get(root.selectedIndex)
         if (pinRow.kind === "app" && pinRow.appId)
           root.toggleFavoriteApp(pinRow.appId)
       }
@@ -295,17 +295,17 @@ Item {
 
   // Existing watchers supply static inputs; only the local controller owns live reads.
   DesktopActionController {
-    id: desktopActions
+    id: desktopActionsObject
     active: root.desktopSearchActive
     observationsEnabled: root.windowEnabled
   }
   // Persistent action owner, also used by inert render and integration fixtures.
-  readonly property alias desktopActions: desktopActions
+  readonly property alias desktopActions: desktopActionsObject
 
   // Only capture/preview makes the client inert; hiding never cancels observation.
   Projects.ProjectClient {
     id: projectClient
-    captureActive: !root.windowEnabled || desktopActions.showcaseActive
+    captureActive: !root.windowEnabled || desktopActionsObject.showcaseActive
   }
   // Project boundary exposed to inert previews and sandbox integration tests.
   readonly property alias projectClient: projectClient
@@ -322,7 +322,7 @@ Item {
     recentAppIds: history.recentAppIds
     settingsAvailable: sources.settingsAvailable
     projectsAvailable: sources.projectsAvailable
-    actionController: desktopActions
+    actionController: desktopActionsObject
     projectClient: root.projectClient
     onRevisionChanged: if (root.desktopSearchActive)
       root.rebuildDisplay()
@@ -358,7 +358,7 @@ Item {
     recoveryFocused = false
   // Recovery uses existing control destinations rather than inventing another UI.
   function recoverSelected(): void {
-    if (!root.recoveryLabel || desktopActions.showcaseActive)
+    if (!root.recoveryLabel || desktopActionsObject.showcaseActive)
       return
     if (root.recoveryRow.resultType === "project" || root.recoveryRow.resultType === "project-agent") {
       desktopSources.openProjectDetails(root.recoveryRow.desktopKey)
@@ -480,11 +480,11 @@ Item {
       })
     })
     var keep = Math.min(displayModel.count, rows.length)
-    for (var i = 0; i < keep; i++)
+    for (let i = 0; i < keep; i++)
       displayModel.set(i, rows[i])
     if (displayModel.count > rows.length)
       displayModel.remove(rows.length, displayModel.count - rows.length)
-    for (var j = keep; j < rows.length; j++)
+    for (let j = keep; j < rows.length; j++)
       displayModel.append(rows[j])
   }
 
@@ -493,7 +493,7 @@ Item {
   function finishDisplayRebuild(): void {
     layoutSerial += 1
     var keys = []
-    for (var k = 0; k < displayModel.count; k++)
+    for (let k = 0; k < displayModel.count; k++)
       keys.push(displayModel.get(k).itemId)
     var joined = keys.join("\n")
     if (joined !== root.displayKeys) {
@@ -534,7 +534,7 @@ Item {
       return
     }
     if (tile.id === "tile.projects") {
-      var projects = root.item("aranea.projects")
+      let projects = root.item("aranea.projects")
       if (projects && MenuModel.isVisible(root.items, root.itemOrder, guards.whenResults, projects))
         root.activateMenuItem(projects)
       return
@@ -550,8 +550,8 @@ Item {
   // Each display row's section and height, for MenuLayout.
   function displayRowMetrics(): var {
     var rows = []
-    for (var i = 0; i < displayModel.count; i++) {
-      var row = displayModel.get(i)
+    for (let i = 0; i < displayModel.count; i++) {
+      let row = displayModel.get(i)
       rows.push({
         section: row.section,
         height: root.rowHeightForDetail(row.detail)
@@ -693,15 +693,15 @@ Item {
     root.searchDivider = false
 
     if (query && active === "root") {
-      var ranked = DesktopSearch.rankResults(desktopSources.records, root.filterText)
-      for (var r = 0; r < ranked.length; r++) {
-        var record = ranked[r]
-        var entry = record.type === "command" ? root.item(record.target.itemId) : null
-        var appEntry = record.type === "app" ? root.appRows.find(function (app) {
+      let ranked = DesktopSearch.rankResults(desktopSources.records, root.filterText)
+      for (let r = 0; r < ranked.length; r++) {
+        let record = ranked[r]
+        let entry = record.type === "command" ? root.item(record.target.itemId) : null
+        let appEntry = record.type === "app" ? root.appRows.find(function (app) {
           return app.appId === record.target.appId
         }) : null
-        var base = entry || appEntry
-        var desktopRow = base ? MenuModel.displayRow(root.items, root.itemOrder, guards.checkedResults, base, record.detail, r) : {
+        let base = entry || appEntry
+        let desktopRow = base ? MenuModel.displayRow(root.items, root.itemOrder, guards.checkedResults, base, record.detail, r) : {
           kind: record.type,
           target: "",
           action: "",
@@ -723,7 +723,7 @@ Item {
         if (!base)
           desktopRow.label = record.label
         desktopRow.detail = record.detail
-        var feedback = record.type === "action" ? desktopActions.feedback[record.key] : (record.type === "project" || record.type === "project-agent") ? desktopSources.feedbackForProject(record.target.projectId, record.target.checkoutId) : null
+        let feedback = record.type === "action" ? desktopActionsObject.feedback[record.key] : (record.type === "project" || record.type === "project-agent") ? desktopSources.feedbackForProject(record.target.projectId, record.target.checkoutId) : null
         if ((record.type === "project" || record.type === "project-agent") && feedback && feedback.checkoutId !== record.target.checkoutId)
           feedback = null
         if ((record.type === "project" || record.type === "project-agent") && feedback && feedback.status !== "pending" && feedback.status !== "failed")
@@ -733,26 +733,26 @@ Item {
         rows.push(desktopRow)
       }
     } else if (query) {
-      var currentRows = []
-      var drilldownRows = []
+      let currentRows = []
+      let drilldownRows = []
 
-      for (var i = 0; i < root.itemOrder.length; i++) {
-        var entry = root.item(root.itemOrder[i])
+      for (let i = 0; i < root.itemOrder.length; i++) {
+        let entry = root.item(root.itemOrder[i])
         if (!entry || entry.id === "root")
           continue
         if (!MenuModel.isDescendantOf(root.items, entry.id, active))
           continue
         if (!MenuModel.matchesQuery(entry, query, MenuModel.isVisible(root.items, root.itemOrder, guards.whenResults, entry)))
           continue
-        var detail = MenuModel.parentPathFor(root.items, entry.id)
-        var row = MenuModel.displayRow(root.items, root.itemOrder, guards.checkedResults, entry, detail, MenuModel.searchScore(root.items, entry, query))
+        let detail = MenuModel.parentPathFor(root.items, entry.id)
+        let row = MenuModel.displayRow(root.items, root.itemOrder, guards.checkedResults, entry, detail, MenuModel.searchScore(root.items, entry, query))
         if (entry.parent === active)
           currentRows.push(row)
         else
           drilldownRows.push(row)
       }
 
-      var searchSort = function (a, b) {
+      let searchSort = function (a, b) {
         if (a.score !== b.score)
           return a.score - b.score
         return a.path.localeCompare(b.path)
@@ -762,24 +762,24 @@ Item {
       drilldownRows.sort(searchSort)
       // Favorites and Recent hold copies of app rows: show each app once.
       rows = MenuModel.dedupeAppRows(currentRows.concat(drilldownRows))
-      var drilldownIds = ({})
-      for (var d = 0; d < drilldownRows.length; d++)
+      let drilldownIds = ({})
+      for (let d = 0; d < drilldownRows.length; d++)
         drilldownIds[drilldownRows[d].itemId] = true
-      var currentCount = 0
-      for (var c = 0; c < rows.length; c++) {
+      let currentCount = 0
+      for (let c = 0; c < rows.length; c++) {
         if (!drilldownIds[rows[c].itemId])
           currentCount += 1
       }
       root.searchDivider = currentCount > 0 && currentCount < rows.length
       if (root.searchDivider) {
-        for (var e = 0; e < rows.length; e++) {
+        for (let e = 0; e < rows.length; e++) {
           if (drilldownIds[rows[e].itemId])
             rows[e].section = "drilldown"
         }
       }
     } else {
-      for (var j = 0; j < root.itemOrder.length; j++) {
-        var child = root.item(root.itemOrder[j])
+      for (let j = 0; j < root.itemOrder.length; j++) {
+        let child = root.item(root.itemOrder[j])
         if (!child || child.parent !== active)
           continue
         // Projects is already a root tile; retain its command for search.
@@ -801,7 +801,7 @@ Item {
     root.syncRows(rows)
     root.finishDisplayRebuild()
     if (root.desktopSearchActive) {
-      var selected = -1
+      let selected = -1
       if (root.resetDesktopSelection && rows.length)
         selected = 0
       else if (!root.resetDesktopSelection && root.selectedDesktopKey)
@@ -884,7 +884,7 @@ Item {
       return false
 
     if (root.navStack.length > 0) {
-      var previous = root.navStack[root.navStack.length - 1]
+      let previous = root.navStack[root.navStack.length - 1]
       root.navStack = root.navStack.slice(0, root.navStack.length - 1)
       root.setActiveMenu(previous, false)
       return true
@@ -906,7 +906,7 @@ Item {
       }
       if (index < 0 || index >= displayModel.count)
         return
-      var picked = displayModel.get(index)
+      let picked = displayModel.get(index)
       root.applyDmenuSelection(picked.detail ? picked.label + "\t" + picked.detail : picked.label)
       return
     }

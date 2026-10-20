@@ -79,7 +79,7 @@ Canvas {
 
     if (arc.lit) {
       ctx.globalAlpha = 1
-      var gradient = ctx.createLinearGradient(0, 0, arc.width, 0)
+      let gradient = ctx.createLinearGradient(0, 0, arc.width, 0)
       gradient.addColorStop(0, String(Aranea.DesignTokens.accent))
       gradient.addColorStop(1, String(Aranea.DesignTokens.strandEnd))
       ctx.strokeStyle = gradient

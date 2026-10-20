@@ -426,7 +426,7 @@ Item {
       var flow = root.flow
       // A result belongs to one request: drop it for a finished or newer one.
       if (flow && exitCode === 0 && String(flow.cookie || "") === root.lookupCookie) {
-        var info = PolkitLogic.parseActionInfo(actionLookupOut.text)
+        let info = PolkitLogic.parseActionInfo(actionLookupOut.text)
         root.actionDescription = info.description
         root.actionVendor = info.vendor
         // The details rows were rebuilt; a clicked value that held focus is

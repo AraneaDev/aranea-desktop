@@ -316,6 +316,8 @@ ShellRoot {
     add("Weather (refresh)", 380, WeatherLogic.keyHint(false, "refresh"))
     add("Weather (editing)", 380, WeatherLogic.keyHint(true, "place"))
     add("Clock", 440, ClockLogic.keyHint())
+    add("World clock", 380, "↑↓ move · a add · x remove · [ ] reorder · h set home")
+    add("World clock adding", 380, "↑↓ choose · enter add · esc cancel")
     add("Tray menu", 320, TrayLogic.menuKeyHint())
     add("Tray manage", 340, TrayLogic.manageKeyHint())
     return list
@@ -323,6 +325,7 @@ ShellRoot {
 
   Component.onCompleted: t.step(300, function () {
     otherHints().forEach(function (hint) {
+      probe.font.pixelSize = hint.name.indexOf("World clock") === 0 ? Math.max(1, Style.font.caption - 1) : Style.font.caption
       probe.width = testRoot.cardInner(hint.panel)
       probe.text = hint.text
       t.check(probe.text.indexOf("tab next") < 0, hint.name + "'s hint drops tab next, as every hint does")

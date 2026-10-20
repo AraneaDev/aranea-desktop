@@ -42,7 +42,7 @@ Canvas {
     ctx.strokeStyle = String(Aranea.DesignTokens.strandEnd)
     ctx.lineWidth = 1.4
     ctx.beginPath()
-    for (var i = 0; i < pts.length; i++) {
+    for (let i = 0; i < pts.length; i++) {
       if (i === 0)
         ctx.moveTo(pts[i].x, pts[i].y)
       else

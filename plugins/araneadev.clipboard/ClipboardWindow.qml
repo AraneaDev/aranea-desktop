@@ -33,7 +33,7 @@ PanelWindow {
 
   // Makes the mouse ignore hover until it really moves.
   function disarmPointer(): void {
-    pointerGate.reset()
+    pointerGateObject.reset()
   }
 
   // Preselects "cancel" in the clear-history confirmation.
@@ -42,7 +42,7 @@ PanelWindow {
   }
 
   PointerMoveGate {
-    id: pointerGate
+    id: pointerGateObject
     referenceItem: card
   }
 
@@ -165,7 +165,7 @@ PanelWindow {
         secretTtlMs: panel.root.secretTtlMs
         selectedIndex: panel.root.selectedIndex
         cursorActive: panel.root.outlineShown
-        pointerGate: pointerGate
+        pointerGate: pointerGateObject
         layoutChangedAt: panel.root.layoutChangedAt
         revealedIndex: panel.root.revealedIndex
         rowHeight: panel.root.rowHeight

@@ -49,14 +49,14 @@ ColumnLayout {
   property string draftProjectId: ''
   // Latest same-ID definition may be absent if another writer removed it.
   readonly property var conflictDefinition: definitions.filter(function (d) {
-    return d.id === editor.draft.id
+    return d.id === editorObject.draft.id
   })[0] || null
   // Production client transport is replaceable by isolated fixtures.
   property var sharedClient: null
   // Public fixture contract resolves to the persistent observer when injected.
   readonly property Projects.ProjectActionsClient client: sharedClient || fallbackClient
   // Presentation-only editor contract used by capture and behavior tests.
-  property alias editor: editor
+  property alias editor: editorObject
   // Exact lookup refuses missing selected checkout instead of falling back.
   readonly property var checkout: project ? (project.checkouts || []).filter(function (c) {
     return c.id === project.lastCheckoutId
@@ -188,7 +188,7 @@ ColumnLayout {
   function addAction(): void {
     if (displayOnly || actions.client.pending)
       return
-    editor.begin(null, actions.client.snapshot.revision)
+    editorObject.begin(null, actions.client.snapshot.revision)
     draftProjectId = project ? project.id : ''
     editConflict = false
     conflictRefreshed = false
@@ -204,7 +204,7 @@ ColumnLayout {
   function editSuggestion(definition: var): void {
     if (displayOnly || actions.client.pending || !definition)
       return
-    editor.begin(definition, actions.client.snapshot.revision)
+    editorObject.begin(definition, actions.client.snapshot.revision)
     draftProjectId = project ? project.id : ''
     editConflict = false
     conflictRefreshed = false
@@ -215,7 +215,7 @@ ColumnLayout {
     var definition = findAction(id, revision)
     if (displayOnly || actions.client.pending || !definition)
       return
-    editor.begin(definition, actions.client.snapshot.revision)
+    editorObject.begin(definition, actions.client.snapshot.revision)
     draftProjectId = project.id
     editConflict = false
     conflictRefreshed = false
@@ -223,13 +223,13 @@ ColumnLayout {
   }
   // User deliberately approves the retained draft over the freshly displayed state.
   function saveOverLatest(): void {
-    if (displayOnly || actions.client.captureActive || actions.client.pending || !editConflict || !conflictRefreshed || !project || draftProjectId !== project.id || (editor.draft.id && !conflictDefinition))
+    if (displayOnly || actions.client.captureActive || actions.client.pending || !editConflict || !conflictRefreshed || !project || draftProjectId !== project.id || (editorObject.draft.id && !conflictDefinition))
       return
-    editor.fieldError = editor.validate()
-    if (editor.fieldError)
+    editorObject.fieldError = editorObject.validate()
+    if (editorObject.fieldError)
       return
     saving = true
-    if (!actions.client.configure(editor.definition(), conflictRevision))
+    if (!actions.client.configure(editorObject.definition(), conflictRevision))
       saving = false
   }
   // Refuse removal locally for every checkout's protected evidence; backend rechecks.
@@ -251,7 +251,7 @@ ColumnLayout {
       conflictRefreshed: conflictRefreshed,
       conflictRevision: conflictRevision,
       draftProjectId: draftProjectId,
-      editor: editor.captureSnapshot(),
+      editor: editorObject.captureSnapshot(),
       snapshot: sharedClient ? undefined : actions.client.snapshot,
       currentRun: actions.client.currentRun,
       runId: actions.client.runId,
@@ -278,7 +278,7 @@ ColumnLayout {
     conflictRefreshPending = false
     conflictRevision = saved.conflictRevision || 0
     draftProjectId = saved.draftProjectId || (project ? project.id : '')
-    editor.captureRestore(saved.editor)
+    editorObject.captureRestore(saved.editor)
     if (sharedClient)
       return
     actions.client.snapshot = saved.snapshot || {
@@ -302,7 +302,7 @@ ColumnLayout {
   function captureReset(fixture: var): void {
     captureRestore(fixture && fixture.projectActions ? fixture.projectActions : {})
     if (!fixture || !fixture.projectActions || !fixture.projectActions.editor)
-      editor.begin(null, actions.client.snapshot.revision)
+      editorObject.begin(null, actions.client.snapshot.revision)
   }
   // Captures cannot queue a read that executes after capture restoration.
   function scheduleRefresh(): void {
@@ -362,7 +362,7 @@ ColumnLayout {
     text: 'Running is not available. Action configuration remains available. Refresh after restoring the user manager and required helpers.'
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  ProjectProblem {
+  Projects.ProjectProblem {
     objectName: 'actionSubmissionProblem'
     Layout.fillWidth: true
     displayOnly: actions.displayOnly
@@ -379,7 +379,7 @@ ColumnLayout {
       actions.refresh()
     }
   }
-  ProjectProblem {
+  Projects.ProjectProblem {
     objectName: 'actionClientProblem'
     Layout.fillWidth: true
     displayOnly: actions.displayOnly
@@ -409,7 +409,7 @@ ColumnLayout {
       onClicked: actions.addAction()
     }
   }
-  ProjectActionSuggestions {
+  Projects.ProjectActionSuggestions {
     id: suggestionsSection
     Layout.fillWidth: true
     client: actions.client
@@ -509,8 +509,8 @@ ColumnLayout {
       }
     }
   }
-  ProjectActionEditor {
-    id: editor
+  Projects.ProjectActionEditor {
+    id: editorObject
     Layout.fillWidth: true
     visible: actions.editing
     displayOnly: actions.displayOnly
@@ -536,14 +536,14 @@ ColumnLayout {
     Aranea.UiLabel {
       Layout.fillWidth: true
       visible: actions.conflictRefreshed
-      text: !editor.draft.id ? 'State refreshed. Review your new action draft before retrying.' : actions.conflictDefinition ? 'Latest saved: ' + actions.conflictDefinition.name + ' · revision ' + actions.conflictDefinition.revision + ' · ' + actions.conflictDefinition.argv.map(function (arg) {
+      text: !editorObject.draft.id ? 'State refreshed. Review your new action draft before retrying.' : actions.conflictDefinition ? 'Latest saved: ' + actions.conflictDefinition.name + ' · revision ' + actions.conflictDefinition.revision + ' · ' + actions.conflictDefinition.argv.map(function (arg) {
         return JSON.stringify(arg)
       }).join(' ') + ' · folder ' + actions.conflictDefinition.cwdRelative : 'This action was removed. Cancel and add a new action to configure it again.'
       wrapMode: Text.WrapAtWordBoundaryOrAnywhere
     }
     Aranea.ActionButton {
       text: 'Save draft over latest'
-      enabled: !actions.displayOnly && !actions.client.pending && actions.conflictRefreshed && (!editor.draft.id || !!actions.conflictDefinition)
+      enabled: !actions.displayOnly && !actions.client.pending && actions.conflictRefreshed && (!editorObject.draft.id || !!actions.conflictDefinition)
       pointerGate: actions.pointerGate
       onClicked: actions.saveOverLatest()
     }
@@ -568,7 +568,7 @@ ColumnLayout {
       onClicked: actions.inspectHistory(retained.modelData, !!actions.pressedRunIdentity)
     }
   }
-  ProjectRunDetails {
+  Projects.ProjectRunDetails {
     Layout.fillWidth: true
     client: actions.client
     run: actions.client.currentRun

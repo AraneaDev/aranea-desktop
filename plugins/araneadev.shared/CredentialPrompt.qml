@@ -109,7 +109,7 @@ Item {
   // or -1), or -1 when there's none.
   function editableFrom(from, step) {
     var list = prompt.fields || []
-    for (var i = from; i >= 0 && i < list.length; i += step)
+    for (let i = from; i >= 0 && i < list.length; i += step)
       if (list[i] && !list[i].readOnly && !list[i].hidden)
         return i
     return -1
@@ -145,7 +145,7 @@ Item {
   // Empties every editable field and forgets every recorded text, so no
   // typed secret outlives the clear (a field gone since keeps none either).
   function clearFields() {
-    for (var i in prompt.inputs)
+    for (let i in prompt.inputs)
       if (prompt.inputs[i])
         prompt.inputs[i].text = ""
     prompt.texts = ({})
@@ -154,7 +154,7 @@ Item {
   // Whether KEY names one of the current fields.
   function hasField(key) {
     var list = prompt.fields || []
-    for (var i = 0; i < list.length; i++)
+    for (let i = 0; i < list.length; i++)
       if (list[i] && list[i].key === key)
         return true
     return false
@@ -165,7 +165,7 @@ Item {
   function pruneTexts() {
     var copy = {}
     var dropped = false
-    for (var k in prompt.texts) {
+    for (let k in prompt.texts) {
       if (prompt.hasField(k))
         copy[k] = prompt.texts[k]
       else
@@ -178,7 +178,7 @@ Item {
   // Records TEXT as field KEY's current text.
   function noteText(key, text) {
     var copy = {}
-    for (var k in prompt.texts)
+    for (let k in prompt.texts)
       if (prompt.hasField(k))
         copy[k] = prompt.texts[k]
     copy[key] = text

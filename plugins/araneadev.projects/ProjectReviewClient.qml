@@ -268,15 +268,15 @@ Item {
         return
       client.inFlight = null
       if (!client.captureActive && read.epoch === client.epoch) {
-        var response = null
+        let response = null
         try {
           response = JSON.parse(text)
         } catch (e) {}
-        var valid = response && response.ok === true && response.data && response.data.projectId === read.projectId && response.data.checkoutId === read.checkoutId
-        var previous = client.reviews[read.checkoutId] || {}
+        let valid = response && response.ok === true && response.data && response.data.projectId === read.projectId && response.data.checkoutId === read.checkoutId
+        let previous = client.reviews[read.checkoutId] || {}
         if (previous.projectId !== read.projectId)
           previous = {}
-        var failure = response && response.ok === false && response.error && typeof response.error.code === 'string' ? response.error : {
+        let failure = response && response.ok === false && response.error && typeof response.error.code === 'string' ? response.error : {
           code: 'READ_FAILED',
           message: diagnostics || 'The review could not be read.',
           recovery: 'Retry.'

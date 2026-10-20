@@ -10,15 +10,24 @@ export ARANEA_WALLPAPER_DRY_RUN=1
 export ARANEA_SYSTEMCTL=/bin/true
 ctl="$repo_root/scripts/aranea-wallpaper"
 config="$XDG_CONFIG_HOME/aranea/wallpaper-schedule.conf"
+# Asserts the command's output holds LINE. The output is captured first: with
+# pipefail, `cmd | grep -q` fails with 141 whenever grep exits on the
+# "wallpaper:" line before the command has written its "path:" line.
+expect_output() {
+  local line="$1" out
+  shift
+  out="$("$@")"
+  grep -Fq -- "$line" <<<"$out"
+}
 entries='[{"time":"21:30","wallpaper":"monochrome"},{"time":"09:15","wallpaper":"day"},{"time":"06:00","wallpaper":"dawn"}]'
 "$ctl" schedule configure --entries "$entries" >/dev/null
 jq -e '.version == 2 and (.entries | length == 3) and .entries[0].time == "06:00" and .entries[2].wallpaper == "monochrome"' "$config" >/dev/null
 "$ctl" schedule status --json | jq -e '.enabled == false and .entries[1].wallpaper == "day" and .dawn == "06:00" and .night == null' >/dev/null
 for now in 00:00 05:59 21:30 23:59; do
-  ARANEA_NOW="$now" "$ctl" set-scheduled | grep -Fq 'wallpaper: monochrome'
+  ARANEA_NOW="$now" expect_output 'wallpaper: monochrome' "$ctl" set-scheduled
 done
-ARANEA_NOW=06:00 "$ctl" set-phase | grep -Fq 'wallpaper: dawn'
-ARANEA_NOW=10:00 "$ctl" set-day-night | grep -Fq 'wallpaper: day'
+ARANEA_NOW=06:00 expect_output 'wallpaper: dawn' "$ctl" set-phase
+ARANEA_NOW=10:00 expect_output 'wallpaper: day' "$ctl" set-day-night
 # Save while disabled never enables scheduling or writes timer units.
 test ! -e "$ARANEA_SYSTEMD_USER_DIR/aranea-wallpaper-day-night.timer"
 "$ctl" schedule on >/dev/null
@@ -26,7 +35,7 @@ test ! -e "$ARANEA_SYSTEMD_USER_DIR/aranea-wallpaper-day-night.timer"
 [[ "$(cat "$ARANEA_STATE_ROOT/wallpaper-schedule")" == on ]]
 [[ "$(rg -c '^OnCalendar=' "$ARANEA_SYSTEMD_USER_DIR/aranea-wallpaper-day-night.timer")" == 1 ]]
 rg -q 'set-scheduled$' "$ARANEA_SYSTEMD_USER_DIR/aranea-wallpaper-day-night.service"
-ARANEA_NOW=02:59 "$ctl" set-scheduled | grep -Fq 'wallpaper: night'
+ARANEA_NOW=02:59 expect_output 'wallpaper: night' "$ctl" set-scheduled
 # No artificial count cap: every minute may contain one transition.
 many="$(jq -cn '[range(0;1440) | {time:((./60|floor|tostring|if length == 1 then "0"+. else . end)+":"+(.%60|tostring|if length == 1 then "0"+. else . end)),wallpaper:"day"}]')"
 "$ctl" schedule configure --entries "$many" >/dev/null

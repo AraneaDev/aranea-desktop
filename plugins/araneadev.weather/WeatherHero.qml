@@ -55,10 +55,10 @@ Column {
   Item {
     id: top
     width: hero.width
-    implicitHeight: Math.max(left.implicitHeight, right.implicitHeight)
+    implicitHeight: Math.max(leftObject.implicitHeight, rightObject.implicitHeight)
 
     Row {
-      id: left
+      id: leftObject
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       spacing: Style.space(14)
@@ -96,7 +96,7 @@ Column {
       }
     }
     Column {
-      id: right
+      id: rightObject
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       spacing: Style.space(4)

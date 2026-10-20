@@ -64,6 +64,7 @@ place_vpn=true
 audio_installed=false
 bluetooth_installed=false
 clock_installed=false
+worldclock_installed=false
 monitor_installed=false
 network_installed=false
 power_installed=false
@@ -81,6 +82,7 @@ for dir in "$given_config_dir" "$config_dir"; do
   [[ -f "$dir/plugins/araneadev.audio/manifest.json" ]] && audio_installed=true
   [[ -f "$dir/plugins/araneadev.bluetooth/manifest.json" ]] && bluetooth_installed=true
   [[ -f "$dir/plugins/araneadev.clock/manifest.json" ]] && clock_installed=true
+  [[ -f "$dir/plugins/araneadev.worldclock/manifest.json" ]] && worldclock_installed=true
   [[ -f "$dir/plugins/araneadev.monitor/manifest.json" ]] && monitor_installed=true
   [[ -f "$dir/plugins/araneadev.network/manifest.json" ]] && network_installed=true
   [[ -f "$dir/plugins/araneadev.power/manifest.json" ]] && power_installed=true
@@ -110,7 +112,7 @@ note_polkit_handover() {
   fi
 }
 
-jq --argjson activity "$activity_installed" --argjson projects "$projects_installed" --argjson settings "$settings_installed" --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson clock "$clock_installed" --argjson monitor "$monitor_installed" --argjson network "$network_installed" --argjson power "$power_installed" --argjson weather "$weather_installed" --argjson tray "$tray_installed" --argjson agents "$agents_installed" --argjson vpn "$vpn_installed" --argjson placeVpn "$place_vpn" '
+jq --argjson activity "$activity_installed" --argjson projects "$projects_installed" --argjson settings "$settings_installed" --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson clock "$clock_installed" --argjson worldclock "$worldclock_installed" --argjson monitor "$monitor_installed" --argjson network "$network_installed" --argjson power "$power_installed" --argjson weather "$weather_installed" --argjson tray "$tray_installed" --argjson agents "$agents_installed" --argjson vpn "$vpn_installed" --argjson placeVpn "$place_vpn" '
   def entry_id: if type == "string" then . else .id? end;
   # Drops later duplicates by id (string or {id} entries), keeping order.
   def dedupe_by_id: reduce .[] as $e ([]; ($e | entry_id) as $id | if ([.[] | entry_id] | index($id)) != null then . else . + [$e] end);
@@ -150,6 +152,7 @@ jq --argjson activity "$activity_installed" --argjson projects "$projects_instal
              | if $audio and . == "omarchy.audio" then "araneadev.audio" else . end
              | if $bluetooth and . == "omarchy.bluetooth" then "araneadev.bluetooth" else . end
              | if $clock and . == "omarchy.clock" then "araneadev.clock" else . end
+             | if $worldclock and . == "omarchy.elsewhen" then "araneadev.worldclock" else . end
              | if $monitor and . == "omarchy.monitor" then "araneadev.monitor" else . end
              | if $network and . == "omarchy.network" then "araneadev.network" else . end
              | if $power and . == "omarchy.power" then "araneadev.power" else . end
@@ -162,6 +165,7 @@ jq --argjson activity "$activity_installed" --argjson projects "$projects_instal
              elif $audio and type == "object" and .id == "omarchy.audio" then .id = "araneadev.audio"
              elif $bluetooth and type == "object" and .id == "omarchy.bluetooth" then .id = "araneadev.bluetooth"
              elif $clock and type == "object" and .id == "omarchy.clock" then .id = "araneadev.clock"
+             elif $worldclock and type == "object" and .id == "omarchy.elsewhen" then .id = "araneadev.worldclock"
              elif $monitor and type == "object" and .id == "omarchy.monitor" then .id = "araneadev.monitor"
              elif $network and type == "object" and .id == "omarchy.network" then .id = "araneadev.network"
              elif $power and type == "object" and .id == "omarchy.power" then .id = "araneadev.power"
@@ -230,6 +234,7 @@ jq --argjson activity "$activity_installed" --argjson projects "$projects_instal
       + (if $audio then ["araneadev.audio"] else [] end)
       + (if $bluetooth then ["araneadev.bluetooth"] else [] end)
       + (if $clock then ["araneadev.clock"] else [] end)
+      + (if $worldclock then ["araneadev.worldclock"] else [] end)
       + (if $monitor then ["araneadev.monitor"] else [] end)
       + (if $network then ["araneadev.network"] else [] end)
       + (if $power then ["araneadev.power"] else [] end)

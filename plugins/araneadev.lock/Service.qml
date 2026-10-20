@@ -80,8 +80,8 @@ Item {
     var screens = Quickshell.screens || []
     var count = 0
 
-    for (var i = 0; i < screens.length; i++) {
-      var screen = screens[i]
+    for (let i = 0; i < screens.length; i++) {
+      let screen = screens[i]
       if (screen && screen.name && screen.width > 0 && screen.height > 0)
         count += 1
     }

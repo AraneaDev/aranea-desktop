@@ -284,7 +284,7 @@ done
 
 # --- A summon that fails (omarchy-shell down) is the scripted exit 3 with
 # no screenshot and no showcase call, not a set -e abort.
-for surface in network bluetooth clock audio agents; do
+for surface in network bluetooth clock worldclock audio agents; do
   : >"$log"
   rm -f "$out/$surface.png"
   status=0
@@ -293,7 +293,9 @@ for surface in network bluetooth clock audio agents; do
     printf '%s: a failed summon must exit 3 without a screenshot (status %s): %s\n' "$surface" "$status" "$errors" >&2
     exit 1
   fi
-  grep -Fq "Unable to summon popup omarchy.$surface" <<<"$errors"
+  expected_target="omarchy.$surface"
+  [[ "$surface" != worldclock ]] || expected_target=omarchy.elsewhen
+  grep -Fq "Unable to summon popup $expected_target" <<<"$errors"
 done
 
 # --- A failed vpn summon is the same scripted exit 3, with no screenshot and
@@ -309,3 +311,23 @@ fi
 grep -Fq 'Unable to summon popup aranea.vpn' <<<"$errors"
 
 echo "capture showcase behaviour passed"
+
+# World clock captures pin a display-only date and the seed list; a stock
+# Elsewhen or closed Aranea panel must refuse before any frame is written.
+: >"$log"
+"$capture" --surface worldclock --output "$out" >/dev/null
+test -f "$out/worldclock.png"
+assert_calls_in_order 'worldclock: summon, pinned showcase, frame, hide' \
+  'omarchy-shell [shell] [summon] [omarchy.elsewhen]' \
+  'omarchy-shell [omarchy.elsewhen] [showcase] [{"nowMs":1792491180000}]' \
+  'grim' \
+  'omarchy-shell [shell] [hide] [omarchy.elsewhen]'
+: >"$log"
+rm -f "$out/worldclock.png"
+status=0
+SHOWCASE_ANSWER=closed "$capture" --surface worldclock --output "$out" >/dev/null 2>&1 || status=$?
+[[ "$status" == 3 && ! -f "$out/worldclock.png" ]]
+if grep -Fxq grim "$log"; then
+  echo 'worldclock: refused showcase must not capture real city data' >&2
+  exit 1
+fi

@@ -78,10 +78,10 @@ ColumnLayout {
     try {
       if (activeDialog)
         return
-      var overlay = picker.Controls.Overlay.overlay
-      var previousItems = []
+      let overlay = picker.Controls.Overlay.overlay
+      let previousItems = []
       if (overlay) {
-        for (var i = 0; i < overlay.children.length; i++)
+        for (let i = 0; i < overlay.children.length; i++)
           previousItems.push(overlay.children[i])
       }
       activeDialog = folderDialogComponent.createObject(picker)
@@ -89,8 +89,8 @@ ColumnLayout {
       // The public overlay contains the newly opened popup's Control font context.
       // Bind only that new item; Qt's GTK font cache can retain an older system size.
       if (overlay) {
-        for (var j = 0; j < overlay.children.length; j++) {
-          var item = overlay.children[j]
+        for (let j = 0; j < overlay.children.length; j++) {
+          let item = overlay.children[j]
           if (previousItems.indexOf(item) < 0 && item.font !== undefined) {
             item.font = Qt.binding(function () {
               return Qt.font({

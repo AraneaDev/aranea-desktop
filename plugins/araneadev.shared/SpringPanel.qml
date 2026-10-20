@@ -178,13 +178,13 @@ PanelWindow {
   // returned here has the bar's internal padding baked in (e.g. ~13px
   // from vertical centering of the widget row), which is why `cardOrigin`
   // below uses `barH` for the perpendicular axis instead of this y.
-  readonly property point anchorScreenPos: {
-    anchorWatcher.transform
-    // reactive dependency
+  function mappedAnchorPosition(transform: QtObject): point {
     if (!anchorItem || !anchorWindow)
       return Qt.point(0, 0)
     return anchorItem.mapToItem(anchorWindow.contentItem, 0, 0)
   }
+  // Position recomputed whenever the watched ancestor transform changes.
+  readonly property point anchorScreenPos: mappedAnchorPosition(anchorWatcher.transform)
   // Anchor button width used to center horizontal dropdowns.
   readonly property real anchorW: anchorItem ? anchorItem.width : 0
   // Anchor button height used to center vertical dropdowns.
@@ -358,13 +358,13 @@ PanelWindow {
         return null
       var p = barPoint(px, py)
       var targets = root.bar.clickTargets
-      for (var i = targets.length - 1; i >= 0; i--) {
-        var target = targets[i]
+      for (let i = targets.length - 1; i >= 0; i--) {
+        let target = targets[i]
         if (!target || !target.triggerPress || target.visible === false || target.opacity === 0 || !target.mapToItem)
           continue
         if (root.bar.targetBelongsToWindow && !root.bar.targetBelongsToWindow(target, root.anchorWindow))
           continue
-        var pos = root.anchorWindow.itemPosition(target)
+        let pos = root.anchorWindow.itemPosition(target)
         if (p.x >= pos.x && p.x <= pos.x + target.width && p.y >= pos.y && p.y <= pos.y + target.height)
           return target
       }

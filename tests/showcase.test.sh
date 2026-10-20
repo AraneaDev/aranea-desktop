@@ -14,7 +14,7 @@ done
 
 # --- 4e: the capturable dropdowns are listed; widgets without a popup and
 # the Wi-Fi QR (it shows the password) are not
-for surface in clock weather image-picker; do
+for surface in clock worldclock weather image-picker; do
   grep -Fxq "$surface" <<<"$list_output"
 done
 for surface in keyboard-layout system-update wifiqr; do

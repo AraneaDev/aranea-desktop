@@ -44,8 +44,8 @@ ColumnLayout {
     var bytes = 0
     var index = 0
     for (; index < text.length; index++) {
-      var code = text.charCodeAt(index)
-      var size = code < 128 ? 1 : code < 2048 ? 2 : 3
+      let code = text.charCodeAt(index)
+      let size = code < 128 ? 1 : code < 2048 ? 2 : 3
       if (code >= 0xd800 && code <= 0xdbff && index + 1 < text.length && text.charCodeAt(index + 1) >= 0xdc00 && text.charCodeAt(index + 1) <= 0xdfff)
         size = 4
       if (bytes + size > 262144)

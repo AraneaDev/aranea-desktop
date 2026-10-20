@@ -108,7 +108,7 @@ Item {
     var wrap = rowRepeater.itemAt(index)
     if (!wrap)
       return null
-    for (var i = 0; i < wrap.children.length; i++)
+    for (let i = 0; i < wrap.children.length; i++)
       if (wrap.children[i].objectName === "workspaceNode")
         return wrap.children[i]
     return null

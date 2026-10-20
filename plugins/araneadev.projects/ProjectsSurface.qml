@@ -186,7 +186,7 @@ Item {
       if (chooseSection('actions'))
         client.logs(target.runId)
     } else if (method === 'open-preview') {
-      var run = (client.snapshot.runs || []).find(function (r) {
+      let run = (client.snapshot.runs || []).find(function (r) {
         return r.id === target.runId && r.projectId === target.projectId && r.checkoutId === target.checkoutId
       })
       if (run) {
@@ -278,7 +278,7 @@ Item {
     parent: panel
     pending: projectsPage.setupNavigationPending || panel.root.activityClient.pending
     error: (projectsPage.details.profileEditing ? projectsPage.details.profileEditor.fieldError : '') || projectsPage.details.fieldError || projectsPage.error || (panel.root.actionClient.error ? panel.root.actionClient.error.message : '') || projectsPage.details.actions.editor.fieldError
-    pointerGate: pointerGate
+    pointerGate: pointerGateObject
     onSaveRequested: panel.saveNavigationDraft()
     onDiscardRequested: {
       if (pending || panel.root.inert)
@@ -438,7 +438,7 @@ Item {
     rowsFiltered: true
     selectedId: panel.root.projectId
     displayOnly: panel.root.inert || panel.navigationBlocked
-    pointerGate: pointerGate
+    pointerGate: pointerGateObject
     pinningEnabled: true
     showAddProject: true
     onSetupRequested: panel.addProject()
@@ -537,7 +537,7 @@ Item {
   // Invalidate pointer movement accepted before content moved.
   function stampLayout() {
     layoutChangedAt = Date.now()
-    pointerGate.reset()
+    pointerGateObject.reset()
   }
   // Clamp explicit scroll requests inside the current content viewport.
   function scrollTo(y) {
@@ -652,7 +652,7 @@ Item {
   function refreshTools() {
     var project = projectsPage.selectedProject
     if (project && !(project.profiles || []).length && project.id !== seedingProjectId) {
-      var next = Object.assign({}, seededProjects)
+      let next = Object.assign({}, seededProjects)
       delete next[project.id]
       seededProjects = next
       setSeedFailure(project.id, null)
@@ -872,7 +872,7 @@ Item {
     function onFinished(operation, projectId, checkoutId, response) {
       var project = projectsPage.selectedProject
       if (operation === 'fetch' || operation === 'pull') {
-        var stored = panel.gitCommandError
+        let stored = panel.gitCommandError
         if (!response.ok)
           panel.gitCommandError = {
             projectId: projectId,
@@ -903,8 +903,8 @@ Item {
           panel.taskFormError = response.error
         }
       } else if (operation === 'task-remove') {
-        var target = panel.removeTarget
-        var matches = !!target && target.projectId === projectId && target.checkoutId === checkoutId
+        let target = panel.removeTarget
+        let matches = !!target && target.projectId === projectId && target.checkoutId === checkoutId
         if (panel.removeChecking) {
           panel.removeChecking = false
           if (matches) {
@@ -977,7 +977,7 @@ Item {
         panel.seedingProjectId = ''
       // Record what the seed made, not that it was asked for.
       if (action === 'profiles-seed') {
-        var seeded = ((state || {}).projects || []).find(function (p) {
+        let seeded = ((state || {}).projects || []).find(function (p) {
           return p.id === args.projectId
         })
         panel.setSeedMadeNothing(args.projectId, !!seeded && !(seeded.profiles || []).length)
@@ -1018,7 +1018,7 @@ Item {
     }
   }
   PointerMoveGate {
-    id: pointerGate
+    id: pointerGateObject
     referenceItem: card
     property real layoutChangedAt: panel.layoutChangedAt
   }
@@ -1060,7 +1060,7 @@ Item {
       client: panel.root.projectClient
       launching: !!panel.root.inspectionLaunchIntent
       displayOnly: panel.root.inert
-      pointerGate: pointerGate
+      pointerGate: pointerGateObject
       systemBusy: panel.switcherPending
       loadProblem: !panel.seedOwnsRegistryError && (panel.root.projectController.error || panel.root.projectController.errorObject) ? Problems.problem(panel.root.projectController.errorObject || {
         message: panel.root.projectController.error
@@ -1105,7 +1105,7 @@ Item {
             visible: panel.compact && !projectsPage.selectedProject && !projectsPage.setupActive
             text: 'Choose project'
             enabled: !panel.root.inert && !panel.navigationBlocked
-            pointerGate: pointerGate
+            pointerGate: pointerGateObject
             onClicked: projectPicker.open()
           }
           Aranea.UiLabel {
@@ -1118,7 +1118,7 @@ Item {
             id: closeButton
             text: 'Close'
             variant: 'quiet'
-            pointerGate: pointerGate
+            pointerGate: pointerGateObject
             onClicked: panel.root.close()
           }
         }
@@ -1151,7 +1151,7 @@ Item {
               bindings: panel.root.projectClient.snapshot.bindings || []
               selectedId: projectsPage.selectedProject ? projectsPage.selectedProject.id : panel.root.projectId
               navigationEnabled: !panel.navigationBlocked && !panel.root.inert
-              pointerGate: pointerGate
+              pointerGate: pointerGateObject
               onProjectRequested: function (id) {
                 panel.navigate(id)
               }
@@ -1177,7 +1177,7 @@ Item {
               Layout.fillHeight: true
               clip: true
               contentWidth: Math.max(1, width - Style.space(16))
-              contentHeight: content.implicitHeight
+              contentHeight: contentObject.implicitHeight
               boundsBehavior: Flickable.StopAtBounds
               onContentYChanged: panel.stampLayout()
               onContentHeightChanged: panel.stampLayout()
@@ -1203,11 +1203,11 @@ Item {
                 }
               }
               Column {
-                id: content
+                id: contentObject
                 width: scroller.contentWidth
                 spacing: Style.space(16)
                 ProjectHeader {
-                  width: content.width
+                  width: contentObject.width
                   visible: !!projectsPage.selectedProject && !projectsPage.setupActive
                   compact: panel.compact
                   managementActive: panel.section === 'profiles'
@@ -1227,7 +1227,7 @@ Item {
                   pending: panel.root.projectClient.submitting || !!panel.root.inspectionLaunchIntent
                   acceptanceUnknown: panel.root.projectClient.acceptanceUnknown
                   displayOnly: !!panel.root.inert
-                  pointerGate: pointerGate
+                  pointerGate: pointerGateObject
                   tools: panel.root.projectController.tools
                   menuHost: panel
                   onStartProfile: function (id, revision) {
@@ -1253,14 +1253,14 @@ Item {
                   }
                 }
                 ProjectTaskForm {
-                  width: content.width
+                  width: contentObject.width
                   visible: !!projectsPage.selectedProject && !projectsPage.setupActive && panel.taskFormProjectId !== '' && projectsPage.selectedProject.id === panel.taskFormProjectId
                   project: projectsPage.selectedProject
                   pending: !!panel.root.gitCommands.pending && panel.root.gitCommands.pending.operation === 'task-create' && panel.root.gitCommands.pending.projectId === panel.taskFormProjectId
                   blocked: !!panel.root.gitCommands.pending
                   error: panel.taskFormError
                   displayOnly: !!panel.root.inert
-                  pointerGate: pointerGate
+                  pointerGate: pointerGateObject
                   onCreateRequested: function (branch) {
                     panel.taskFormError = null
                     panel.runTaskCreate(branch)
@@ -1271,7 +1271,7 @@ Item {
                   }
                 }
                 ProjectTaskRemove {
-                  width: content.width
+                  width: contentObject.width
                   visible: !!projectsPage.selectedProject && !projectsPage.setupActive && !!panel.removeTarget && panel.removeTarget.projectId === projectsPage.selectedProject.id && panel.removeTarget.checkoutId === projectsPage.selectedProject.lastCheckoutId
                   checkout: panel.selectedCheckout
                   facts: panel.removeFacts
@@ -1279,7 +1279,7 @@ Item {
                   blocked: !!panel.root.gitCommands.pending
                   error: panel.removeError
                   displayOnly: !!panel.root.inert
-                  pointerGate: pointerGate
+                  pointerGate: pointerGateObject
                   onConfirmRequested: function (confirmUnpushed) {
                     var target = panel.removeTarget
                     if (panel.root.inert || !target)
@@ -1295,13 +1295,13 @@ Item {
                   }
                 }
                 Aranea.PageHeader {
-                  width: content.width
+                  width: contentObject.width
                   visible: projectsPage.setupActive
                   title: 'Add a project'
                   description: 'Add an exact Git repository to open its Overview.'
                 }
                 Flow {
-                  width: content.width
+                  width: contentObject.width
                   spacing: Style.space(4)
                   visible: !projectsPage.setupActive && (!!projectsPage.selectedProject || panel.section === 'help' || panel.section === 'preferences')
                   Repeater {
@@ -1333,29 +1333,29 @@ Item {
                       text: modelData.label
                       selected: panel.section === modelData.id
                       enabled: (modelData.id === 'help' || modelData.id === 'preferences' || !!projectsPage.selectedProject) && (panel.section === modelData.id || !panel.navigationBlocked)
-                      pointerGate: pointerGate
+                      pointerGate: pointerGateObject
                       onClicked: panel.chooseSection(modelData.id)
                     }
                   }
                 }
                 Aranea.UiLabel {
-                  width: content.width
+                  width: contentObject.width
                   visible: !!panel.root.inspectionError
                   text: panel.root.inspectionError
                   color: Aranea.DesignTokens.urgent
                 }
                 ProjectsWelcome {
-                  width: content.width
+                  width: contentObject.width
                   visible: !projectsPage.selectedProject && !projectsPage.setupActive && panel.section !== 'help' && panel.section !== 'preferences'
                   hasProjects: (panel.root.projectController.state.projects || []).length > 0
                   pending: panel.navigationBlocked
                   displayOnly: !!panel.root.inert
-                  pointerGate: pointerGate
+                  pointerGate: pointerGateObject
                   onSetupRequested: panel.addProject()
                   onHelpRequested: panel.chooseSection('help')
                 }
                 Aranea.PageHeader {
-                  width: content.width
+                  width: contentObject.width
                   visible: panel.section === 'preferences' && !projectsPage.setupActive
                   title: 'Preferences'
                   description: 'Choose tools and workspace behavior. Manage the folders used to discover repositories.'
@@ -1381,7 +1381,7 @@ Item {
                   errorObject: (panel.seedOwnsRegistryError ? null : panel.root.projectController.errorObject) || (!panel.pageRegistryError && !panel.startOwnsError && panel.root.projectClient.error ? {
                       message: panel.root.projectClient.error
                     } : null)
-                  pointerGate: pointerGate
+                  pointerGate: pointerGateObject
                   onRegisterRequested: function (paths) {
                     panel.root.projectController.request('register', {
                       paths: paths
@@ -1477,7 +1477,7 @@ Item {
                   }
                 }
                 ColumnLayout {
-                  width: content.width
+                  width: contentObject.width
                   visible: !!projectsPage.selectedProject && (panel.root.projectClient.acceptanceUnknown || !!panel.root.projectClient.requestError || panel.root.projectClient.preparing)
                   Aranea.UiLabel {
                     objectName: 'projectPreparing'
@@ -1492,7 +1492,7 @@ Item {
                     Layout.fillWidth: true
                     displayOnly: panel.root.inert
                     actionsEnabled: !panel.root.projectClient.submitting
-                    pointerGate: pointerGate
+                    pointerGate: pointerGateObject
                     readonly property var client: panel.root.projectClient
                     // Remembered profile that Start another would reuse.
                     readonly property var another: projectsPage.selectedProject ? Profiles.remembered(projectsPage.selectedProject) : null
@@ -1536,13 +1536,13 @@ Item {
                       text: 'Cancel preparation'
                       visible: panel.root.projectClient.canCancelPreparation
                       enabled: !panel.root.inert
-                      pointerGate: pointerGate
+                      pointerGate: pointerGateObject
                       onClicked: panel.root.cancelPreparation()
                     }
                     Aranea.ActionButton {
                       text: 'Manage profiles'
                       visible: !panel.root.projectClient.acceptanceUnknown && !panel.root.projectClient.preparing
-                      pointerGate: pointerGate
+                      pointerGate: pointerGateObject
                       onClicked: panel.chooseSection('profiles')
                     }
                   }
@@ -1570,7 +1570,7 @@ Item {
                   }
                   actionError: !panel.root.actionClient.submissionUncertain && !panel.root.actionClient.error && !panel.root.actionClient.summaryError && panel.root.actionClient.available && panel.overviewModel.services.concat(panel.overviewModel.checks).length && panel.root.actionClient.availability.execution !== true ? 'Running is not available. Manage actions to check required helpers.' : ''
                   activityError: panel.root.activityClient.error ? 'Agent connection not available. Open Details to reconnect.' : ''
-                  pointerGate: pointerGate
+                  pointerGate: pointerGateObject
                   suggestions: panel.overviewSuggestions
                   onSuggestionAddRequested: function (key) {
                     panel.addOverviewSuggestion(key)
@@ -1615,7 +1615,7 @@ Item {
                     else if (method === 'open')
                       panel.root.projectClient.request(target)
                     else {
-                      var parts = method.split(':'), payload = Object.assign({}, target)
+                      let parts = method.split(':'), payload = Object.assign({}, target)
                       payload[parts[0] + 'Role'] = parts[1]
                       panel.root.clearDismissalIntent()
                       panel.root.projectClient.recoverEnvironment(payload)
@@ -1636,7 +1636,7 @@ Item {
                   agentChoice: panel.agentChoice
                   pending: projectsPage.details.pending
                   openAvailable: projectsPage.details.openAvailable
-                  pointerGate: pointerGate
+                  pointerGate: pointerGateObject
                   onStartRequested: function (agentId) {
                     if (panel.chooseSection('overview'))
                       projectsPage.details.startAgent(agentId)

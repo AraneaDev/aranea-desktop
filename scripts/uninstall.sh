@@ -30,7 +30,7 @@ omarchy_config="$HOME/.config/omarchy"
 data_root="$(xdg_data_home)"
 state_root="$(aranea_ownership_root)"
 project_state_root="$(aranea_state_root)"
-hook_files=("$omarchy_config/hooks/theme-set.d/theme-set" "$omarchy_config/hooks/post-boot.d/post-boot")
+hook_files=("$omarchy_config/hooks/theme-set.d/theme-set" "$omarchy_config/hooks/post-boot.d/post-boot" "$omarchy_config/hooks/post-update.d/post-update")
 # The desktop settings Aranea changes (install-integration save_gsetting).
 gsetting_keys=("org.gnome.desktop.interface cursor-theme" "org.gnome.desktop.interface icon-theme" "org.gnome.desktop.interface font-name" "org.gnome.desktop.interface text-scaling-factor")
 unit_files=("$config_root/systemd/user/aranea-wallpaper-day-night.timer" "$config_root/systemd/user/aranea-wallpaper-day-night.service")
@@ -130,7 +130,7 @@ is_aranea_hook() {
   [[ -f "$1" ]] && grep -q '^# Aranea theme:' "$1"
 }
 
-# Removes Aranea's theme-set and post-boot hooks, so a later theme switch or
+# Removes Aranea's theme-set, post-boot and post-update hooks, so a later theme switch or
 # login does not install Aranea again.
 remove_hooks() {
   local hook
