@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.36.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.35.1...v2.36.0) (2026-10-21)
+
+
+### Features
+
+* **artwork:** expand wallpapers and refresh the Silken Vault showcase ([#204](https://github.com/AraneaDev/aranea-desktop/issues/204)) ([4875aa1](https://github.com/AraneaDev/aranea-desktop/commit/4875aa1c621597329996c40ba1a3d31d5dfa3756))
+
 ## [2.35.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.35.0...v2.35.1) (2026-10-20)
 
 
