@@ -5,15 +5,25 @@
 /** @typedef {{id:string,label?:string,path?:string,available:boolean}} WallpaperAsset */
 /** @typedef {{monitor?:string|null,scale?:number|null,width?:number|null,height?:number|null,availability?:string,persistenceSupport?:string,configuredScale?:number|null}} DisplayState */
 /** @typedef {{uiFamily:string,technicalFamily:string,families:Array<string>,monospaceFamilies:Array<string>,availability:string,catalogAvailable?:boolean}} FontsState */
-/** @typedef {{fonts?:FontsState,display?:DisplayState,motion?:MotionState,wallpaper?:WallpaperState,schedule?:ScheduleState,integrations?:Array<IntegrationState>,wallpapers?:Array<WallpaperAsset>,integrationsAvailability?:string,wallpapersAvailability?:string}} SettingsState */
+/** @typedef {{catalogAvailable?:boolean,selectedId?:string|null,mode?:string|null,choices?:Array<{id:string,available:boolean}>,idle?:{screensaverSeconds?:number|null,lockSeconds?:number|null}}} ScreensaverState */
+/** @typedef {{screensaver?:ScreensaverState,fonts?:FontsState,display?:DisplayState,motion?:MotionState,wallpaper?:WallpaperState,schedule?:ScheduleState,integrations?:Array<IntegrationState>,wallpapers?:Array<WallpaperAsset>,integrationsAvailability?:string,wallpapersAvailability?:string}} SettingsState */
 /** @typedef {{requested:string,monitor:string,width:number,height:number,expectedScale:number,effectiveScale?:number|null,confirmed:boolean,persistence:string}} DisplayScaleResult */
-/** @typedef {{displayScale?:DisplayScaleResult}} MutationResult */
+/** @typedef {{accepted?:boolean,sessionId?:string|null,delegated?:string}} ScreensaverPreviewResult */
+/** @typedef {{persisted?:boolean,applied?:boolean,error?:string|null}} ScreensaverTimingResult */
+/** @typedef {{displayScale?:DisplayScaleResult,screensaverPreview?:ScreensaverPreviewResult,screensaverTiming?:ScreensaverTimingResult}} MutationResult */
 /** Normalize a requested settings destination.
  * @param {string} value Requested section.
  * @returns {string} Supported section.
  */
 function normalizeSection(value) {
-  return ["appearance", "display", "schedule", "integrations", "notifications"].indexOf(value) >= 0
+  return [
+    "appearance",
+    "display",
+    "schedule",
+    "integrations",
+    "notifications",
+    "screensavers"
+  ].indexOf(value) >= 0
     ? value
     : "appearance"
 }
@@ -181,7 +191,35 @@ function command(path, operation, args, state) {
   state = state || {}
   if (operation === "status" && args.length === 0) return [path, "status", "--json"]
   var section = operation.split(" ")[1]
-  if (section === "fonts") {
+  if (section === "screensaver-timing") {
+    if (
+      operation !== "configure screensaver-timing" ||
+      args.length !== 2 ||
+      !args.every(function (value) {
+        return (
+          typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value) && Number(value) <= 86400
+        )
+      }) ||
+      (Number(args[0]) > 0 && Number(args[1]) > 0 && Number(args[1]) <= Number(args[0]))
+    )
+      return null
+  } else if (section === "screensaver") {
+    var saver = state.screensaver || {}
+    if (
+      saver.catalogAvailable !== true ||
+      !Array.isArray(saver.choices) ||
+      !saver.choices.some(function (choice) {
+        return choice.id === args[0] && choice.available === true
+      }) ||
+      !(
+        (operation === "preview screensaver" && args.length === 1) ||
+        (operation === "configure screensaver" &&
+          args.length === 2 &&
+          ["single", "shuffle"].indexOf(args[1]) >= 0)
+      )
+    )
+      return null
+  } else if (section === "fonts") {
     var fonts = state.fonts
     if (
       operation !== "configure fonts" ||
@@ -297,6 +335,40 @@ function parseResponse(stdout, exitCode) {
  */
 function outcome(operation, args, state, succeeded, result) {
   state = state || {}
+  if (operation === "preview screensaver")
+    return succeeded &&
+      result &&
+      result.screensaverPreview &&
+      result.screensaverPreview.accepted === true
+      ? result.screensaverPreview.delegated === "stock"
+        ? "Stock preview delegated"
+        : "Preview accepted"
+      : "Preview not confirmed"
+  if (operation === "configure screensaver-timing") {
+    var timing = result && result.screensaverTiming
+    if (!succeeded)
+      return timing && timing.persisted === true && timing.applied === false
+        ? "Saved · reload failed"
+        : "Failed"
+    var idle = state.screensaver && state.screensaver.idle
+    return timing &&
+      timing.persisted === true &&
+      timing.applied === true &&
+      idle &&
+      idle.screensaverSeconds === Number(args[0]) &&
+      idle.lockSeconds === Number(args[1])
+      ? "Timing saved"
+      : "Save not confirmed"
+  }
+  if (operation === "configure screensaver")
+    return succeeded &&
+      state.screensaver &&
+      state.screensaver.selectedId === args[0] &&
+      state.screensaver.mode === args[1]
+      ? "Saved"
+      : succeeded
+        ? "Save not confirmed"
+        : "Failed"
   if (!succeeded) {
     var failedMotion = operation === "set motion" && state.motion
     if (!failedMotion || failedMotion.configured !== args[0]) return "Failed"

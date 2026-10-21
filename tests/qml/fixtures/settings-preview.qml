@@ -104,6 +104,57 @@ ShellRoot {
       }
     }
     var state = {
+      screensaver: {
+        availability: 'available',
+        catalogAvailable: true,
+        selectedId: 'silk-journey',
+        mode: 'single',
+        choices: [
+          {
+            id: 'silk-journey',
+            label: 'Silk Journey',
+            description: 'A silken journey through the quiet web.',
+            renderer: 'web',
+            thumbnail: Quickshell.env('ARANEA_SETTINGS_RENDER_ROOT') + '/branding/3d/live/preview.png',
+            available: true,
+            shuffleEligible: true
+          },
+          {
+            id: 'silk-chamber',
+            label: 'Silk Chamber',
+            description: 'A chamber of luminous threads.',
+            renderer: 'video',
+            thumbnail: Quickshell.env('ARANEA_SETTINGS_RENDER_ROOT') + '/branding/3d/silk-chamber.png',
+            available: true,
+            shuffleEligible: true
+          },
+          {
+            id: 'omarchy',
+            label: 'Omarchy',
+            description: 'The classic Omarchy screensaver.',
+            renderer: 'stock',
+            thumbnail: null,
+            available: true,
+            shuffleEligible: false
+          }
+        ],
+        idle: {
+          screensaverSeconds: 900,
+          lockSeconds: 1200,
+          stayAwake: false,
+          screensaverOff: false,
+          error: null
+        },
+        integration: {
+          installed: true,
+          reachable: true
+        },
+        session: {
+          running: false,
+          ready: false
+        },
+        error: null
+      },
       display: {
         monitor: 'eDP-1',
         scale: 2,
@@ -192,6 +243,8 @@ ShellRoot {
       itemErrors: {}
     }
     var section = 'appearance'
+    if (fixture === 'screensavers')
+      section = 'screensavers'
     if (fixture === 'scaling') {
       section = 'display'
       state.display.scale = 2.666667

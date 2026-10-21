@@ -7,7 +7,7 @@ settings take effect immediately. Commands below run from a repository checkout;
 
 ## Aranea settings
 
-The settings window has five destinations:
+The settings window has six destinations:
 
 | Destination   | Change                                          | When it takes effect                                                   |
 | ------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
@@ -18,11 +18,37 @@ The settings window has five destinations:
 | Schedule      | Daily wallpaper entries.                        | **Save schedule** commits the draft.                                   |
 | Schedule      | Enable or disable the saved schedule.           | Immediately.                                                           |
 | Integrations  | Activate or deactivate a supported integration. | Immediately, after the operation completes.                            |
+| Screensavers  | Scene or shuffle; idle and lock deadlines.      | **Apply scene** and **Apply timing** save independently.               |
 | Notifications | Manual Do not disturb.                          | Immediately.                                                           |
 
 Navigating between pages keeps your drafts and scroll positions. Unavailable
 controls show an error and **Retry** without disabling unrelated preferences.
 Closing the window does not cancel an accepted integration installation.
+
+### Choose screensavers and timing
+
+Open **Settings → Screensavers**, or search for **screensaver**, **shuffle** or
+**lock** in the command center. Select a card to draft a single scene, or enable
+**Shuffle Aranea scenes**; shuffle excludes Omarchy. **Apply scene** saves the
+selection, while **Discard** restores the current owner choice. Unavailable scenes
+cannot be selected. **Preview** never saves either draft and hides Settings when
+the launch is accepted. Move the pointer, click, or press a key to dismiss the
+preview. Launch acceptance is not a rendered-frame confirmation; reopen Settings
+to read any startup error.
+
+Both timing deadlines count from last activity. Set whole minutes from 1 to 1440
+or explicitly choose **Disabled**. When both are enabled, lock must be later than
+the screensaver. **Apply timing** saves only timing; **Discard timing draft**
+restores the configured values. Existing precise seconds stay unchanged until
+that field is edited, including when the other duration is saved. Non-minute
+values are shown exactly in **Configured**, with the minutes field left blank
+until edited. The initial 15/20-minute user configuration is preserved until save.
+
+**Timing saved** confirms persistence and a successful shell reload request;
+**Configured** describes saved values, not independently verified running timers.
+If reload or readback fails, the draft and diagnostic stay visible for correction.
+Stay awake and screensaver-off indicators explain pauses without toggling them.
+Automatic activation requires the installed, reachable Aranea session integration.
 
 ### Choose fonts
 

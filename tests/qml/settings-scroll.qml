@@ -20,7 +20,7 @@ ShellRoot {
   // Repeat the matrix with a real wrapped read failure visible.
   property bool withError: false
   // Stable category identities used by the production host.
-  readonly property var sections: ['appearance', 'display', 'schedule', 'integrations', 'notifications']
+  readonly property var sections: ['appearance', 'display', 'schedule', 'integrations', 'notifications', 'screensavers']
   QmlTest {
     id: t
   }
@@ -97,6 +97,8 @@ ShellRoot {
       return t.findChild(surface, 'displayScaleApply')
     if (entry.section === 'schedule')
       return t.findChild(surface, 'scheduleSave')
+    if (entry.section === 'screensavers')
+      return t.findChild(surface, 'screensaverMinutes:lockSeconds')
     if (entry.section === 'integrations') {
       var actions = t.findChildren(surface, 'integrationAction')
       return actions[actions.length - 1]
@@ -191,6 +193,32 @@ ShellRoot {
         availability: 'available'
       })
     entry.controller.state = {
+      screensaver: {
+        catalogAvailable: true,
+        selectedId: 'silk-journey',
+        mode: 'single',
+        choices: [
+          {
+            id: 'silk-journey',
+            label: 'Silk Journey',
+            available: true
+          },
+          {
+            id: 'silk-chamber',
+            label: 'Silk Chamber',
+            available: true
+          },
+          {
+            id: 'omarchy',
+            label: 'Omarchy',
+            available: true
+          }
+        ],
+        idle: {
+          screensaverSeconds: 900,
+          lockSeconds: 1200
+        }
+      },
       wallpapers: wallpapers,
       wallpapersAvailability: 'available',
       wallpaper: {

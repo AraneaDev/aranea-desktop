@@ -52,7 +52,15 @@ Item {
       scaleDirty: displayPage.scaleDirty,
       detailsExpanded: displayPage.detailsExpanded,
       scheduleDraft: JSON.parse(JSON.stringify(schedulePage.draft)),
-      scheduleDirty: schedulePage.dirty
+      scheduleDirty: schedulePage.dirty,
+      screensaver: {
+        selectedId: screensaversPage.selectedId,
+        modeDraft: screensaversPage.modeDraft,
+        sceneDirty: screensaversPage.sceneDirty,
+        timingDraft: Object.assign({}, screensaversPage.timingDraft),
+        timingText: Object.assign({}, screensaversPage.timingText),
+        timingDirty: screensaversPage.timingDirty
+      }
     }
   }
   // Restore local capture state after restoring owner observations and section.
@@ -70,6 +78,14 @@ Item {
     displayPage.detailsExpanded = saved.detailsExpanded
     schedulePage.draft = JSON.parse(JSON.stringify(saved.scheduleDraft))
     schedulePage.dirty = saved.scheduleDirty
+    if (saved.screensaver) {
+      screensaversPage.selectedId = saved.screensaver.selectedId
+      screensaversPage.modeDraft = saved.screensaver.modeDraft
+      screensaversPage.sceneDirty = saved.screensaver.sceneDirty
+      screensaversPage.timingDraft = Object.assign({}, saved.screensaver.timingDraft)
+      screensaversPage.timingText = Object.assign({}, saved.screensaver.timingText)
+      screensaversPage.timingDirty = saved.screensaver.timingDirty
+    }
     pageOffsets = saved.pageOffsets
     scrollSection = saved.scrollSection
     scrollTo(saved.contentY)
@@ -90,6 +106,7 @@ Item {
     displayPage.detailsExpanded = false
     schedulePage.dirty = false
     schedulePage.syncDraft()
+    screensaversPage.resetDrafts()
     pageOffsets = ({})
     scrollTo(0)
   }
@@ -179,6 +196,11 @@ Item {
         appearancePage.fontDrafts.dirty = false
         appearancePage.fontDrafts.syncDraft()
       }
+      if (succeeded && (operation === 'configure screensaver' || operation === 'configure screensaver-timing'))
+        screensaversPage.acceptSaved(operation, args)
+      // Overlay keyboard focus must yield to the accepted fullscreen preview.
+      if (operation === 'preview screensaver' && succeeded)
+        panel.root.close()
       if (operation === 'configure schedule' && succeeded)
         schedulePage.acceptSaved(args)
     }
@@ -310,7 +332,7 @@ Item {
                 id: pages
                 width: Math.min(scroller.contentWidth, Style.space(560))
                 height: pages.children[pages.currentIndex] ? pages.children[pages.currentIndex].implicitHeight : 0
-                currentIndex: ['appearance', 'display', 'schedule', 'integrations', 'notifications'].indexOf(panel.root.section)
+                currentIndex: ['appearance', 'display', 'schedule', 'integrations', 'notifications', 'screensavers'].indexOf(panel.root.section)
                 AppearancePage {
                   id: appearancePage
                   Layout.fillHeight: false
@@ -389,6 +411,21 @@ Item {
                     panel.controller.request(operation, args)
                   }
                   onRetryRequested: panel.controller.refreshNotifications()
+                }
+                ScreensaversPage {
+                  id: screensaversPage
+                  Layout.fillHeight: false
+                  backendState: panel.controller.state
+                  displayOnly: panel.controller.showcaseActive
+                  pending: panel.controller.pending
+                  pendingKey: panel.controller.pendingKey
+                  results: panel.controller.results
+                  errors: panel.controller.itemErrors
+                  pointerGate: pointerGateObject
+                  onRequest: function (operation, args) {
+                    panel.controller.request(operation, args)
+                  }
+                  onRetryRequested: panel.controller.refresh()
                 }
               }
             }
