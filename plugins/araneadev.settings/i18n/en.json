@@ -37,5 +37,6 @@
   "screensavers.timingSaved": "Timing saved",
   "screensavers.reloadFailed": "Saved · reload failed",
   "screensavers.failed": "Failed",
-  "screensavers.applying": "Applying…"
+  "screensavers.applying": "Applying…",
+  "screensavers.confirmationFailed": "The result could not be confirmed. Review the current values and retry."
 }
