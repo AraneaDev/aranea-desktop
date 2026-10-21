@@ -1,4 +1,4 @@
-"""Bounded Hyprland IPC, with literal dispatcher arguments and owned event stream."""
+"""Bounded Hyprland IPC, fixed typed Lua dispatch and an owned event stream."""
 
 import json
 import os
@@ -9,6 +9,22 @@ import time
 from pathlib import Path
 
 APP_ID = "org.omarchy.screensaver"
+
+
+def lua_string(value):
+    """Encode UTF-8 data as one Lua literal, including quotes and control bytes."""
+    if not isinstance(value, str):
+        raise TypeError("Compositor dispatch data must be a string")
+    # Lua uses decimal byte escapes, not JSON's Unicode escape syntax. Always
+    # emit three digits so a following digit cannot extend an escaped byte.
+    return (
+        '"'
+        + "".join(
+            chr(byte) if 32 <= byte <= 126 and byte not in (34, 92) else f"\\{byte:03d}"
+            for byte in value.encode("utf-8")
+        )
+        + '"'
+    )
 
 
 class Hyprland:
@@ -83,7 +99,31 @@ class Hyprland:
             "togglespecialworkspace",
         ):
             raise ValueError("Unsupported compositor dispatch")
-        self.command(["hyprctl", "dispatch", name, str(value)])
+        literal = lua_string(value)
+        if name == "focusmonitor":
+            expression = "hl.dsp.focus({ monitor = " + literal + " })"
+        elif name == "focuswindow":
+            if not re.fullmatch(r"address:0x[0-9a-fA-F]+", value):
+                raise ValueError("Invalid owned window address")
+            expression = "hl.dsp.focus({ window = " + literal + " })"
+        elif name == "movetoworkspacesilent":
+            parts = value.rsplit(",address:", 1)
+            if (
+                len(parts) != 2
+                or not parts[0]
+                or not re.fullmatch(r"0x[0-9a-fA-F]+", parts[1])
+            ):
+                raise ValueError("Invalid owned workspace move")
+            expression = (
+                "hl.dsp.window.move({ workspace = "
+                + lua_string(parts[0])
+                + ", follow = false, window = "
+                + lua_string("address:" + parts[1])
+                + " })"
+            )
+        else:
+            expression = "hl.dsp.workspace.toggle_special(" + literal + ")"
+        self.command(["hyprctl", "dispatch", expression])
 
     def subscribe(self):
         signature = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")

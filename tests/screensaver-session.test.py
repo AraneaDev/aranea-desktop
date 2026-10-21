@@ -149,6 +149,78 @@ while True:
 """
 
 
+LUA_DISPATCH = r"""local seen = false
+local function fields(value, names)
+  assert(type(value) == "table")
+  local count = 0
+  for key, _ in pairs(value) do
+    assert(names[key], "unexpected constructor field")
+    count = count + 1
+  end
+  local wanted = 0
+  for key, expected in pairs(names) do
+    assert(type(value[key]) == expected, "incorrect typed field")
+    wanted = wanted + 1
+  end
+  assert(count == wanted)
+end
+local hl = { dsp = { window = {}, workspace = {} } }
+function hl.dsp.focus(value)
+  if value.monitor ~= nil then
+    fields(value, {monitor="string"})
+    return {"focusmonitor", value.monitor}
+  end
+  fields(value, {window="string"})
+  return {"focuswindow", value.window}
+end
+function hl.dsp.window.move(value)
+  fields(value, {workspace="string",follow="boolean",window="string"})
+  assert(value.follow == false)
+  return {"movetoworkspacesilent", value.workspace .. "," .. value.window}
+end
+function hl.dsp.workspace.toggle_special(value)
+  assert(type(value) == "string")
+  return {"togglespecialworkspace", value}
+end
+function hl.dispatch(action)
+  assert(not seen, "multiple dispatches from one expression")
+  seen = true
+  for _, value in ipairs(action) do
+    io.write(tostring(#value), ":", value)
+  end
+end
+local chunk, problem = load("return hl.dispatch(" .. arg[1] .. ")", "hyprctl-dispatch", "t", {hl=hl})
+assert(chunk, problem)
+chunk()
+assert(seen)
+"""
+
+
+def native_dispatch(compositor, argv):
+    """Fake Hyprland's Lua-only constructor boundary, using the real parser."""
+    if len(argv) != 3:
+        print("return hl.dispatch(focusmonitor eDP-1): ')' expected near 'eDP'")
+        raise SystemExit(7)
+    with (compositor.root / "dispatch-argv").open("a") as stream:
+        stream.write(json.dumps(argv[1:]) + "\n")
+    result = subprocess.run(
+        ["lua", str(compositor.root / "dispatch.lua"), argv[2]],
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode:
+        sys.stderr.buffer.write(result.stderr)
+        raise SystemExit(7)
+    pending = result.stdout
+    decoded = []
+    while pending:
+        count, pending = pending.split(b":", 1)
+        length = int(count)
+        decoded.append(pending[:length].decode("utf-8"))
+        pending = pending[length:]
+    compositor.dispatch(*decoded)
+
+
 def run_session(root, preview, ready_timeout):
     from tools.screensaver import session
 
@@ -434,12 +506,13 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def native_boundary(self):
+        (self.root / "dispatch.lua").write_text(LUA_DISPATCH)
         command = (
             "#!/usr/bin/env python3\n"
             + "import importlib.util, json, os, pathlib, sys\n"
             + f"spec=importlib.util.spec_from_file_location('fixture', {str(Path(__file__).resolve())!r})\n"
             + "module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)\nroot=pathlib.Path(os.environ['FIXTURE_ROOT']);compositor=module.Compositor(root)\n"
-            + "name=pathlib.Path(sys.argv[0]).name\nif name == 'omarchy-shell':\n print(json.dumps(compositor.read('locked')))\nelif sys.argv[1] == 'monitors': print(json.dumps(compositor.monitors()))\nelif sys.argv[1] == 'clients': print(json.dumps(compositor.clients()))\nelif sys.argv[1] == 'activewindow': print(json.dumps(compositor.active_window()))\nelif sys.argv[1] == 'dispatch': compositor.dispatch(sys.argv[2], sys.argv[3])\nelse: sys.exit(19)\n"
+            + "name=pathlib.Path(sys.argv[0]).name\nif name == 'omarchy-shell':\n print(json.dumps(compositor.read('locked')))\nelif sys.argv[1] == 'monitors': print(json.dumps(compositor.monitors()))\nelif sys.argv[1] == 'clients': print(json.dumps(compositor.clients()))\nelif sys.argv[1] == 'activewindow': print(json.dumps(compositor.active_window()))\nelif sys.argv[1] == 'dispatch': module.native_dispatch(compositor, sys.argv)\nelse: sys.exit(19)\n"
         )
         for name in ("hyprctl", "omarchy-shell"):
             path = self.root / "bin" / name
@@ -474,6 +547,87 @@ class SessionTests(unittest.TestCase):
             server.close()
 
         self.addCleanup(close)
+
+    def test_native_lua_dispatch_templates(self):
+        from tools.screensaver.hyprland import Hyprland
+
+        self.native_boundary()
+        adapter = Hyprland()
+        cases = [
+            ("focusmonitor", "eDP-1", 'hl.dsp.focus({ monitor = "eDP-1" })'),
+            (
+                "focuswindow",
+                "address:0xface",
+                'hl.dsp.focus({ window = "address:0xface" })',
+            ),
+            (
+                "movetoworkspacesilent",
+                "special:work notes,address:0xbeef",
+                'hl.dsp.window.move({ workspace = "special:work notes", follow = false, window = "address:0xbeef" })',
+            ),
+            (
+                "togglespecialworkspace",
+                "work notes",
+                'hl.dsp.workspace.toggle_special("work notes")',
+            ),
+        ]
+        for operation, value, _ in cases:
+            adapter.dispatch(operation, value)
+        calls = [
+            json.loads(line)
+            for line in (self.root / "dispatch-argv").read_text().splitlines()
+        ]
+        self.assertEqual(
+            calls, [["dispatch", expression] for _, _, expression in cases]
+        )
+        actual = [
+            json.loads(line)
+            for line in (self.root / "dispatches").read_text().splitlines()
+        ]
+        self.assertEqual(actual, [[operation, value] for operation, value, _ in cases])
+
+    def test_native_lua_string_data_cannot_become_dispatch_code(self):
+        from tools.screensaver.hyprland import Hyprland
+
+        self.native_boundary()
+        adapter = Hyprland()
+        values = [
+            'quote " and backslash \\',
+            "東京 🕷",
+            "line\nreturn\rtab\t",
+            "\x0099\x0199\x7f",
+            '"); hl.dispatch(hl.dsp.workspace.toggle_special("INJECTED")); --',
+        ]
+        expected = []
+        for value in values:
+            for operation in (
+                "focusmonitor",
+                "togglespecialworkspace",
+                "movetoworkspacesilent",
+            ):
+                argument = (
+                    "special:" + value + ",address:0xbeef"
+                    if operation == "movetoworkspacesilent"
+                    else value
+                )
+                adapter.dispatch(operation, argument)
+                expected.append([operation, argument])
+        actual = [
+            json.loads(line)
+            for line in (self.root / "dispatches").read_text().splitlines()
+        ]
+        self.assertEqual(actual, expected)
+        for operation, value in [
+            ("exec", "anything"),
+            ("focuswindow", 'address:0x1"});evil()'),
+            ("movetoworkspacesilent", "special:x"),
+            ("focusmonitor", None),
+        ]:
+            with self.assertRaises((ValueError, TypeError)):
+                adapter.dispatch(operation, value)
+        self.assertEqual(
+            len((self.root / "dispatch-argv").read_text().splitlines()), len(expected)
+        )
 
     def test_detached_preview_accepts_before_ready_and_reports_live_state(self):
         self.native_boundary()
