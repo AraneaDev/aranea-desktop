@@ -105,7 +105,9 @@ RENDERER = r"""#!/usr/bin/env python3
 import json, os, pathlib, signal, subprocess, sys, time, urllib.parse, urllib.request
 root = pathlib.Path(os.environ["FIXTURE_ROOT"])
 assert (root / "subscribed").exists()
-url = next(x.removeprefix("--app=") for x in sys.argv if x.startswith("--app="))
+assert "--kiosk" in sys.argv
+assert not any(x.startswith("--app=") for x in sys.argv)
+url = sys.argv[sys.argv.index("--kiosk") + 1]
 query = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
 screen = query["screen"][0]
 behavior = json.loads((root / "behavior").read_text())

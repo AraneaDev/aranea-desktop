@@ -18,13 +18,15 @@ class OwnedProcess:
     closed: bool = False
 
 
-def launch_web(url, profile_dir, app_id, *, popen=subprocess.Popen, browser="chromium"):
-    """Launch an isolated browser with no user's extensions, sync or profile."""
+def launch_web(
+    url, profile_dir, app_id, *, popen=subprocess.Popen, browser="chromium", kiosk=False
+):
+    """Use kiosk for exact Wayland identity; retain app mode for legacy preview."""
     process = popen(
         [
             browser,
             f"--user-data-dir={profile_dir}",
-            f"--app={url}",
+            *(["--kiosk", url] if kiosk else [f"--app={url}"]),
             "--start-fullscreen",
             "--no-first-run",
             "--no-default-browser-check",

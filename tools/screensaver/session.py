@@ -344,6 +344,7 @@ class Supervisor:
                             self.server.url(name),
                             directory / f"profile-{index}",
                             APP_ID,
+                            kiosk=True,
                         )
                     else:
                         child = launch_video(

@@ -199,6 +199,7 @@ class RendererTests(unittest.TestCase):
             child = subprocess.Popen(
                 [sys.executable, "-c", code, str(record), *argv], **kwargs
             )
+            self.addCleanup(child.wait, timeout=2)
             records.append(record)
             return child
 
@@ -208,6 +209,13 @@ class RendererTests(unittest.TestCase):
             "org.omarchy.screensaver",
             popen=spawn,
         )
+        kiosk = self.renderers.launch_web(
+            "http://127.0.0.1:123/live/?session=token",
+            self.root / "profile-kiosk",
+            "org.omarchy.screensaver",
+            popen=spawn,
+            kiosk=True,
+        )
         video = self.renderers.launch_video(
             self.root / "model.glb",
             self.root / "ipc",
@@ -215,17 +223,37 @@ class RendererTests(unittest.TestCase):
             ROOT / "branding/3d/preview.lua",
             popen=spawn,
         )
-        for owned in [web, video]:
+        for owned in [web, kiosk, video]:
             self.assertEqual(os.getpgid(owned.process.pid), owned.pgid)
             self.assertEqual(owned.pgid, owned.process.pid)
             self.assertEqual(owned.process.wait(timeout=2), 0)
-        webargs, videoargs = [json.loads(record.read_text()) for record in records]
+        webargs, kioskargs, videoargs = [
+            json.loads(record.read_text()) for record in records
+        ]
         self.assertEqual(
             webargs,
             [
                 "chromium",
                 f"--user-data-dir={self.root / 'profile'}",
                 "--app=http://127.0.0.1:123/live/?session=token",
+                "--start-fullscreen",
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-background-networking",
+                "--disable-component-update",
+                "--disable-sync",
+                "--disable-extensions",
+                "--disable-features=MediaRouter",
+                "--class=org.omarchy.screensaver",
+            ],
+        )
+        self.assertEqual(
+            kioskargs,
+            [
+                "chromium",
+                f"--user-data-dir={self.root / 'profile-kiosk'}",
+                "--kiosk",
+                "http://127.0.0.1:123/live/?session=token",
                 "--start-fullscreen",
                 "--no-first-run",
                 "--no-default-browser-check",
