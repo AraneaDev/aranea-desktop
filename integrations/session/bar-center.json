@@ -1,0 +1,30 @@
+{
+  "centerAnchor": "araneadev.clock",
+  "center": [
+    {
+      "id": "omarchy.indicators",
+      "items": ["ScreenRecording"]
+    },
+    {
+      "id": "omarchy.indicators",
+      "items": ["Reminder"]
+    },
+    {
+      "id": "omarchy.indicators",
+      "items": ["StayAwake"]
+    },
+    {
+      "id": "araneadev.clock"
+    },
+    {
+      "id": "araneadev.sudo"
+    },
+    {
+      "id": "araneadev.updates"
+    },
+    {
+      "id": "omarchy.indicators",
+      "items": ["NightLight"]
+    }
+  ]
+}
