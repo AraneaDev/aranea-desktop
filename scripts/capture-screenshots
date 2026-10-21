@@ -113,7 +113,10 @@ focus_capture_workspace() {
 # user's saved background link or schedule. Restore even after a failed grab.
 capture_frame() (
   focus_capture_workspace || exit 3
-  local previous_background restore_background frame_path="${!#}" grabbed=0
+  local previous_background restore_background frame_path="${!#}" staged status=0
+  local -a grab_args=("$@")
+  staged="$(mktemp "$(dirname "$frame_path")/.capture-frame.XXXXXX.png")" || exit 3
+  grab_args[${#grab_args[@]} - 1]="$staged"
   previous_background="$(readlink -f -- "$HOME/.local/state/omarchy/current/background" 2>/dev/null || true)"
   [[ -f "$previous_background" ]] || previous_background="$repo_root/backgrounds/00-default.png"
   # shellcheck disable=SC2329 # Invoked by the EXIT trap.
@@ -122,17 +125,23 @@ capture_frame() (
     restore_background="$(readlink -f -- "$HOME/.local/state/omarchy/current/background" 2>/dev/null || true)"
     [[ -f "$restore_background" ]] || restore_background="$previous_background"
     if ! omarchy-shell background setInstant "$restore_background" >/dev/null 2>&1; then
-      ((grabbed == 0)) || rm -f -- "$frame_path"
       echo 'Unable to restore the desktop background after capture' >&2
       return 3
     fi
   }
-  trap 'restore_capture_background || exit 3' EXIT
-  omarchy-shell background setInstant "$repo_root/backgrounds/variants/silken-vault.png" >/dev/null || exit 3
-  sleep 0.5
+  trap 'status=$?; if [[ "${ARANEA_CAPTURE_BACKGROUND_MANAGED:-}" != 1 ]]; then restore_capture_background || status=3; fi; rm -f -- "$staged"; exit "$status"' EXIT
+  if [[ "${ARANEA_CAPTURE_BACKGROUND_MANAGED:-}" != 1 ]]; then
+    omarchy-shell background setInstant "$repo_root/backgrounds/variants/silken-vault.png" >/dev/null || exit 3
+    sleep 0.5
+  fi
   focus_capture_workspace || exit 3
-  grabbed=1
-  command grim "$@"
+  command grim "${grab_args[@]}" || status=$?
+  trap 'rm -f -- "$staged"' EXIT
+  if [[ "${ARANEA_CAPTURE_BACKGROUND_MANAGED:-}" != 1 ]]; then restore_capture_background || exit 3; fi
+  # Some grim versions report a warning after writing a complete frame.
+  # Callers decide whether to accept that status; never publish before restore.
+  if [[ -s "$staged" ]]; then mv -f -- "$staged" "$frame_path" || exit 3; fi
+  exit "$status"
 )
 
 # Prints the running shell's config dir, resolved like omarchy-restart-shell:
@@ -357,6 +366,13 @@ if ((capture_all)); then
   # badges then show capture data only, never the user's own count.
   mkdir -p "$(aranea_state_root)"
   batch_inbox_backup="$(mktemp -d "$(aranea_state_root)/capture-backup.XXXXXX")"
+  batch_background_backup="$(mktemp -d "$(aranea_state_root)/background-backup.XXXXXX")"
+  batch_background_link="$HOME/.local/state/omarchy/current/background"
+  if [[ -e "$batch_background_link" || -L "$batch_background_link" ]]; then
+    cp -a -- "$batch_background_link" "$batch_background_backup/background"
+  fi
+  batch_background_staged=0
+  batch_wallpaper_timer_paused=0
   # Restore the real inbox, leave the finished capture set visible on the
   # intentionally empty workspace for a moment, then return focus. Set
   # before the inbox is parked; the swapped flag is only set once the real
@@ -384,6 +400,20 @@ if ((capture_all)); then
     else
       remove_empty_backup "$batch_inbox_backup" || batch_finish_status=1
     fi
+    if ((batch_background_staged)); then
+      if [[ -e "$batch_background_backup/background" || -L "$batch_background_backup/background" ]]; then
+        mv -Tf -- "$batch_background_backup/background" "$batch_background_link" || batch_finish_status=1
+      else
+        rm -f -- "$batch_background_link" || batch_finish_status=1
+      fi
+      batch_background_staged=0
+    else
+      rm -f -- "$batch_background_backup/background" || batch_finish_status=1
+    fi
+    rmdir -- "$batch_background_backup" || batch_finish_status=1
+    if ((batch_wallpaper_timer_paused)); then
+      systemctl --user start aranea-wallpaper-day-night.timer || batch_finish_status=1
+    fi
     omarchy restart shell >/dev/null 2>&1 || true
     sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"
     hyprctl dispatch 'hl.dsp.focus({ workspace = "1" })' >/dev/null 2>&1 || true
@@ -396,7 +426,19 @@ if ((capture_all)); then
     echo 'notification inbox not parked (session locked, shell still running or a file could not be moved); nothing captured' >&2
     exit 3
   fi
+  # Pin the batch once. Shell restarts reload this same link; child frames
+  # must not reload or restore the wallpaper between captures.
+  mkdir -p "$(dirname "$batch_background_link")"
+  if systemctl --user is-active --quiet aranea-wallpaper-day-night.timer; then
+    batch_wallpaper_timer_paused=1
+    systemctl --user stop aranea-wallpaper-day-night.timer aranea-wallpaper-day-night.service || exit 3
+  fi
+  batch_background_staged=1
+  ln -nsf -- "$repo_root/backgrounds/variants/silken-vault.png" "$batch_background_link"
   sleep 3
+  omarchy-shell background setInstant "$repo_root/backgrounds/variants/silken-vault.png" >/dev/null || exit 3
+  export ARANEA_CAPTURE_BACKGROUND_MANAGED=1
+  sleep 1
   # Captures one surface in a child run; fails on a child error or no new PNG. The
   # previous PNG is set aside first (so it never counts as a new capture) and
   # put back when the capture fails, so the README keeps its old screenshot.
@@ -565,7 +607,8 @@ capture_inert_surface() (
   restore_needed=1
   hyprctl dispatch 'hl.dsp.focus({ workspace = "2" })' >/dev/null 2>&1 || exit 3
   local attempt ready=0
-  for ((attempt = 0; attempt < 30; attempt++)); do
+  # Cold artwork decoding for a full catalog can exceed the old 3-second wait.
+  for ((attempt = 0; attempt < 180; attempt++)); do
     answer="$(omarchy-shell "$target" captureState 2>/dev/null || true)"
     jq -e '.readOnly == true' <<<"$answer" >/dev/null 2>&1 || exit 3
     if jq -e '.ready == true' <<<"$answer" >/dev/null 2>&1; then

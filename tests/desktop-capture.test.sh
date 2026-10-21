@@ -27,9 +27,11 @@ mkdir -p "$HOME/.local/state/omarchy/current"
 ln -s "$ARANEA_TEST_SANDBOX/ready.png" "$HOME/.local/state/omarchy/current/background"
 cat >"$bin/omarchy-shell" <<'STUB'
 #!/usr/bin/env bash
+if [[ "$1" == shell ]]; then echo ok; exit 0; fi
 [[ "$1 $2" == 'background setInstant' ]] || exit 8
 printf '%s\n' "$3" >>"$ARANEA_TEST_SANDBOX/background-calls"
 [[ "${FAIL_CAPTURE_BACKGROUND:-0}" != 1 || "$3" != */silken-vault.png ]] || exit 7
+[[ "${FAIL_RESTORE_BACKGROUND:-0}" != 1 || "$3" == */silken-vault.png ]] || exit 7
 printf '%s' "$3" >"$ARANEA_TEST_SANDBOX/live-background"
 STUB
 cat >"$bin/hyprctl" <<'STUB'
@@ -37,6 +39,7 @@ cat >"$bin/hyprctl" <<'STUB'
 case "$1" in
   dispatch) touch "$ARANEA_TEST_SANDBOX/focused" ;;
   activeworkspace) echo '{"id":2}' ;;
+  layers) echo '{}' ;;
 esac
 STUB
 printf '#!/usr/bin/env bash\nexit 0\n' >"$bin/sleep"
@@ -62,6 +65,14 @@ ARANEA_CAPTURE_WORKSPACE=2 "$capture" --surface desktop --output "$out" >/dev/nu
 test -f "$ARANEA_TEST_SANDBOX/focused"
 
 [[ "$(cat "$ARANEA_TEST_SANDBOX/live-background")" == "$ARANEA_TEST_SANDBOX/ready.png" ]]
+
+# A direct-output surface must preserve its published frame if restoration fails.
+printf previous >"$out/osd.png"
+if FAIL_RESTORE_BACKGROUND=1 "$capture" --surface osd --output "$out" >/dev/null 2>&1; then
+  echo 'capture accepted a failed background restoration' >&2
+  exit 1
+fi
+[[ "$(cat "$out/osd.png")" == previous ]]
 [[ "$(readlink "$HOME/.local/state/omarchy/current/background")" == "$ARANEA_TEST_SANDBOX/ready.png" ]]
 previous_count="$(cat "$ARANEA_TEST_SANDBOX/count")"
 if FAIL_CAPTURE_BACKGROUND=1 "$capture" --surface desktop --output "$out" >/dev/null 2>&1; then

@@ -156,8 +156,7 @@ completed history that can be cleared.
 
 The hero is a tour of the current desktop. Expand a collection below to inspect
 individual surfaces or choose a wallpaper. Agent usage captures show Codex with
-demonstration data; the desktop background is Signal Shrine. New capture defaults
-use Silken Vault.
+demonstration data; every desktop backdrop uses Silken Vault.
 
 <details>
 <summary><strong>Desktop panels, settings, pickers, and applications</strong></summary>

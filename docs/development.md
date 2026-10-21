@@ -116,10 +116,12 @@ persists across restarts.
 
 Network hosts VPN and Bluetooth captures; System hosts Display and Health.
 Health waits for live CPU history. Calendar, World Clock and Weather are captured
-as separate pages of the popup below the time. All screenshot backgrounds use Silken Vault. Live frames temporarily stage it
-and restore the saved desktop background afterwards without changing the wallpaper
-schedule. Workspaces and lock previews use the same image. Settings previews use
-Silken Vault, and
+as separate pages of the popup below the time. All screenshot backgrounds use
+Silken Vault. A batch selects it once at the start, keeps it across shell
+restarts, and restores the saved background once at the end. An active wallpaper
+timer is paused during the batch and resumed afterwards; its configuration stays
+unchanged. Workspaces and lock previews use the same
+image. Settings previews use Silken Vault, and
 `settings-schedule` shows the daily time/image editor. Nearby device names,
 audio labels, provider details, and notification contents are staged for the
 showcase. Audio transport and agent refresh/selection are refused while their
