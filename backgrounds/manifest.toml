@@ -160,3 +160,83 @@ path = "backgrounds/variants/frostbound-nexus.png"
 aspect = "16:9"
 contrast = "standard"
 motion = false
+
+[[wallpapers]]
+id = "prism-weaver"
+label = "Prism Weaver"
+path = "backgrounds/variants/prism-weaver.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "forge-of-silk"
+label = "Forge of Silk"
+path = "backgrounds/variants/forge-of-silk.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "basalt-covenant"
+label = "Basalt Covenant"
+path = "backgrounds/variants/basalt-covenant.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "silken-vault"
+label = "Silken Vault"
+path = "backgrounds/variants/silken-vault.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "orbital-sigil"
+label = "Orbital Sigil"
+path = "backgrounds/variants/orbital-sigil.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "echo-basin"
+label = "Echo Basin"
+path = "backgrounds/variants/echo-basin.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "glass-tide"
+label = "Glass Tide"
+path = "backgrounds/variants/glass-tide.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "vector-garden"
+label = "Vector Garden"
+path = "backgrounds/variants/vector-garden.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "midnight-switchyard"
+label = "Midnight Switchyard"
+path = "backgrounds/variants/midnight-switchyard.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "quiet-singularity"
+label = "Quiet Singularity"
+path = "backgrounds/variants/quiet-singularity.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false

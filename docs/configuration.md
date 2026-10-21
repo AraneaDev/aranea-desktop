@@ -138,28 +138,38 @@ schedule continues to choose its images.
 
 Displayed titles and stable CLI IDs are different:
 
-| Title                   | Stable ID          |
-| ----------------------- | ------------------ |
-| Signal Shrine (default) | `signal-shrine`    |
-| Aranea Core             | `aranea-core`      |
-| Neural Deck             | `cockpit`          |
-| Rain City               | `day`              |
-| Silent Vault            | `night`            |
-| First Departure         | `dawn`             |
-| Dead Frequency          | `dusk`             |
-| Black Signal            | `sparse`           |
-| Undercity               | `dense`            |
-| Ghost in the Wire       | `monochrome`       |
-| Violet Pursuit          | `violet-pursuit`   |
-| Deep Current            | `deep-current`     |
-| Orbital Relay           | `ultrawide`        |
-| Canopy Circuit          | `canopy-circuit`   |
-| Polar Freight           | `polar-freight`    |
-| Lunar Weaver            | `lunar-weaver`     |
-| Abyssal Sanctum         | `abyssal-sanctum`  |
-| Ghost Weaver            | `ghost-weaver`     |
-| Skyline Sentinel        | `skyline-sentinel` |
-| Frostbound Nexus        | `frostbound-nexus` |
+| Title                   | Stable ID             |
+| ----------------------- | --------------------- |
+| Signal Shrine (default) | `signal-shrine`       |
+| Aranea Core             | `aranea-core`         |
+| Neural Deck             | `cockpit`             |
+| Rain City               | `day`                 |
+| Silent Vault            | `night`               |
+| First Departure         | `dawn`                |
+| Dead Frequency          | `dusk`                |
+| Black Signal            | `sparse`              |
+| Undercity               | `dense`               |
+| Ghost in the Wire       | `monochrome`          |
+| Violet Pursuit          | `violet-pursuit`      |
+| Deep Current            | `deep-current`        |
+| Orbital Relay           | `ultrawide`           |
+| Canopy Circuit          | `canopy-circuit`      |
+| Polar Freight           | `polar-freight`       |
+| Lunar Weaver            | `lunar-weaver`        |
+| Abyssal Sanctum         | `abyssal-sanctum`     |
+| Ghost Weaver            | `ghost-weaver`        |
+| Skyline Sentinel        | `skyline-sentinel`    |
+| Frostbound Nexus        | `frostbound-nexus`    |
+| Prism Weaver            | `prism-weaver`        |
+| Forge of Silk           | `forge-of-silk`       |
+| Basalt Covenant         | `basalt-covenant`     |
+| Silken Vault            | `silken-vault`        |
+| Orbital Sigil           | `orbital-sigil`       |
+| Echo Basin              | `echo-basin`          |
+| Glass Tide              | `glass-tide`          |
+| Vector Garden           | `vector-garden`       |
+| Midnight Switchyard     | `midnight-switchyard` |
+| Quiet Singularity       | `quiet-singularity`   |
 
 To list or select them directly:
 
