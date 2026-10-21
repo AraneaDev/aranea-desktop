@@ -310,6 +310,149 @@ test("approved lifecycle actions vary by exact checkout, native capability and r
     assert.equal(row.secondary && row.secondary.kind, "")
   }
 })
+test("external task actions require every registered identity guard and literal native eligibility", () => {
+  const variants = [
+    { association: { status: "unassigned", projectId: "p", checkoutId: "c", cwd: "/repo" } },
+    { association: { status: "registered", projectId: "other", checkoutId: "c", cwd: "/repo" } },
+    { association: { status: "registered", projectId: "p", checkoutId: "c2", cwd: "/repo" } },
+    { association: { status: "registered", projectId: "p", checkoutId: "c", cwd: "/repo/" } }
+  ]
+  for (const variant of variants) {
+    for (const state of ["working", "ready-for-review", "failed"]) {
+      const [row] = logic.rows(
+        { tasks: [task("guarded", state, { resumeCommand: "resume", ...variant })] },
+        registry
+      )
+      assert.equal(row.assigned, false)
+      assert.equal(row.projectLabel, "")
+      assert.equal(row.branch, "")
+      assert.equal(row.primary.kind, state === "failed" ? "inspect-failure" : "")
+      assert.equal(row.primary.local, state === "failed")
+      assert.equal(row.secondary.kind, "")
+    }
+  }
+  for (const nativeSessionEligible of [false, undefined, 1, "true"]) {
+    for (const state of ["working", "ready-for-review", "failed", "ended"]) {
+      const [row] = logic.rows(
+        { tasks: [task("non-native", state, { nativeSessionEligible, resumeCommand: "resume" })] },
+        registry
+      )
+      assert.equal(row.assigned, true)
+      assert.equal(
+        row.primary.kind,
+        state === "ready-for-review" ? "open-checkout" : state === "failed" ? "inspect-failure" : ""
+      )
+      assert.equal(row.primary.local, state === "failed")
+      assert.equal(row.secondary.kind, "")
+    }
+  }
+})
+test("display state chooses actions while reported completion and freshness independently permit dismissal", () => {
+  const cases = [
+    {
+      reported: "failed",
+      display: "working",
+      freshness: "connected",
+      blockers: [],
+      action: "focus",
+      attention: false,
+      dismiss: true
+    },
+    {
+      reported: "failed",
+      display: "working",
+      freshness: "connected",
+      blockers: [{ summary: "pending" }],
+      action: "focus",
+      attention: false,
+      dismiss: false
+    },
+    {
+      reported: "working",
+      display: "failed",
+      freshness: "connected",
+      blockers: [],
+      action: "inspect-failure",
+      attention: true,
+      dismiss: false
+    },
+    {
+      reported: "working",
+      display: "needs-input",
+      freshness: "connection-lost",
+      blockers: [{ summary: "pending" }],
+      action: "reopen",
+      attention: false,
+      dismiss: true
+    },
+    {
+      reported: "working",
+      display: "ended",
+      freshness: "connected",
+      blockers: [{ summary: "pending" }],
+      action: "reopen",
+      attention: false,
+      dismiss: true
+    },
+    {
+      reported: "finished",
+      display: "working",
+      freshness: "unconfirmed",
+      blockers: [{ summary: "pending" }],
+      action: "reopen",
+      attention: false,
+      dismiss: true
+    },
+    {
+      reported: "needs-input",
+      display: "",
+      freshness: "",
+      blockers: [],
+      action: "reopen",
+      attention: true,
+      dismiss: false
+    }
+  ]
+  for (const entry of cases) {
+    const [row] = logic.rows(
+      {
+        tasks: [
+          task("split-state", entry.reported, {
+            displayState: entry.display,
+            freshness: entry.freshness,
+            blockers: entry.blockers,
+            resumeCommand: "resume"
+          })
+        ]
+      },
+      registry
+    )
+    assert.equal(row.primary.kind, entry.action)
+    assert.equal(row.attention, entry.attention)
+    assert.equal(row.canDismiss, entry.dismiss)
+    assert.equal(row.hasBlockers, entry.blockers.length > 0)
+  }
+})
+test("attention ordering breaks equal priorities by key and retains unknown states last", () => {
+  const rows = logic.rows(
+    {
+      tasks: [
+        task("z", "working"),
+        task("unknown", "unexpected"),
+        task("finished", "finished"),
+        task("a", "working"),
+        task("review", "ready-for-review")
+      ]
+    },
+    registry
+  )
+  assert.deepEqual(
+    rows.map((row) => row.key),
+    ["review", "a", "z", "finished", "unknown"]
+  )
+  assert.equal(rows[4].primary.kind, "")
+  assert.equal(rows[4].stateLabel, "Status not reported")
+})
 test("completed or owner-stale records advertise dismissal while current work remains protected", () => {
   for (const reportedState of [
     "working",
