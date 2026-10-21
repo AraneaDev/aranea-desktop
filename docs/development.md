@@ -116,10 +116,10 @@ persists across restarts.
 
 Network hosts VPN and Bluetooth captures; System hosts Display and Health.
 Health waits for live CPU history. Calendar, World Clock and Weather are captured
-as separate pages of the popup below the time. Workspaces uses the current
-background; `ARANEA_CAPTURE_BACKGROUND` selects another image explicitly. Its
-isolated renderer defaults to Signal Shrine when no current background exists.
-Settings previews use Signal Shrine, and
+as separate pages of the popup below the time. All screenshot backgrounds use Silken Vault. Live frames temporarily stage it
+and restore the saved desktop background afterwards without changing the wallpaper
+schedule. Workspaces and lock previews use the same image. Settings previews use
+Silken Vault, and
 `settings-schedule` shows the daily time/image editor. Nearby device names,
 audio labels, provider details, and notification contents are staged for the
 showcase. Audio transport and agent refresh/selection are refused while their

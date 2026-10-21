@@ -139,6 +139,6 @@ done
 "$capture" --surface settings-schedule --output "$out" >/dev/null
 test -f "$out/settings-schedule.png"
 grep -Fq '"section":"schedule"' "$log"
-grep -Fq '"wallpaper":"signal-shrine"' "$log"
+grep -Fq '"wallpaper":"silken-vault"' "$log"
 grep -Fq captureRestore "$log"
 echo 'Settings capture contract passed'

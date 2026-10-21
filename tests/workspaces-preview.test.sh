@@ -39,12 +39,12 @@ done
 [[ "$(magick "$out/selected.png" -crop 420x240+36+55 +repage -fx 'min(r,min(g,b))' -format '%[fx:int(255*maxima)]' info:)" -gt 180 ]]
 
 # An inert preview uses repository art by default, even if HOME advertises
-# another current background. The visible corner must match Signal Shrine.
+# another current background. The visible corner must match Silken Vault.
 mkdir -p "$HOME/.local/state/omarchy/current"
 ln -s "$art_dir/$art_name" "$HOME/.local/state/omarchy/current/background"
 "$renderer" --fixture workspaces --output "$out/default.png"
 for channel in r g b; do
-  expected="$(magick "$repo_root/backgrounds/variants/signal-shrine.png" -format "%[fx:int(255*p{0,0}.$channel)]" info:)"
+  expected="$(magick "$repo_root/backgrounds/variants/silken-vault.png" -format "%[fx:int(255*p{0,0}.$channel)]" info:)"
   actual="$(magick "$out/default.png" -format "%[fx:int(255*p{0,0}.$channel)]" info:)"
   ((actual >= expected - 2 && actual <= expected + 2))
 done
@@ -56,24 +56,14 @@ rm "$HOME/.local/state/omarchy/current/background"
 [[ "$(magick "$out/capture-fallback/workspaces.png" -format '%[pixel:p{0,0}]' info:)" == "$(magick "$out/default.png" -format '%[pixel:p{0,0}]' info:)" ]]
 ln -s "$art_dir/$art_name" "$HOME/.local/state/omarchy/current/background"
 
-# The capture caller selects the current desktop art explicitly. The inert
-# renderer above deliberately ignores HOME, so this exercises the route too.
+# Captures default to the collection artwork even when the desktop differs.
 capture="$repo_root/scripts/capture-screenshots"
 "$capture" --surface workspaces --output "$out/capture-current"
-[[ "$(magick "$out/capture-current/workspaces.png" -format '%[pixel:p{0,0}]' info:)" == 'srgba(20,40,60,1)' ]]
+[[ "$(magick "$out/capture-current/workspaces.png" -format '%[pixel:p{0,0}]' info:)" == "$(magick "$out/default.png" -format '%[pixel:p{0,0}]' info:)" ]]
 
-# An explicit capture override wins over the current-background link. Its
-# path is resolved from the caller's directory, with URL characters intact.
-override_name="override 'wallpaper' #?%.png"
-magick -size 160x90 xc:'#503264' "$art_dir/$override_name"
-(cd "$art_dir" && ARANEA_CAPTURE_BACKGROUND="$override_name" "$capture" --surface workspaces --output "$out/capture-override")
-[[ "$(magick "$out/capture-override/workspaces.png" -format '%[pixel:p{0,0}]' info:)" == 'srgba(80,50,100,1)' ]]
-printf old >"$out/capture-override/workspaces.png"
-if ARANEA_CAPTURE_BACKGROUND="$art_dir/missing.png" "$capture" --surface workspaces --output "$out/capture-override" >"$TMPDIR/capture-error.log" 2>&1; then
-  echo 'workspace capture accepted a missing background override' >&2
-  exit 1
-fi
-[[ "$(cat "$out/capture-override/workspaces.png")" == old ]]
+# The legacy capture override cannot change collection artwork.
+ARANEA_CAPTURE_BACKGROUND="$art_dir/missing.png" "$capture" --surface workspaces --output "$out/fixed-background"
+[[ "$(magick "$out/fixed-background/workspaces.png" -format '%[pixel:p{0,0}]' info:)" == "$(magick "$out/default.png" -format '%[pixel:p{0,0}]' info:)" ]]
 
 # Invalid files must fail without replacing a previously published frame.
 printf 'not an image' >"$art_dir/corrupt.png"

@@ -19,9 +19,7 @@
 #   --size WxH         output size in device pixels (default 3840x2160)
 #   --scale N          device pixel ratio, an integer (default 3); the size
 #                      must divide by it
-#   --background FILE  wallpaper behind the lock (default: what the
-#                      ~/.local/state/omarchy/current/background link points
-#                      at, else the repository's backgrounds/background-night.png)
+#   --background FILE  wallpaper behind the lock (default: Silken Vault)
 #   --clock HH:MM      stand-in time (default 09:41)
 #   --date YYYY-MM-DD  stand-in date, formatted as the lock formats it
 #                      (default 2026-10-03)
@@ -102,8 +100,7 @@ quickshell_path="$(command -v "$quickshell_bin" 2>/dev/null)" || die "quickshell
 command -v magick >/dev/null 2>&1 || die "ImageMagick (magick) is required"
 
 if [[ -z "$background" ]]; then
-  background="$(readlink -f -- "$HOME/.local/state/omarchy/current/background" 2>/dev/null || true)"
-  [[ -f "$background" ]] || background="$repo_root/backgrounds/background-night.png"
+  background="$repo_root/backgrounds/variants/silken-vault.png"
 fi
 [[ -f "$background" ]] || die "missing background: $background"
 background="$(readlink -f -- "$background")"

@@ -1,6 +1,6 @@
 # Aranea wallpaper variants
 
-Signal Shrine is the default background. The relative link
+Silken Vault is the default background. The relative link
 `../00-default.png` puts it first in Omarchy's sorted background selection
 without duplicating the image or changing its catalog ID.
 

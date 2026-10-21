@@ -100,7 +100,7 @@ schedules retain their choices.
 
 The default fonts are **Inter** for the interface and **JetBrains Mono** for
 technical text. Motion can be turned off. The wallpaper collection contains
-thirty distinct scenes in obsidian, mint, and violet, with **Signal Shrine** as
+thirty distinct scenes in obsidian, mint, and violet, with **Silken Vault** as
 the default. Signal Shrine and Aranea Core feature the spider, joined by Lunar
 Weaver, Abyssal Sanctum, Ghost Weaver, Skyline Sentinel, and Frostbound Nexus.
 Ghost in the Wire is the cybernetic portrait, and Neural Deck is the command room.
@@ -156,7 +156,8 @@ completed history that can be cleared.
 
 The hero is a tour of the current desktop. Expand a collection below to inspect
 individual surfaces or choose a wallpaper. Agent usage captures show Codex with
-demonstration data; the desktop background is Signal Shrine.
+demonstration data; the desktop background is Signal Shrine. New capture defaults
+use Silken Vault.
 
 <details>
 <summary><strong>Desktop panels, settings, pickers, and applications</strong></summary>
@@ -246,7 +247,7 @@ Human titles appear in the picker; stable IDs preserve selections and schedules.
 See the [title/ID map](docs/configuration.md#wallpapers) and
 [artwork sources and prompts](backgrounds/ARTWORK.md).
 
-| Signal Shrine (default)                                  | Aranea Core                                          | Neural Deck                                      |
+| Signal Shrine                                            | Aranea Core                                          | Neural Deck                                      |
 | -------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------ |
 | ![Signal Shrine](backgrounds/variants/signal-shrine.png) | ![Aranea Core](backgrounds/variants/aranea-core.png) | ![Neural Deck](backgrounds/variants/cockpit.png) |
 
@@ -274,24 +275,24 @@ See the [title/ID map](docs/configuration.md#wallpapers) and
 | -------------------------------------------------------------- | -------------------------------------------------------------- |
 | ![Skyline Sentinel](backgrounds/variants/skyline-sentinel.png) | ![Frostbound Nexus](backgrounds/variants/frostbound-nexus.png) |
 
-| Prism Weaver | Forge of Silk |
-| --- | --- |
+| Prism Weaver                                           | Forge of Silk                                            |
+| ------------------------------------------------------ | -------------------------------------------------------- |
 | ![Prism Weaver](backgrounds/variants/prism-weaver.png) | ![Forge of Silk](backgrounds/variants/forge-of-silk.png) |
 
-| Basalt Covenant | Silken Vault |
-| --- | --- |
+| Basalt Covenant                                              | Silken Vault (default)                                 |
+| ------------------------------------------------------------ | ------------------------------------------------------ |
 | ![Basalt Covenant](backgrounds/variants/basalt-covenant.png) | ![Silken Vault](backgrounds/variants/silken-vault.png) |
 
-| Orbital Sigil | Echo Basin |
-| --- | --- |
+| Orbital Sigil                                            | Echo Basin                                         |
+| -------------------------------------------------------- | -------------------------------------------------- |
 | ![Orbital Sigil](backgrounds/variants/orbital-sigil.png) | ![Echo Basin](backgrounds/variants/echo-basin.png) |
 
-| Glass Tide | Vector Garden |
-| --- | --- |
+| Glass Tide                                         | Vector Garden                                            |
+| -------------------------------------------------- | -------------------------------------------------------- |
 | ![Glass Tide](backgrounds/variants/glass-tide.png) | ![Vector Garden](backgrounds/variants/vector-garden.png) |
 
-| Midnight Switchyard | Quiet Singularity |
-| --- | --- |
+| Midnight Switchyard                                                  | Quiet Singularity                                                |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | ![Midnight Switchyard](backgrounds/variants/midnight-switchyard.png) | ![Quiet Singularity](backgrounds/variants/quiet-singularity.png) |
 
 See [Visual language](docs/visual-language.md) for the design system behind
