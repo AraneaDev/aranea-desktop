@@ -52,6 +52,7 @@ sandbox_on_exit cleanup
 # Runs one test file; prints its result and returns non-zero when it failed.
 run_test() {
   local test_file="$1" name plugin waited=0 status=0
+  local state_home="$XDG_STATE_HOME"
   name="$(basename "$test_file" .qml)"
   # Short path: the quickshell IPC socket path is limited to 108 bytes.
   run_dir="$(mktemp -d /tmp/aranea-qt.XXXXXX)"
@@ -182,8 +183,10 @@ CLOCKCOMMAND
   fi
   if [[ "$name" == bar-foreground || "$name" == bar-foreground-controller ]]; then
     # Exercise real Process/Timer/FileView ownership with only command I/O faked.
-    mkdir -p "$XDG_STATE_HOME/omarchy"
-    printf 'initial\n' >"$XDG_STATE_HOME/omarchy/current"
+    # This watcher needs a file where other fixtures expect a directory.
+    state_home="$run_dir/state"
+    mkdir -p "$state_home/omarchy"
+    printf 'initial\n' >"$state_home/omarchy/current"
     for display_command in omarchy-bar-text-color bar-foreground-fixture; do
       ln -s "$repo_root/tests/qml/fixtures/bar-foreground-command.py" "$run_dir/display-bin/$display_command"
     done
@@ -203,7 +206,7 @@ CLOCKCOMMAND
   (cd "$run_dir" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
     -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE QT_QPA_PLATFORM=offscreen \
     PATH="$run_dir/sudo-bin:$run_dir/display-bin:$PATH" OMARCHY_PATH="${shell_dir%/shell}" ARANEA_SUDO_FIXTURE_ROOT="$run_dir/sudo-state" ARANEA_DISPLAY_FIXTURE_ROOT="$run_dir/display-state" \
-    ARANEA_CLOCK_TEST_PLUGIN_ROOT="$run_dir/external/plugins" XDG_RUNTIME_DIR="$run_dir/run" XDG_CACHE_HOME="$run_dir/cache" \
+    ARANEA_CLOCK_TEST_PLUGIN_ROOT="$run_dir/external/plugins" XDG_RUNTIME_DIR="$run_dir/run" XDG_CACHE_HOME="$run_dir/cache" XDG_STATE_HOME="$state_home" \
     "$quickshell_bin" -p "$run_dir/cfg") >"$run_dir/log" 2>&1 &
   qs_pid=$!
   while ((waited < timeout_s * 5)); do
