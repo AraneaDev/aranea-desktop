@@ -29,7 +29,9 @@ const qmlPragma = {
 }
 
 module.exports = [
-  { ignores: ["node_modules/**", "coverage/**", "docs/superpowers/**"] },
+  {
+    ignores: ["node_modules/**", "coverage/**", "docs/superpowers/**", "branding/3d/live/vendor/**"]
+  },
   {
     files: ["plugins/**/*.js"],
     plugins: { qml: { processors: { pragma: qmlPragma } } },
@@ -64,6 +66,16 @@ module.exports = [
   },
   {
     files: ["tools/**/*.mjs"],
+    languageOptions: { ecmaVersion: 2023, sourceType: "module", globals: { ...globals.node } },
+    rules: { ...js.configs.recommended.rules }
+  },
+  {
+    files: ["branding/3d/live/*.mjs", "branding/3d/live/dismiss.js"],
+    languageOptions: { ecmaVersion: 2023, sourceType: "module", globals: { ...globals.browser } },
+    rules: { ...js.configs.recommended.rules }
+  },
+  {
+    files: ["tests/js/**/*.mjs"],
     languageOptions: { ecmaVersion: 2023, sourceType: "module", globals: { ...globals.node } },
     rules: { ...js.configs.recommended.rules }
   },

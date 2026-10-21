@@ -24,6 +24,19 @@ Static fallback: [desktop capture](screenshots/desktop.png) · [full showcase GI
 
 [Install](#install) · [Daily controls](#daily-controls) · [Projects and agents](#projects-and-agents) · [Gallery](#gallery) · [Documentation](#documentation)
 
+## Spider screensaver
+
+The original Aranea spider is now a rigged 3D model with a live cyberpunk
+screensaver: suspended bridges, silk descents, and occasional kanji projections
+and particle effects. Preview it from the checkout:
+
+```bash
+scripts/aranea-screensaver preview
+```
+
+Move the mouse or press Escape to close. See the [model and screensaver guide](branding/3d/README.md)
+for editable assets, requirements, and the rendered video alternative.
+
 ## Install
 
 Aranea runs on [Omarchy](https://omarchy.org). Clone the repository and open the

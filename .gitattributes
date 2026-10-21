@@ -1,2 +1,5 @@
 # Preserve upstream font notices verbatim, including their original whitespace.
 fonts/*/*.txt whitespace=-blank-at-eol
+
+# Keep the pinned upstream Three.js sources byte-for-byte intact.
+branding/3d/live/vendor/** whitespace=-space-before-tab
