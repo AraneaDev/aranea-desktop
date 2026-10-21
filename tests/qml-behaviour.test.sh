@@ -154,6 +154,19 @@ PYBARWINDOW
     ln -s "$repo_root/tests/qml/fixtures" "$run_dir/external/fixtures"
     ln -s "$shell_dir/services" "$run_dir/cfg/services"
   fi
+  if [[ "$name" == screensaver-idle ]]; then
+    # Preserve upstream Service/IdleModel verbatim except native IdleMonitor.
+    mkdir -p "$run_dir/cfg/upstream-idle"
+    ln -s "$shell_dir/plugins/services/idle/IdleModel.js" "$run_dir/cfg/upstream-idle/IdleModel.js"
+    python3 - "$shell_dir/plugins/services/idle/Service.qml" "$run_dir/cfg/upstream-idle/Service.qml" <<'PYIDLE'
+import pathlib, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+assert source.count("  IdleMonitor {") == 1
+source = source.replace('import QtQuick', 'import QtQuick\nimport "../fixtures/idle-host"', 1)
+source = source.replace("  IdleMonitor {", "  NativeIdleMonitor {")
+pathlib.Path(sys.argv[2]).write_text(source)
+PYIDLE
+  fi
   ln -s "$repo_root/shell.toml" "$run_dir/cfg/theme-shell.toml"
   cp "$test_file" "$run_dir/cfg/shell.qml"
   # Fixed Display command boundary: controllers and hosted System tests never
@@ -189,6 +202,30 @@ CLOCKCOMMAND
     printf 'initial\n' >"$state_home/omarchy/current"
     for display_command in omarchy-bar-text-color bar-foreground-fixture; do
       ln -s "$repo_root/tests/qml/fixtures/bar-foreground-command.py" "$run_dir/display-bin/$display_command"
+    done
+  fi
+  if [[ "$name" == screensaver-idle ]]; then
+    : >"${ARANEA_TEST_SANDBOX:?}/idle-effects"
+    # Login-shell setup is an external boundary; preserve Process commands and
+    # route their fixed actions into this private PATH, never the host session.
+    cat >"$run_dir/display-bin/bash" <<'IDLEBASH'
+#!/usr/bin/python3
+import os, sys
+args = ["-c" if value == "-lc" else value for value in sys.argv[1:]]
+os.execv("/usr/bin/bash", ["bash", *args])
+IDLEBASH
+    cat >"$run_dir/display-bin/idle-action" <<'IDLEACTION'
+#!/usr/bin/python3
+import os, pathlib, sys
+name = pathlib.Path(sys.argv[0]).name
+with (pathlib.Path(os.environ["ARANEA_TEST_SANDBOX"]) / "idle-effects").open("a") as stream:
+    stream.write(name + " " + " ".join(sys.argv[1:]) + "\n")
+if name == "omarchy-shell":
+    print("false")
+IDLEACTION
+    chmod +x "$run_dir/display-bin/bash" "$run_dir/display-bin/idle-action"
+    for display_command in omarchy-shell omarchy-launch-screensaver omarchy-system-lock omarchy-system-wake; do
+      ln -s "$run_dir/display-bin/idle-action" "$run_dir/display-bin/$display_command"
     done
   fi
   # Replace the entire native sudo helper; never execute a grant or policy command.
