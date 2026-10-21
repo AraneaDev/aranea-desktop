@@ -462,14 +462,17 @@ function outcome(operation, args, state, succeeded, result) {
  * @param {number} screenWidth Available width.
  * @param {number} screenHeight Available height.
  * @param {number} scale Host logical-unit scale.
+ * @param {number} [desiredHeight] Requested height in host units, defaulting to 460.
  * @returns {object} Geometry and navigation mode.
  */
-function geometry(screenWidth, screenHeight, scale) {
+function geometry(screenWidth, screenHeight, scale, desiredHeight) {
   scale = scale || 1
+  if (typeof desiredHeight !== "number" || !isFinite(desiredHeight) || desiredHeight <= 0)
+    desiredHeight = 460
   var width = Math.max(1, Math.min(840 * scale, screenWidth - 48 * scale))
   return {
     width: width,
-    height: Math.max(1, Math.min(460 * scale, screenHeight - 48 * scale)),
+    height: Math.max(1, Math.min(desiredHeight * scale, screenHeight - 48 * scale)),
     compact: width < 720 * scale
   }
 }

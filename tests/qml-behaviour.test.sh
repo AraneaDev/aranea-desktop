@@ -90,6 +90,22 @@ PYBOUNDARY
         ln -s "$source" "$run_dir/cfg/plugins/araneadev.clock/${source##*/}"
       done
       sed 's/visible: false/visible: true/' "$plugin/BarWidget.qml" >"$run_dir/cfg/plugins/araneadev.clock/BarWidget.qml"
+    elif [[ "$plugin" == */araneadev.settings && "$name" == settings-window-geometry ]]; then
+      # Keep the production window's geometry/content bindings; only replace
+      # its compositor boundary with the same inert host used by panel tests.
+      mkdir -p "$run_dir/cfg/plugins/araneadev.settings"
+      for source in "$plugin"/*; do
+        [[ "${source##*/}" == SettingsWindow.qml ]] && continue
+        ln -s "$source" "$run_dir/cfg/plugins/araneadev.settings/${source##*/}"
+      done
+      python - "$plugin/SettingsWindow.qml" "$run_dir/cfg/plugins/araneadev.settings/SettingsWindow.qml" <<'PYSETTINGSWINDOW'
+import pathlib, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+source = source.replace('import QtQuick', 'import QtQuick\nimport "../../fixtures/agent-panel-host"', 1)
+source = source.replace('PanelWindow {', 'NativePanelWindow {', 1)
+source = source.replace('WlrLayershell.', 'nativeLayer.')
+pathlib.Path(sys.argv[2]).write_text(source)
+PYSETTINGSWINDOW
     elif [[ "$plugin" == */araneadev.osd && "$name" == osd-messages ]]; then
       # Keep OSD state, layout and real presentation; replace only its native
       # layer-shell window so session-message checks never need a compositor.

@@ -15,7 +15,7 @@ PanelWindow {
   // Settings entry object supplied by the summoned host.
   required property var root
   // Desired size capped to the screen with 24-unit margins.
-  readonly property var geometry: Logic.geometry(screen ? screen.width : 1920, screen ? screen.height : 1080, Style.spaceReal(1))
+  readonly property var geometry: Logic.geometry(screen ? screen.width : 1920, screen ? screen.height : 1080, Style.spaceReal(1), root.section === 'screensavers' ? 620 : 460)
   // Give the first keyboard target focus on summon.
   function focusKeys() {
     surface.focusKeys()

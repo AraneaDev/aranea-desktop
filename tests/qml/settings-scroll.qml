@@ -108,10 +108,10 @@ ShellRoot {
   // Visit one size/page combination, allowing real layout and event delivery.
   function visit() {
     var size = sizes[sizeIndex]
-    var geometry = Logic.geometry(size[0] / size[2], size[1] / size[2], 1)
+    entry.section = sections[sectionIndex]
+    var geometry = Logic.geometry(size[0] / size[2], size[1] / size[2], 1, entry.section === 'screensavers' ? 620 : 460)
     surface.width = geometry.width
     surface.height = geometry.height
-    entry.section = sections[sectionIndex]
     if (entry.section === 'appearance') {
       var chooser = t.findChild(surface, 'wallpaperChoose')
       if (chooser.text === 'Choose wallpaper')

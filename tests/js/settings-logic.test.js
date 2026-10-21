@@ -135,6 +135,28 @@ test("compact window height preserves 24-unit caps and navigation threshold", ()
   assert.deepEqual(logic.geometry(1280, 720, 1.5), { width: 1208, height: 648, compact: false })
 })
 
+test("taller sections retain scaled screen margins and compact navigation", () => {
+  const cases = [
+    [1920, 1080, 1, { width: 840, height: 620, compact: false }],
+    [3840, 2160, 2, { width: 1680, height: 1240, compact: false }],
+    [3840, 2160, 2.5, { width: 2100, height: 1550, compact: false }],
+    [1280, 720, 1.5, { width: 1208, height: 648, compact: false }],
+    [700, 500, 1, { width: 652, height: 452, compact: true }],
+    [432, 260, 1, { width: 384, height: 212, compact: true }],
+    [40, 40, 1, { width: 1, height: 1, compact: true }]
+  ]
+  for (const [width, height, scale, expected] of cases)
+    assert.deepEqual(logic.geometry(width, height, scale, 620), expected)
+})
+test("invalid desired heights preserve the existing compact page size", () => {
+  for (const height of [undefined, null, 0, -620, NaN, Infinity, -Infinity, "620", true])
+    assert.deepEqual(logic.geometry(1920, 1080, 1, height), {
+      width: 840,
+      height: 460,
+      compact: false
+    })
+})
+
 test("custom scale validates decimals and preserves exact argv and observed target", () => {
   const state = { display: { monitor: "eDP-1", scale: 2, availability: "available" } }
   for (const scale of ["2.5", "2.667", "1", "4"]) {
