@@ -18,6 +18,7 @@ grep -Fq "would set theme to aranea" "$output"
 grep -Fq "would install cursor integration" "$output"
 grep -Fq "would install icons integration" "$output"
 grep -Fq "would install terminal integration" "$output"
+grep -Fq "would install session integration" "$output"
 grep -Fq "would persist profile: full" "$output"
 grep -Fq "would install project command: $HOME/.local/bin/aranea" "$output"
 
@@ -32,6 +33,10 @@ PATH="$repo_root/tests/fake-bin:$PATH" \
   OMARCHY_INSTALLER_TEST=1 \
   "$repo_root/scripts/install.sh" --dry-run --yes --profile no_apps >"$minimal_output"
 
+if grep -Fq "would install session integration" "$minimal_output"; then
+  echo 'no_apps unexpectedly installs session integration' >&2
+  exit 1
+fi
 grep -Fq "profile: no_apps" "$minimal_output"
 grep -Fq "would install theme hooks" "$minimal_output"
 grep -Fq "would persist profile: no_apps" "$minimal_output"
@@ -42,6 +47,7 @@ grep -Fq 'profile_file=' "$repo_root/hooks/post-boot"
 json_output="$(PATH="$repo_root/tests/fake-bin:$PATH" \
   OMARCHY_INSTALLER_TEST=1 \
   "$repo_root/scripts/install.sh" --json --dry-run --yes --profile full)"
+jq -se 'any(.[]; .step == "install-session" or .data.step == "install-session" or .message == "would install session integration")' <<<"$json_output" >/dev/null
 first_event=1
 last_event=''
 while IFS= read -r event; do
@@ -152,6 +158,9 @@ unset XDG_BIN_HOME
 for install_profile in full no_apps; do
   PATH="$name_root/bin:$PATH" "$repo_root/scripts/install.sh" --yes --profile "$install_profile" \
     --source https://example.invalid/AraneaDev/aranea-desktop.git >/dev/null
+  if [[ "$install_profile" == full ]]; then
+    [[ "$(readlink "$HOME/.local/bin/omarchy-launch-screensaver")" == "$HOME/.config/omarchy/themes/aranea/integrations/session/bin/omarchy-launch-screensaver" ]]
+  fi
   [[ "$(readlink "$HOME/.local/bin/aranea")" == "$HOME/.config/omarchy/themes/aranea/scripts/aranea" ]]
   "$HOME/.local/bin/aranea" agents list --json | jq -se 'last | .data.tasks == [] and .data.outcome == "observed"' >/dev/null
   "$HOME/.local/bin/aranea" projects list --json | jq -se 'last | .data.projects == []' >/dev/null

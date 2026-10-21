@@ -10,8 +10,8 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from tools.screensaver.catalog import load_catalog, validate_selection
+from tools.screensaver.idle import configure_idle, integration_status, read_idle
 from tools.screensaver.preferences import (
-    config_directory,
     configure_preferences,
     read_preferences,
 )
@@ -23,29 +23,6 @@ from tools.screensaver.session import (
 )
 
 
-def read_idle(config_home: Path | None = None) -> dict:
-    """Read actual valid Omarchy shell timing; unknown or invalid values remain null."""
-    defaults = {"screensaverSeconds": 150, "lockSeconds": 300}
-    unknown = {"screensaverSeconds": None, "lockSeconds": None}
-    try:
-        shell = json.loads(
-            (config_directory(config_home) / "omarchy/shell.json").read_text()
-        )
-    except FileNotFoundError:
-        return defaults
-    except (OSError, ValueError):
-        return unknown
-    if not isinstance(shell, dict) or not isinstance(shell.get("idle", {}), dict):
-        return unknown
-    idle = shell.get("idle", {})
-    timing = dict(unknown)
-    for key, public in (("screensaver", "screensaverSeconds"), ("lock", "lockSeconds")):
-        value = idle.get(key, defaults[public])
-        if type(value) is int and value >= 0:
-            timing[public] = value
-    return timing
-
-
 def snapshot(repo_root: Path, config_home: Path | None = None) -> dict:
     """Return read-only preferences, timing and owned-session state."""
     state = {
@@ -54,7 +31,7 @@ def snapshot(repo_root: Path, config_home: Path | None = None) -> dict:
         "selectedId": None,
         "mode": None,
         "choices": [],
-        "integration": {"installed": False, "reachable": False},
+        "integration": integration_status(),
         "idle": read_idle(config_home),
         "session": session_status(),
         "error": None,
@@ -94,6 +71,7 @@ def main(argv: list[str] | None = None) -> int:
             if not acknowledged:
                 accept({"accepted": False, "error": str(error)})
             return 1
+    timing_update = None
     try:
         if args in (["start"], ["start", "force"]):
             start_session(force=len(args) == 2)
@@ -102,7 +80,10 @@ def main(argv: list[str] | None = None) -> int:
             result = preview_scene(args[1])
             print(json.dumps(result, separators=(",", ":")))
             return 0
-        if args == ["stop", "--json"]:
+        if len(args) == 4 and args[0] == "configure-idle" and args[-1] == "--json":
+            timing_update = configure_idle(args[1], args[2])
+            state = snapshot(repo)
+        elif args == ["stop", "--json"]:
             stop_session()
             state = snapshot(repo)
         elif args in (["list", "--json"], ["status", "--json"]):
@@ -112,14 +93,22 @@ def main(argv: list[str] | None = None) -> int:
             state = snapshot(repo)
         else:
             raise ValueError(
-                "Usage: aranea-screensaver list|status --json | configure ID single|shuffle --json | start [force] | preview-scene ID --json | stop --json"
+                "Usage: aranea-screensaver list|status --json | configure ID single|shuffle --json | configure-idle SECONDS SECONDS --json | start [force] | preview-scene ID --json | stop --json"
             )
     except (OSError, ValueError, TypeError) as error:
         state = snapshot(repo)
         state["error"] = str(error)
+    if timing_update is not None:
+        state["timingUpdate"] = timing_update
+        # Scene preference errors remain visible but cannot block timing persistence.
+        command_error = timing_update["error"]
+        if command_error:
+            state["error"] = command_error
+    else:
+        command_error = state["error"]
     print(json.dumps(state, separators=(",", ":")))
-    if state["error"]:
-        print(state["error"], file=sys.stderr)
+    if command_error:
+        print(command_error, file=sys.stderr)
         return 1
     return 0
 

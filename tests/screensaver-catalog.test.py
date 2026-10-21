@@ -77,7 +77,16 @@ class CatalogTests(unittest.TestCase):
             {"running": False, "ready": False, "sceneId": None, "preview": False},
         )
         self.assertEqual(state["integration"], {"installed": False, "reachable": False})
-        self.assertEqual(state["idle"], {"screensaverSeconds": 150, "lockSeconds": 300})
+        self.assertEqual(
+            state["idle"],
+            {
+                "screensaverSeconds": 150,
+                "lockSeconds": 300,
+                "stayAwake": False,
+                "screensaverOff": False,
+                "error": None,
+            },
+        )
         self.assertFalse(self.config.exists())
 
     def test_three_entries_and_projection(self):
@@ -339,7 +348,13 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(response.returncode, 0, response.stderr)
         self.assertEqual(
             json.loads(response.stdout)["idle"],
-            {"screensaverSeconds": 900, "lockSeconds": 1200},
+            {
+                "screensaverSeconds": 900,
+                "lockSeconds": 1200,
+                "stayAwake": False,
+                "screensaverOff": False,
+                "error": None,
+            },
         )
         bad = self.cli(
             "configure", "$(touch /tmp/aranea-should-not-exist)", "single", "--json"
@@ -351,12 +366,24 @@ class CatalogTests(unittest.TestCase):
         shell.write_text('{"idle":{"screensaver":0}}')
         self.assertEqual(
             json.loads(self.cli("status", "--json").stdout)["idle"],
-            {"screensaverSeconds": 0, "lockSeconds": 300},
+            {
+                "screensaverSeconds": 0,
+                "lockSeconds": 300,
+                "stayAwake": False,
+                "screensaverOff": False,
+                "error": None,
+            },
         )
         shell.write_text('{"idle":{"screensaver":"900","lock":true}}')
         self.assertEqual(
             json.loads(self.cli("status", "--json").stdout)["idle"],
-            {"screensaverSeconds": None, "lockSeconds": None},
+            {
+                "screensaverSeconds": None,
+                "lockSeconds": None,
+                "stayAwake": False,
+                "screensaverOff": False,
+                "error": "Omarchy idle deadlines must be integer seconds from 0 to 86400",
+            },
         )
 
     def test_cli_reports_invalid_config_and_unknown_remembered_id(self):
