@@ -53,6 +53,12 @@ keyboard frames, and motion/focus primitives accept explicit properties and
 signals. Hosts keep cursor identity, focus policy, activation, and lifecycle.
 `RuntimePaths.qml` centralizes state and branding paths.
 
+Wallpaper schedule mutations (`configure`, `on`, and `off`) share a lock beside
+the schedule configuration. `aranea-wallpaper` acquires it before reading saved
+entries or timer runtime state and retains it through commit or exact rollback.
+This also serializes Settings saves with direct CLI changes; status remains a
+read-only observation.
+
 Extract repeated, stable contracts. Leave one-off interactions or behavior tied
 to a particular service in the owning plugin. Window visibility must not become
 the lifetime of an accepted background operation.

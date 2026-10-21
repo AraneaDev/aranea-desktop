@@ -347,6 +347,17 @@ schedule_transaction() {
   return "$rc"
 }
 
+# Serialize shared reads, writes, and rollback across all schedule mutations.
+# The subshell closes the lock descriptor on every success or failure path.
+schedule_mutation() (
+  local mode="$1" schedule_lock_fd
+  mkdir -p -- "$config_root"
+  exec {schedule_lock_fd}>"$config_root/wallpaper-schedule.lock"
+  flock -x "$schedule_lock_fd"
+  if [[ "$mode" == on ]]; then load_schedule; fi
+  schedule_transaction "$mode"
+)
+
 # JSON reads and schedule commands require jq before doing any work.
 if [[ "${*: -1}" == --json || "${1:-}" == schedule || "${1:-}" == set-scheduled || "${1:-}" == set-phase || "${1:-}" == set-day-night ]]; then
   command -v jq >/dev/null 2>&1 || {
@@ -402,7 +413,7 @@ case "${1:-list}" in
         printf 'Usage: %s schedule configure --entries JSON | DAWN DAY DUSK NIGHT\n' "$0" >&2
         exit 2
       fi
-      schedule_transaction configure
+      schedule_mutation configure
       printf 'wallpaper schedule: configured\n'
       exit 0
     fi
@@ -427,10 +438,7 @@ case "${1:-list}" in
       printf '%s\n' "$text_entries"
       exit 0
     fi
-    if [[ "$mode" == on ]]; then
-      load_schedule
-    fi
-    schedule_transaction "$mode"
+    schedule_mutation "$mode"
     printf 'wallpaper schedule: %s\n' "$mode"
     ;;
   motion)
