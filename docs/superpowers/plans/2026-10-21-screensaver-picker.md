@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Initial scenes: Silk Journey (`silk-journey`, web, default), Silk Chamber (`silk-chamber`, video), Omarchy (`omarchy`, stock).
-- Preserve this machine's current 900-second screensaver and 1,200-second lock settings. Timer editing is outside this change.
+- Preserve current 900-second screensaver and 1,200-second lock settings until explicit timing Apply. Provide editable idle deadlines backed by Omarchy shell.json; see Timing controls below.
 - Keep Omarchy's idle service as authority for timing, stay-awake, screensaver-off, wake and lock; custom windows must use exact class `org.omarchy.screensaver`.
 - Do not edit packaged Omarchy files or clone its idle state machine. Do not rewrite general PATH configuration.
 - Install a user-owned, ledger-managed launcher shim, active only for Aranea. Verify resolution in the same login-shell context as idle launch.
@@ -112,16 +112,26 @@ assert session.children_alive() == []
 assert session.restored_focus == session.initial_focus
 ```
 - [ ] Run `tests/run screensaver-session` red.
-- [ ] Implement bounded argv-only Hyprland monitor/client/event adapter. Record monitor, active and special workspaces. Subscribe to window events before spawning. Place sequentially and verify each owned window/class before advancing focus, following packaged special-workspace behavior. Use direct dispatcher argv rather than interpolating user text into Lua or a shell. First mapping must fit stock5second launch grace; use a4second first-map deadline and a20second renderer-ready deadline.
+- [ ] Implement bounded argv-only Hyprland monitor/client/event adapter. Record monitor, active and special workspaces. Subscribe to window events before spawning. Place sequentially and verify each owned window/class before advancing focus, following packaged special-workspace behavior. Use direct dispatcher argv rather than interpolating user text into Lua or a shell. First mapping must fit the actual upstream3second idle launch grace; use a2.5second first-map deadline and a20second renderer-ready deadline.
 - [ ] Supervisor owns one selection, server, profiles, child groups, socket and runtime state. One-second bounded monitor/lock readback complements compositor events and packaged lock's class-based process kill. Reject unknown/unreadable lock state for start; terminate if lock cannot be safely observed during run. Both automatic and forced/manual starts refuse a locked session. Preserve screensaver-off except manual force/Preview.
 - [ ] On a removed monitor, remove its child from the expected set before termination; remaining surfaces continue. Any other child close/input dismisses all. Restore original focus/workspaces only through saved/validated monitor identities, preserving preexisting special workspaces. Cleanup must not kill an unrelated browser or rewrite global desktop state.
 - [ ] Choose/store last automatic scene only after all remaining expected renderers are ready. Preview neither writes preferences nor updates automatic shuffle history. Preflight stock fallback occurs before mapping; mapped failures end session instead of starting a fresh untracked saver.
 - [ ] Expose start/stop/preview-scene/status owner routes. For JSON Preview, acknowledge acceptance without keeping Settings pending for session lifetime; running/ready/error state is independently readable. Busy/invalid/unavailable/locked errors are explicit and bounded. Preserve standalone legacy preview/video.
 - [ ] Run new session tests, catalog/renderer suites, legacy spider/guard contracts and quality gates. Commit `feat(screensaver): supervise idle sessions across monitors`.
 
+### Timing controls (user scope addition)
+
+The user requested editable screensaver and lock times on the picker and approved enabling automatic idle behavior at installation. Both deadlines count from last activity. Add two duration fields with a Disabled option and independent Apply timing/Discard draft; preserve current values until explicit Apply. UI minutes1..1440 or Disabled; preserve exact existing seconds without rounding on read. When both deadlines are enabled, require lock later than screensaver. Backend strict integer seconds0 or60..86400, compatible with unchanged preexisting exact seconds. No Preview or scene Apply timer side effects.
+
+Task4 adds owner `configure-idle SCREENSAVER_SECONDS LOCK_SECONDS --json` and Settings `configure screensaver-timing SCREENSAVER_SECONDS LOCK_SECONDS --json`. Serialize adjacent-lock/same-directory atomic mutation of only idle.screensaver/idle.lock, preserve unrelated shell data and symlink targets, reject malformed existing documents. Missing config uses trusted packaged defaults on explicit save. Request bounded shell reloadConfig and distinguish persisted from applied; failed application is reported honestly. No restart or Stay awake toggle during timing Apply. Reads create no state.
+
+Task5 adds local timing draft, errors, Apply/Discard, disabled support and explanatory labels; capture snapshot/reset/restore includes draft fields. Task4 tests real persistence, validation, byte preservation, symlinks, concurrency, missing/corrupt config and reload failure. Task5 tests production controls, draft/readback/error/discard and Preview/showcase isolation. Root installation enables idle via omarchy-shell idle enable; retains900/1200.
+
+Task3 also adds actual upstream Idle Service QML lifecycle fixture (not a reimplemented model), with fake external effects and only native IdleMonitor boundary replacement if needed. Verify startup activity preserves pending lock, early last-window close cancels and lock timeout dispatches fake lock. See task-3-idle-contract.md.
+
 ### Task 4: Managed automatic activation and Settings backend
 
-**Files:** Create `integrations/session/bin/omarchy-launch-screensaver`, `tests/screensaver-integration.test.sh`, `tests/screensaver-settings.test.sh`; modify `scripts/install-integration`, `scripts/lib/ownership.sh` only if existing integration-root ownership needs adjustment, `scripts/aranea-settings`, `tools/screensaver/cli.py`, `integrations/session/README.md`, `tests/install.test.sh`/`tests/uninstall.test.sh`/existing integration tests as necessary.
+**Files:** Create `tools/screensaver/idle.py`, `integrations/session/bin/omarchy-launch-screensaver`, `tests/screensaver-integration.test.sh`, `tests/screensaver-settings.test.sh`; modify `scripts/install-integration`, `scripts/lib/ownership.sh` only if existing integration-root ownership needs adjustment, `scripts/aranea-settings`, `tools/screensaver/cli.py`, `integrations/session/README.md`, `tests/install.test.sh`/`tests/uninstall.test.sh`/existing integration tests as necessary.
 
 **Consumes:** Task3 start/preview/status operations and stable installed theme layout.
 **Produces:** user managed shim in `xdg_bin_home()/omarchy-launch-screensaver`; `.state.screensaver` in Settings readback; typed configure/preview adapter operations matching shared schema.
@@ -141,10 +151,10 @@ jq -e '.ok and .result.screensaverPreview.accepted==true' "$TMPDIR/preview.json"
 
 ### Task 5: Picker page, typed menu/search routes and capture-safe state
 
-**Files:** Create `plugins/araneadev.settings/ScreensaversPage.qml`, `plugins/araneadev.settings/i18n/en.json` (extend if exists), `tests/qml/settings-screensavers.qml`, focused JS policy tests; modify `SettingsLogic.js`, `SettingsController.qml`, `SettingsNavigation.qml`, `SettingsSurface.qml`, `Settings.qml`, `manifest.json` in settings plugin; `DesktopSearchTargets.js`, canonical settings-target allowlists in menu/search and regenerate any affected facade through generator; `scripts/aranea-showcase` fixture; relevant Settings/menu/search JS/QML tests; architecture/user docs.
+**Files:** Create `plugins/araneadev.settings/ScreensaversPage.qml`, `plugins/araneadev.settings/i18n/en.json` (extend if exists), `tests/qml/settings-screensavers.qml`, focused JS policy tests; modify `SettingsLogic.js`, `SettingsController.qml`, `SettingsNavigation.qml`, `SettingsSurface.qml`, `Settings.qml`, `manifest.json` in settings plugin; `DesktopSearchTargets.js`, canonical settings-target allowlists in menu/search and regenerate any affected facade through generator; `tests/qml/fixtures/settings-preview.qml` inert fixture and `tools/render-settings-preview` allowlist if needed; relevant Settings/menu/search JS/QML tests; architecture/user docs.
 
 **Consumes:** Task4 `.state.screensaver` and configure/preview operations. Do not add a second preference store or derive executable commands from labels.
-**Produces:** `screensavers` destination, explicit local draft `{selectedId,mode}`, thumbnail preview/Apply, authoritative current summary and availability/timing.
+**Produces:** `screensavers` destination, explicit local draft `{selectedId,mode}`, thumbnail preview/Apply, authoritative current summary and editable timing.
 
 - [ ] Write failing real-component QML tests for initial owner state, selecting without mutation, Preview without save, Apply/readback, failed Apply retains draft, shuffle mode, scene click returns to single mode, unavailable entry, current mode summary, keyboard/pointer gates, narrow/short layout, plain-text labels and capture read-only behavior. JS tests assert exact allowlisted argv and unknown ID/mode/section rejection.
 ```javascript
@@ -168,7 +178,7 @@ assert.equal(Logic.command("/adapter", "preview screensaver", ["unknown"], state
 
 - [ ] Root verifies core tree via `tools/check` (full non-fast). Record actual exit status, QML skip assertions and counts; fix real regressions, do not suppress failures.
 - [ ] Root reads approved installer/deployer source, snapshots relevant user state and installs source from this managed worktree using existing safe installer/owned integration path. Keep installed theme independent of worktree. Enable managed session integration, persist Silk Journey/single for initial automatic selection and preserve900/1200 timings. Installing this approved feature needs no further user confirmation; sandbox escalation is still required for protected paths. Stop existing owned preview before replacing code.
-- [ ] Root confirms installed runtime/UI files match source hashes, both configured scene readback and actual login launcher resolution, idle status and current timers. Use native multi-monitor preview on live compositor to verify class/placement, focus restore, ordinary input dismissal and no orphan processes/profiles/server. Do not force-lock or change the user's idle deadlines. Use isolated idle/lock fixtures for deadline behavior.
+- [ ] Root confirms installed runtime/UI files match source hashes, both configured scene readback and actual login launcher resolution, idle status, approved automatic enablement and preserved current timers. Use native multi-monitor preview on live compositor to verify class/placement, focus restore, ordinary input dismissal and no orphan processes/profiles/server. Do not force-lock or change the user's idle deadlines. Use isolated idle/lock fixtures for deadline behavior.
 - [ ] Add failing capture contract for new declared surface/hero entry and inert section. Add exact `settings-screensavers` surface after `settings-schedule`; total47 surfaces, hero39 frames. Preserve real notification/clipboard backups, fixture read-only guards, named-key input only and background set once per batch.
 ```bash
 scripts/capture-screenshots settings-screensavers

@@ -24,7 +24,7 @@ Show the current choice, thumbnail gallery, Preview and Apply. Selecting a thumb
 
 Optional **Shuffle** chooses an available Aranea scene once per idle session, avoiding the previous scene when more than one is available. The packaged Omarchy choice remains a selectable fallback rather than joining shuffle. There is no playlist editor or mid-session scene switching in this version.
 
-Display existing idle timing so the user knows when activation and locking occur. Preserve this machine's current 900-second screensaver and 1,200-second lock settings. Timer editing is outside this change.
+Provide editable screensaver-start and lock deadlines in a Timing section, as subsequently requested by the user. Both count from last activity. Keep local timing drafts and a separate Apply timing/Discard flow, with Disabled as an explicit option. Preserve this machine's current 900-second screensaver and 1,200-second lock settings until the user applies a change. Persist only Omarchy's idle fields, request bounded reload, and read back persistence/application honestly; do not implement separate timers.
 
 ## Catalog and persistence
 
@@ -60,7 +60,7 @@ Omarchy must observe the custom surfaces so that starting the saver leaves its p
 
 Integrate launcher ownership into the existing session integration and installer. Respect existing user-owned files and the managed-file backup/restore policy. Keep assets/runtime in the stable installed theme, independent of the development checkout. Theme switching falls back to stock behavior; uninstall removes only owned integration and restores replaced files.
 
-After implementation passes review and checks, install the completed source on this machine and select Silk Journey for automatic activation. Keep existing idle and lock timing. Confirm the actual installed version/assets, launcher resolution, Settings readback and live window identity. Publishing another release is not part of this request.
+After implementation passes review and checks, install the completed source on this machine and select Silk Journey for automatic activation. Enable automatic idle behavior as explicitly approved, while keeping existing idle and lock timing. Confirm the actual installed version/assets, launcher resolution, Settings readback and live window identity. Publishing another release is not part of this request.
 
 ## Verification
 
