@@ -59,7 +59,7 @@ Installation already activates Aranea. When returning from another theme, run:
 omarchy theme set aranea
 ```
 
-**Signal Shrine** is the default when there is no matching current background.
+**Silken Vault** is the default when there is no matching current background.
 Choose another scene in **Command center → Settings → Aranea → Appearance**.
 An enabled wallpaper schedule continues to choose its scheduled images.
 

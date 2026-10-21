@@ -18,7 +18,9 @@ printf '%s\n' "$*" >>"$ARANEA_TEST_SANDBOX/calls"
   echo 'omarchy-shell is not running' >&2
   exit 1
 }
-# Closing an open panel before the capture is the only other shell call.
+# The frame temporarily stages its fixed background and restores it afterwards.
+[[ "$1 $2" != "background setInstant" ]] || exit 0
+# Close open panels before the capture.
 [[ "$1 $2" != "shell hide" ]] || exit 0
 [[ "$1" == aranea.projects.capture ]] || exit 1
 snapshot='{"opened":false,"mode":"","section":"projects","projectId":"p-real"}'
@@ -85,7 +87,7 @@ for surface in projects project-overview project-problem project-switcher projec
   (($(line '^shell hide araneadev.notifications$') < $(line captureBegin)))
   (($(line '^shell hide araneadev.menu$') < $(line captureBegin)))
   # Only the capture transaction: no open, refresh, summon or settings call.
-  [[ "$(grep -cv '^hyprctl \|^grim$\|^aranea.projects.capture capture\|^shell hide araneadev\.\(notifications\|menu\)$' "$log")" == 0 ]]
+  [[ "$(grep -cv '^background setInstant \|^hyprctl \|^grim$\|^aranea.projects.capture capture\|^shell hide araneadev\.\(notifications\|menu\)$' "$log")" == 0 ]]
   rm "$out/$surface.png"
 done
 [[ "$(node "$repo_root/tools/project-capture-fixture.mjs" project-overview | jq -r .mode)" == "" ]]

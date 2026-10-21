@@ -15,7 +15,15 @@ ready='{"ready":true,"readOnly":true}'
 case "$2" in
   captureSnapshot) echo "${CAPTURE_SETTINGS_SNAPSHOT-$snapshot}" ;;
   captureBegin) echo "${CAPTURE_SETTINGS_ANSWER-ok}" ;;
-  captureState) echo "${CAPTURE_SETTINGS_READY-$ready}" ;;
+  captureState)
+    if [[ -n "${CAPTURE_SETTINGS_READY_AFTER:-}" ]]; then
+      count=$(cat "$ARANEA_TEST_SANDBOX/ready-count" 2>/dev/null || echo 0)
+      count=$((count + 1))
+      echo "$count" >"$ARANEA_TEST_SANDBOX/ready-count"
+      if ((count < CAPTURE_SETTINGS_READY_AFTER)); then ready='{"ready":false,"readOnly":true}'; fi
+    fi
+    echo "${CAPTURE_SETTINGS_READY-$ready}"
+    ;;
   captureRestore) echo "${CAPTURE_SETTINGS_RESTORE-ok}" ;;
 esac
 STUB
@@ -139,6 +147,9 @@ done
 "$capture" --surface settings-schedule --output "$out" >/dev/null
 test -f "$out/settings-schedule.png"
 grep -Fq '"section":"schedule"' "$log"
-grep -Fq '"wallpaper":"signal-shrine"' "$log"
+grep -Fq '"wallpaper":"silken-vault"' "$log"
 grep -Fq captureRestore "$log"
+# A cold expanded artwork catalog can take longer than the first 30 polls.
+CAPTURE_SETTINGS_READY_AFTER=40 "$capture" --surface settings-schedule --output "$out" >/dev/null
+[[ "$(cat "$ARANEA_TEST_SANDBOX/ready-count")" == 40 ]]
 echo 'Settings capture contract passed'

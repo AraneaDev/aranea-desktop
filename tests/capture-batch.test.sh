@@ -42,6 +42,11 @@ SH
 # BREAK_LIST=1 makes `quickshell list` fail from then on.
 cat >"$bin/fake-surface" <<'SH'
 #!/usr/bin/env bash
+[[ "${ARANEA_CAPTURE_BACKGROUND_MANAGED:-}" == 1 ]] || exit 8
+[[ "$(readlink "$HOME/.local/state/omarchy/current/background")" == */variants/silken-vault.png ]] || exit 8
+if [[ "${CAPTURE_TIMER_INACTIVE:-0}" != 1 ]]; then
+  [[ -f "$ARANEA_TEST_SANDBOX/timer-paused" ]] || exit 8
+fi
 [[ " ${CAPTURE_FAILS:-} " == *" $1 "* ]] && exit 1
 printf 'new %s\n' "$1" >"$2/$1.png"
 [[ " ${CAPTURE_FAIL_AFTER_WRITE:-} " == *" $1 "* ]] && exit 1
@@ -126,6 +131,11 @@ SH
 cat >"$bin/systemctl" <<'SH'
 #!/usr/bin/env bash
 printf 'systemctl %s\n' "$*" >>"$ARANEA_TEST_SANDBOX/guard.log"
+case "$2" in
+  is-active) [[ "${CAPTURE_TIMER_INACTIVE:-0}" != 1 ]] && [[ ! -f "$ARANEA_TEST_SANDBOX/timer-paused" ]]; exit $? ;;
+  stop) touch "$ARANEA_TEST_SANDBOX/timer-paused" ;;
+  start) rm -f "$ARANEA_TEST_SANDBOX/timer-paused" ;;
+esac
 [[ "$*" == "--user show-environment" ]] && printf 'OMARCHY_PATH=%s\n' "$ARANEA_TEST_SANDBOX/session-omarchy"
 exit 0
 SH
@@ -152,6 +162,8 @@ run_batch() {
 
 # Seeds the real inbox: entries with images, and a reference copy of each.
 seed_real() {
+  mkdir -p "$HOME/.local/state/omarchy/current"
+  ln -nsf /saved/user-wallpaper.png "$HOME/.local/state/omarchy/current/background"
   rm -rf "${inbox:?}" "${images:?}" "$real"
   mkdir -p "$inbox" "$images" "$real/inbox" "$real/images"
   printf 'real\n' >"$inbox/1-1.json"
@@ -172,6 +184,8 @@ seed_real() {
 # Fails unless the inbox and images dirs hold exactly the reference files.
 assert_real_back() {
   local what="$1" dir
+  [[ "$(readlink "$HOME/.local/state/omarchy/current/background")" == /saved/user-wallpaper.png ]]
+  [[ ! -f "$ARANEA_TEST_SANDBOX/timer-paused" ]]
   for dir in inbox images; do
     diff -r "$real/$dir" "$notifications/$dir" >/dev/null || {
       printf '%s: %s is not the real one:\n' "$what" "$dir" >&2
@@ -218,6 +232,7 @@ if compgen -G "$out/.*.previous" >/dev/null; then
   exit 1
 fi
 assert_no_backup 'failed surfaces'
+[[ "$(grep -c 'omarchy-shell background setInstant ' "$ARANEA_TEST_SANDBOX/guard.log")" == 1 ]]
 grep -Fq 'omarchy restart shell' "$ARANEA_TEST_SANDBOX/guard.log"
 grep -Fq 'hl.dsp.focus({ workspace = "1" })' "$ARANEA_TEST_SANDBOX/guard.log"
 
@@ -266,6 +281,15 @@ grep -Fq "quickshell kill -p $session/shell --any-display" "$ARANEA_TEST_SANDBOX
 grep -Fq "quickshell list -p $session/shell --any-display" "$ARANEA_TEST_SANDBOX/guard.log"
 if grep -Fq 'quickshell kill -p /caller/omarchy/shell' "$ARANEA_TEST_SANDBOX/guard.log"; then
   echo "the shell must be stopped through the session's OMARCHY_PATH" >&2
+  exit 1
+fi
+
+# A timer that was inactive must remain inactive.
+seed_real
+CAPTURE_TIMER_INACTIVE=1 run_batch >/dev/null
+assert_real_back 'inactive wallpaper timer'
+if grep -Eq 'systemctl --user (stop|start) aranea-wallpaper-day-night' "$ARANEA_TEST_SANDBOX/guard.log"; then
+  echo 'capture activated or stopped an inactive wallpaper timer' >&2
   exit 1
 fi
 

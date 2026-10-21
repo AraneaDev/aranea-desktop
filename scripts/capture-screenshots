@@ -64,7 +64,7 @@ set -euo pipefail
 # composes the disk-unlock prompt from the boot theme's own assets and
 # omarchy.script geometry (tools/render-plymouth-preview; no plymouthd, sudo
 # or reboot). A render that fails exits non-zero with no screenshot written.
-#   ARANEA_CAPTURE_BACKGROUND    Workspaces artwork (defaults to current background, then Signal Shrine)
+# All screenshot backgrounds use Silken Vault; live frames restore the saved background afterwards.
 #   ARANEA_CAPTURE_WIFI_NAMES    JSON array of Wi-Fi names (default below)
 #   ARANEA_CAPTURE_BT_NAMES      JSON array of Bluetooth names (default below)
 #   ARANEA_NETWORK_GRAPH_DELAY   seconds the Network graph records (default 20)
@@ -109,12 +109,40 @@ focus_capture_workspace() {
   hyprctl dispatch 'hl.dsp.focus({ workspace = "2" })' >/dev/null || return 3
   [[ "$(hyprctl activeworkspace -j | jq -r '.id')" == 2 ]] || return 3
 }
-# Recheck immediately before grabbing so a workspace change never leaks a terminal.
-capture_frame() {
-  focus_capture_workspace || return 3
-  if [[ "${ARANEA_CAPTURE_WORKSPACE:-}" == 2 ]]; then sleep 0.25; fi
-  command grim "$@"
-}
+# Stage the collection wallpaper for every live frame without changing the
+# user's saved background link or schedule. Restore even after a failed grab.
+capture_frame() (
+  focus_capture_workspace || exit 3
+  local previous_background restore_background frame_path="${!#}" staged status=0
+  local -a grab_args=("$@")
+  staged="$(mktemp "$(dirname "$frame_path")/.capture-frame.XXXXXX.png")" || exit 3
+  grab_args[${#grab_args[@]} - 1]="$staged"
+  previous_background="$(readlink -f -- "$HOME/.local/state/omarchy/current/background" 2>/dev/null || true)"
+  [[ -f "$previous_background" ]] || previous_background="$repo_root/backgrounds/00-default.png"
+  # shellcheck disable=SC2329 # Invoked by the EXIT trap.
+  restore_capture_background() {
+    # A schedule tick during the capture owns the latest saved selection.
+    restore_background="$(readlink -f -- "$HOME/.local/state/omarchy/current/background" 2>/dev/null || true)"
+    [[ -f "$restore_background" ]] || restore_background="$previous_background"
+    if ! omarchy-shell background setInstant "$restore_background" >/dev/null 2>&1; then
+      echo 'Unable to restore the desktop background after capture' >&2
+      return 3
+    fi
+  }
+  trap 'status=$?; if [[ "${ARANEA_CAPTURE_BACKGROUND_MANAGED:-}" != 1 ]]; then restore_capture_background || status=3; fi; rm -f -- "$staged"; exit "$status"' EXIT
+  if [[ "${ARANEA_CAPTURE_BACKGROUND_MANAGED:-}" != 1 ]]; then
+    omarchy-shell background setInstant "$repo_root/backgrounds/variants/silken-vault.png" >/dev/null || exit 3
+    sleep 0.5
+  fi
+  focus_capture_workspace || exit 3
+  command grim "${grab_args[@]}" || status=$?
+  trap 'rm -f -- "$staged"' EXIT
+  if [[ "${ARANEA_CAPTURE_BACKGROUND_MANAGED:-}" != 1 ]]; then restore_capture_background || exit 3; fi
+  # Some grim versions report a warning after writing a complete frame.
+  # Callers decide whether to accept that status; never publish before restore.
+  if [[ -s "$staged" ]]; then mv -f -- "$staged" "$frame_path" || exit 3; fi
+  exit "$status"
+)
 
 # Prints the running shell's config dir, resolved like omarchy-restart-shell:
 # the session's OMARCHY_PATH (a caller may disagree after dev link/unlink),
@@ -338,6 +366,13 @@ if ((capture_all)); then
   # badges then show capture data only, never the user's own count.
   mkdir -p "$(aranea_state_root)"
   batch_inbox_backup="$(mktemp -d "$(aranea_state_root)/capture-backup.XXXXXX")"
+  batch_background_backup="$(mktemp -d "$(aranea_state_root)/background-backup.XXXXXX")"
+  batch_background_link="$HOME/.local/state/omarchy/current/background"
+  if [[ -e "$batch_background_link" || -L "$batch_background_link" ]]; then
+    cp -a -- "$batch_background_link" "$batch_background_backup/background"
+  fi
+  batch_background_staged=0
+  batch_wallpaper_timer_paused=0
   # Restore the real inbox, leave the finished capture set visible on the
   # intentionally empty workspace for a moment, then return focus. Set
   # before the inbox is parked; the swapped flag is only set once the real
@@ -365,6 +400,20 @@ if ((capture_all)); then
     else
       remove_empty_backup "$batch_inbox_backup" || batch_finish_status=1
     fi
+    if ((batch_background_staged)); then
+      if [[ -e "$batch_background_backup/background" || -L "$batch_background_backup/background" ]]; then
+        mv -Tf -- "$batch_background_backup/background" "$batch_background_link" || batch_finish_status=1
+      else
+        rm -f -- "$batch_background_link" || batch_finish_status=1
+      fi
+      batch_background_staged=0
+    else
+      rm -f -- "$batch_background_backup/background" || batch_finish_status=1
+    fi
+    rmdir -- "$batch_background_backup" || batch_finish_status=1
+    if ((batch_wallpaper_timer_paused)); then
+      systemctl --user start aranea-wallpaper-day-night.timer || batch_finish_status=1
+    fi
     omarchy restart shell >/dev/null 2>&1 || true
     sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"
     hyprctl dispatch 'hl.dsp.focus({ workspace = "1" })' >/dev/null 2>&1 || true
@@ -377,7 +426,19 @@ if ((capture_all)); then
     echo 'notification inbox not parked (session locked, shell still running or a file could not be moved); nothing captured' >&2
     exit 3
   fi
+  # Pin the batch once. Shell restarts reload this same link; child frames
+  # must not reload or restore the wallpaper between captures.
+  mkdir -p "$(dirname "$batch_background_link")"
+  if systemctl --user is-active --quiet aranea-wallpaper-day-night.timer; then
+    batch_wallpaper_timer_paused=1
+    systemctl --user stop aranea-wallpaper-day-night.timer aranea-wallpaper-day-night.service || exit 3
+  fi
+  batch_background_staged=1
+  ln -nsf -- "$repo_root/backgrounds/variants/silken-vault.png" "$batch_background_link"
   sleep 3
+  omarchy-shell background setInstant "$repo_root/backgrounds/variants/silken-vault.png" >/dev/null || exit 3
+  export ARANEA_CAPTURE_BACKGROUND_MANAGED=1
+  sleep 1
   # Captures one surface in a child run; fails on a child error or no new PNG. The
   # previous PNG is set aside first (so it never counts as a new capture) and
   # put back when the capture fails, so the README keeps its old screenshot.
@@ -444,16 +505,7 @@ mkdir -p "$output"
 # never reads the live desktop. Other project previews remain fully isolated.
 case "$surface" in
   workspaces)
-    workspace_args=()
-    if [[ -v ARANEA_CAPTURE_BACKGROUND ]]; then
-      workspace_args=(--background "$ARANEA_CAPTURE_BACKGROUND")
-    else
-      workspace_background="$(readlink -f "$HOME/.local/state/omarchy/current/background" 2>/dev/null || true)"
-      if [[ -f "$workspace_background" && -r "$workspace_background" ]]; then
-        workspace_args=(--background "$workspace_background")
-      fi
-    fi
-    "$repo_root/tools/render-settings-preview" --output "$output/$surface.png" --fixture "$surface" "${workspace_args[@]}"
+    "$repo_root/tools/render-settings-preview" --output "$output/$surface.png" --fixture "$surface"
     exit 0
     ;;
   projects-empty | projects-discovery | projects-grouped | projects-partial | project-details | project-launch-partial)
@@ -555,7 +607,8 @@ capture_inert_surface() (
   restore_needed=1
   hyprctl dispatch 'hl.dsp.focus({ workspace = "2" })' >/dev/null 2>&1 || exit 3
   local attempt ready=0
-  for ((attempt = 0; attempt < 30; attempt++)); do
+  # Cold artwork decoding for a full catalog can exceed the old 3-second wait.
+  for ((attempt = 0; attempt < 180; attempt++)); do
     answer="$(omarchy-shell "$target" captureState 2>/dev/null || true)"
     jq -e '.readOnly == true' <<<"$answer" >/dev/null 2>&1 || exit 3
     if jq -e '.ready == true' <<<"$answer" >/dev/null 2>&1; then
@@ -596,9 +649,9 @@ capture_settings_surface() {
       display: {monitor:"eDP-1",scale: (if $section == "display" then 2.666667 else 2 end),width:3840,height:2160,availability:"available",persistenceSupport:"supported",configuredScale: (if $section == "display" then 2.66667 else 2 end)},
       fonts:{uiFamily:"Inter",technicalFamily:"JetBrains Mono",families:["Inter","IBM Plex Sans","Source Sans 3","JetBrains Mono"],monospaceFamilies:["JetBrains Mono","JetBrains Mono NL"],availability:"available"},
       motion:{configured:"on",applied:"on",application:"applied",availability:"available"},
-      wallpaper:{activeId:"signal-shrine",availability:"available"},
+      wallpaper:{activeId:"silken-vault",availability:"available"},
       wallpapers:$catalog,wallpapersAvailability:"available",
-      schedule:{enabled:true,applied:true,availability:"available",entries:[{time:"07:00",wallpaper:"day"},{time:"12:30",wallpaper:"aranea-core"},{time:"18:00",wallpaper:"deep-current"},{time:"21:00",wallpaper:"signal-shrine"}],dawn:null,day:"07:00",dusk:null,night:null},
+      schedule:{enabled:true,applied:true,availability:"available",entries:[{time:"07:00",wallpaper:"day"},{time:"12:30",wallpaper:"aranea-core"},{time:"18:00",wallpaper:"deep-current"},{time:"21:00",wallpaper:"silken-vault"}],dawn:null,day:"07:00",dusk:null,night:null},
       integrations:[{id:"session",status:"inactive",availability:"available"},{id:"terminal",status:"active",availability:"available"}],integrationsAvailability:"available"},
       notifications:{dnd:"off",dndAvailability:"available",quiet:"scheduled",quietAvailability:"available",window:"22:00-07:00",windowAvailability:"available"},
       results:(if $section == "display" then {"display-scale":"Applied · 2.666667 · saved"} else {} end), itemErrors:{}}}')" || exit 3
@@ -1588,7 +1641,7 @@ SH
   lock)
     # The real LockView rendered offscreen with a stand-in clock; the session
     # is never locked. The renderer writes nothing when it fails.
-    "$repo_root/tools/render-lock-preview" --output "$output/$surface.png" >/dev/null || {
+    "$repo_root/tools/render-lock-preview" --background "$repo_root/backgrounds/variants/silken-vault.png" --output "$output/$surface.png" >/dev/null || {
       echo 'Unable to render the lock screen' >&2
       exit 1
     }
@@ -1596,7 +1649,7 @@ SH
     exit 0
     ;;
   dawn)
-    cp "$repo_root/backgrounds/variants/dawn.png" "$output/$surface.png"
+    cp "$repo_root/backgrounds/variants/silken-vault.png" "$output/$surface.png"
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;

@@ -152,7 +152,7 @@ Omarchy's existing timers, and the bar follows those changes.
 
 ## Wallpapers and motion
 
-Choose from thirteen scenes, with **Signal Shrine** as the default. The
+Choose from thirty scenes, with **Silken Vault** as the default. The
 collection includes city, rail, rooftop, desert, ocean, orbital, and interior
 scenes. **Neural Deck** is the command room; **Ghost in the Wire** is the
 cybernetic portrait. [The catalog](configuration.md#wallpapers) lists their

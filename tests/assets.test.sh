@@ -27,7 +27,7 @@ done < <(sed -n 's/^path = "\(.*\)"$/\1/p' "$repo_root/backgrounds/manifest.toml
 
 # Omarchy selects the first sorted top-level background on theme activation.
 default_background="$(find -L "$repo_root/backgrounds" -maxdepth 1 -type f -name '*.png' | sort | head -n1)"
-[[ "$(readlink -f "$default_background")" == "$repo_root/backgrounds/variants/signal-shrine.png" ]]
+[[ "$(readlink -f "$default_background")" == "$repo_root/backgrounds/variants/silken-vault.png" ]]
 
 test -f "$repo_root/screenshots/hero-showcase.gif"
 hero_dimensions="$(identify -format '%wx%h' "$repo_root/screenshots/hero-showcase.gif[0]")"

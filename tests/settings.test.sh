@@ -75,7 +75,7 @@ jq -e '.schemaVersion == 1 and .operation == "status" and .ok
   and .state.motion.configured == "on" and .state.motion.applied == "on"
   and .state.wallpaper.activeId == null and .state.wallpaper.availability == "unavailable"
   and .state.schedule.enabled == false and .state.schedule.dawn == "06:00"
-  and (.state.wallpapers | length == 20)
+  and (.state.wallpapers | length == 30)
   and any(.state.wallpapers[]; .id == "canopy-circuit" and .label == "Canopy Circuit" and .available)
   and any(.state.wallpapers[]; .id == "polar-freight" and .label == "Polar Freight" and .available)
   and any(.state.wallpapers[]; .id == "lunar-weaver" and .label == "Lunar Weaver" and .available)
