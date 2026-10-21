@@ -11,6 +11,7 @@
   "screensavers.discard": "Discard",
   "screensavers.currentMarker": "Current",
   "screensavers.unavailable": "Unavailable",
+  "screensavers.unavailableReason": "%1 is unavailable: %2",
   "screensavers.retry": "Retry",
   "screensavers.previewHelp": "Preview opens full screen. Move your pointer, click, or press a key to return.",
   "screensavers.automaticMissing": "Automatic activation is unavailable. Install or repair the Aranea session integration.",

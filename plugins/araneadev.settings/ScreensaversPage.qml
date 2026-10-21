@@ -262,6 +262,28 @@ ColumnLayout {
       }
     }
   }
+  ColumnLayout {
+    objectName: 'screensaverUnavailableReasons'
+    Layout.fillWidth: true
+    visible: unavailableReasons.count > 0
+    spacing: Style.space(10)
+    Repeater {
+      id: unavailableReasons
+      model: page.choices.filter(function (value) {
+        return value.available !== true
+      })
+      SettingsLabel {
+        required property var modelData
+        objectName: 'screensaverUnavailableReason:' + modelData.id
+        Layout.fillWidth: true
+        Layout.minimumWidth: 0
+        text: strings.t('screensavers.unavailableReason').arg(modelData.label || modelData.id).arg(modelData.reason || strings.t('screensavers.unavailable'))
+        color: Aranea.DesignTokens.attention
+        Accessible.role: Accessible.StaticText
+        Accessible.name: text
+      }
+    }
+  }
   RowLayout {
     Layout.fillWidth: true
     SettingsToggle {
@@ -334,12 +356,6 @@ ColumnLayout {
     Layout.fillWidth: true
     visible: !!page.saver.session && !!page.saver.session.error
     text: page.saver.session ? page.saver.session.error || '' : ''
-    color: Aranea.DesignTokens.attention
-  }
-  SettingsLabel {
-    Layout.fillWidth: true
-    visible: !!page.choice && page.choice.available !== true
-    text: page.choice ? page.choice.reason || strings.t('screensavers.unavailable') : ''
     color: Aranea.DesignTokens.attention
   }
   SettingsLabel {

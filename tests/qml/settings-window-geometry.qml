@@ -103,6 +103,8 @@ ShellRoot {
       t.equal(panel.implicitHeight, 628, 'native desired height includes the existing motion gutter')
       var scroll = viewport(panel)
       t.check(!!scroll && scroll.contentY === 0, 'production content starts at the top')
+      var diagnostics = t.findChild(panel, 'screensaverUnavailableReasons')
+      t.check(!!diagnostics && !diagnostics.visible && diagnostics.implicitHeight === 0, 'all-available diagnostics take no layout space')
       var cards = ['silk-journey', 'silk-chamber', 'omarchy'].map(function (id) {
         return t.findChild(panel, 'screensaverChoice:' + id)
       })
