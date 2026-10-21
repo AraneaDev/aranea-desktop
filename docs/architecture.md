@@ -89,6 +89,14 @@ reflow hover suppression, brightness, monitor/scale operations, IPC, and
 hosted/standalone lifecycle. Closing either popup leaves accepted commands and
 their confirmation reads alive.
 
+Network keeps `NetworkTelemetry.qml` as a persistent child for its connection
+read process, 1.5-second polling, throughput and ping measurements, and Link
+graph history. The Panel passes its open state and band-change suppression,
+keeps public aliases and sample forwarders, and invokes measurement and graph
+resets at their existing close-handler positions. Closing stops future polls;
+an in-flight read still applies, without adding closed-panel graph samples.
+The Panel retains pages, window lifecycle, credentials, network actions, and IPC.
+
 `repair-shell-config` removes redundant child entries only when their host is
 present. The bar exposes Notifications, Agents, Network, Audio, and System,
 with a disclosed tray and a conditional Health issue shortcut.
@@ -192,7 +200,7 @@ node tools/js-facade-generator.mjs --check
 
 For example, `MenuSearch.js` owns search and `MenuTree.js` owns traversal.
 Shared throughput graphs use `GraphLogic.js` for bounded sample history and plot
-math, `LinkGraph.qml` for presentation, and host-owned live sampling. History
+math, `LinkGraph.qml` for presentation, and plugin-owned live sampling. History
 resets when the interface changes; illustrative capture names do not turn graph
 samples into invented telemetry.
 

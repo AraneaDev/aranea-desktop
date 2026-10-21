@@ -17,7 +17,6 @@ import "Model.js" as Model
 import "NetworkLogic.js" as NetworkLogic
 import "../araneadev.shared/ShowcaseLogic.js" as Showcase
 import "../araneadev.shared/CursorLogic.js" as CursorLogic
-import "../araneadev.shared/GraphLogic.js" as GraphLogic
 import "../araneadev.shared/VpnApps.js" as VpnApps
 import "../araneadev.shared" as Aranea
 
@@ -131,45 +130,45 @@ Panel {
   }
 
   // Live connection details from `ip` / /sys / iw.
-  property var info: ({})  // { iface, type, ip, prefix, gateway, speed, duplex, ssid, signal, freq, bitrate, rx_bytes, tx_bytes, router_ping_ms, internet_ping_ms }
+  property alias info: telemetry.info
 
   // Throughput tracking. Rates are computed as deltas between successive
   // `omarchy-network-status --verbose` samples (~1.5s apart via detailsPoll).
   // We hold "prev" alongside a timestamp so the first sample after open or
   // after an interface switch doesn't manufacture a spike.
-  property real prevRxBytes: 0
+  property alias prevRxBytes: telemetry.prevRxBytes
   // Bytes sent as of the last sample.
-  property real prevTxBytes: 0
+  property alias prevTxBytes: telemetry.prevTxBytes
   // Wall-clock time of the last sample, in seconds.
-  property real prevSampleTime: 0
+  property alias prevSampleTime: telemetry.prevSampleTime
   // Interface the last sample was taken on; a change resets the rate calc.
-  property string prevIface: ""
+  property alias prevIface: telemetry.prevIface
   // Download rate in bytes/sec, derived from the last two samples.
-  property real downloadRate: 0  // bytes/sec
+  property alias downloadRate: telemetry.downloadRate
   // Upload rate in bytes/sec, derived from the last two samples.
-  property real uploadRate: 0    // bytes/sec
+  property alias uploadRate: telemetry.uploadRate
   // Interface the ping history was sampled on; a change resets the window.
-  property string pingIface: ""
+  property alias pingIface: telemetry.pingIface
   // Recent router ping samples, newest last, windowed to pingHistoryWindow.
-  property var routerPingSamples: []
+  property alias routerPingSamples: telemetry.routerPingSamples
   // Recent internet ping samples, newest last, windowed to pingHistoryWindow.
-  property var internetPingSamples: []
+  property alias internetPingSamples: telemetry.internetPingSamples
   // Rolling average router ping latency in ms, or -1 before enough samples.
-  property real routerPingLatency: -1
+  property alias routerPingLatency: telemetry.routerPingLatency
   // Rolling average internet ping latency in ms, or -1 before enough samples.
-  property real internetPingLatency: -1
+  property alias internetPingLatency: telemetry.internetPingLatency
   // Percentage of the recent internet ping samples that were lost.
-  property int internetPingPacketLoss: 0
+  property alias internetPingPacketLoss: telemetry.internetPingPacketLoss
   // How many ping samples routerPingSamples/internetPingSamples retain.
-  readonly property int pingHistoryWindow: 24
+  readonly property int pingHistoryWindow: telemetry.pingHistoryWindow
   // How many of the most recent samples the rolling average is taken over.
-  readonly property int pingAverageWindow: 5
+  readonly property int pingAverageWindow: telemetry.pingAverageWindow
   // Whether there is at least one internet ping sample to report on.
-  readonly property bool hasInternetPing: internetPingSamples.length > 0
+  readonly property bool hasInternetPing: telemetry.hasInternetPing
   // Every stat row stays mounted whether or not there is data behind it, so a
   // sample arriving late never reflows the grid. This says whether the numbers
   // are real yet or the row should read "--".
-  readonly property bool hasTransferStats: info.rx_bytes !== undefined
+  readonly property bool hasTransferStats: telemetry.hasTransferStats
   // Index into connectionPhrases for the rotating status phrase.
   property int connectionPhraseIndex: 0
   // Phrases that rotate through the header caption while connected.
@@ -561,15 +560,7 @@ Panel {
       scanRestart.stop()
       // Reset throughput tracking so the next open doesn't compute a fake
       // rate from a sample taken minutes ago.
-      prevSampleTime = 0
-      downloadRate = 0
-      uploadRate = 0
-      pingIface = ""
-      routerPingSamples = []
-      internetPingSamples = []
-      routerPingLatency = -1
-      internetPingLatency = -1
-      internetPingPacketLoss = 0
+      telemetry.resetMeasurements()
       setScannerEnabled(false)
     }
   }
@@ -722,8 +713,7 @@ Panel {
   function refresh(scanWifi) {
     if (scanWifi === undefined)
       scanWifi = false
-    if (!detailsProc.running)
-      detailsProc.running = true
+    telemetry.refresh()
     if (!dnsProc.running) {
       dnsProc.command = ["bash", "-c", root.dnsCommand("")]
       dnsProc.running = true
@@ -761,56 +751,19 @@ Panel {
     return Model.headerDetail(info)
   }
 
-  // Applies a freshly parsed `omarchy-network-status --verbose` sample.
+  // Applies a parsed command sample through the persistent telemetry owner.
   function updateDetails(raw) {
-    var next = Model.parseKeyValue(raw)
-
-    // A band change tears the link down and brings it back, and the status
-    // command reports nothing at all while there is no route. Publishing that
-    // would blank every stat and unmount the whole section mid-toggle, so the
-    // last good sample stands until the reconnect settles. A real disconnect is
-    // still reported, because nothing is in flight then.
-    if (bandBusy && !next.iface)
-      return
-    info = next
-    updateThroughput(next)
-    updatePingLatency(next)
-    recordLinkSample()
+    telemetry.updateDetails(raw)
   }
 
-  // Recomputes download/upload rates from the latest sample.
+  // Retain the public sample helpers used by the host and capture consumers.
   function updateThroughput(next) {
-    var state = Model.throughputState({
-      prevIface: prevIface,
-      prevRxBytes: prevRxBytes,
-      prevTxBytes: prevTxBytes,
-      prevSampleTime: prevSampleTime,
-      downloadRate: downloadRate,
-      uploadRate: uploadRate
-    }, next, Date.now() / 1000)
-
-    prevIface = state.prevIface
-    prevRxBytes = state.prevRxBytes
-    prevTxBytes = state.prevTxBytes
-    prevSampleTime = state.prevSampleTime
-    downloadRate = state.downloadRate
-    uploadRate = state.uploadRate
+    telemetry.updateThroughput(next)
   }
 
   // Recomputes rolling ping latency/loss from the latest sample.
   function updatePingLatency(next) {
-    var state = Model.pingLatencyState({
-      pingIface: pingIface,
-      routerPingSamples: routerPingSamples,
-      internetPingSamples: internetPingSamples
-    }, next, pingHistoryWindow, pingAverageWindow)
-
-    pingIface = state.pingIface
-    routerPingSamples = state.routerPingSamples
-    internetPingSamples = state.internetPingSamples
-    routerPingLatency = state.routerPingLatency
-    internetPingLatency = state.internetPingLatency
-    internetPingPacketLoss = state.internetPingPacketLoss
+    telemetry.updatePingLatency(next)
   }
 
   // Formats a byte count for display, delegating to Model.js.
@@ -1157,14 +1110,10 @@ Panel {
 
   Component.onCompleted: refresh()
 
-  // Pulls everything we want about the active route's interface in one shot.
-  Process {
-    id: detailsProc
-    command: ["omarchy-network-status", "--verbose"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.updateDetails(text)
-    }
+  NetworkTelemetry {
+    id: telemetry
+    pollingEnabled: root.opened
+    bandBusy: root.bandBusy
   }
 
   Timer {
@@ -1265,17 +1214,6 @@ Panel {
     }
   }
   // qmllint enable signal-handler-parameters
-
-  // Poll details while the panel is open so the IP/route header catches up
-  // as soon as NetworkManager finishes activating a connection.
-  Timer {
-    id: detailsPoll
-    interval: 1500
-    repeat: true
-    running: root.opened
-    onTriggered: if (!detailsProc.running)
-      detailsProc.running = true
-  }
 
   Timer {
     id: connectionPhraseTimer
@@ -1545,7 +1483,7 @@ Panel {
   property real captionOpacity: 1
   // Throughput samples for the Link graph, oldest first: [{iface, rx, tx}].
   // Cleared on close; pushSample restarts it on an interface change.
-  property var linkHistory: []
+  property alias linkHistory: telemetry.linkHistory
   // NetworkManager devices from the extras poll (NetworkLogic.parseDevices).
   property var extraDevices: []
   // NetworkManager connection profiles from the extras poll
@@ -1581,16 +1519,9 @@ Panel {
   // the view the same array and its Repeaters keep their delegates.
   property var rowCache: ({})
 
-  // Records one Link graph sample from the rates stock just computed. Only
-  // while open, so the occasional refresh of a closed panel adds nothing.
+  // Records a Link graph sample through the persistent telemetry owner.
   function recordLinkSample() {
-    if (!opened || !info.iface || !hasTransferStats)
-      return
-    linkHistory = GraphLogic.pushSample(linkHistory, {
-      iface: info.iface,
-      rx: downloadRate,
-      tx: uploadRate
-    }, 40)
+    telemetry.recordLinkSample()
   }
 
   // Applies the own-app VPN config file's text, or null when it's missing
@@ -2179,7 +2110,7 @@ Panel {
         root.bandCursorKey = ""
         root.headerCursorKey = ""
       } else {
-        root.linkHistory = []
+        telemetry.resetLinkHistory()
       }
     }
     function onWifiNetworksChanged() {
