@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Preview the live spider journey or the rendered loop; idle timers are unchanged.
-# Usage: scripts/aranea-screensaver preview | video | --help
+# Usage: scripts/aranea-screensaver preview | video | list|status --json | configure ID MODE --json
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 case "${1:---help}" in
   -h | --help)
-    printf 'Usage: %s preview | video\n\nLive silk-lit journey, or the rendered walking loop. Move the mouse, click, or press Escape to close.\n' "${0##*/}"
+    printf 'Usage: %s preview | video | list|status --json | configure ID single|shuffle --json\n\nLive silk-lit journey, or the rendered walking loop. Move the mouse, click, or press Escape to close.\n' "${0##*/}"
     exit 0
+    ;;
+  list | status | configure)
+    exec python3 "$repo_root/tools/screensaver/cli.py" "$@"
     ;;
   preview)
     [[ $# == 1 ]] || {
@@ -24,7 +27,7 @@ case "${1:---help}" in
     exit 2
   } ;;
   *)
-    echo 'Usage: aranea-screensaver preview | video' >&2
+    echo 'Usage: aranea-screensaver preview | video | list|status --json | configure ID single|shuffle --json' >&2
     exit 2
     ;;
 esac
