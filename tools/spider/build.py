@@ -2,26 +2,28 @@
 
 Run: blender -b --factory-startup --python-exit-code 1 --python tools/spider/build.py
      -- [--output DIR] [--render-still] [--render-loop] [--width 1280] [--samples 32]
-All geometry is authored here or derived from the repository's canonical SVG.
+Geometry is authored here and in stage.py, or derived from the canonical SVG.
 """
 
 import argparse
 import json
 import math
-from pathlib import Path
 import re
 import sys
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
-import bpy
 import bmesh
+import bpy
 from mathutils import Vector
 from mathutils.geometry import tessellate_polygon
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from validate import validate, validate_preview, validate_gait
-from gait import toe_motion, WORLD_SPEED
+from animation import bake_clip
+from gait import WORLD_SPEED
+from stage import aim, build_stage
+from validate import validate, validate_gait, validate_preview
 
 p = argparse.ArgumentParser()
 p.add_argument("--output", type=Path, default=ROOT / "branding/3d")
@@ -379,112 +381,8 @@ for obj in list(character.objects):
 armature.pose_position = "POSE"
 
 
-def animate(name, length, walking=False):
-    rig.animation_data_create()
-    action = bpy.data.actions.new(name)
-    rig.animation_data.action = action
-    for frame in range(1, length + 1):
-        bpy.context.scene.frame_set(frame)
-        phase = 2 * math.pi * (frame - 1) / (length - 1)
-        for bone in rig.pose.bones:
-            bone.rotation_euler = (0, 0, 0)
-            bone.location = (0, 0, 0)
-        body_pose = rig.pose.bones["body"]
-        body_pose.location.z = (0.012 if walking else 0.012) * math.sin(
-            phase * 2 if walking else phase
-        )
-        body_pose.rotation_euler.x = 0.004 * math.sin(phase)
-        for i, names in enumerate(bone_names):
-            sign = 1 if i % 2 == 0 else -1
-            # Alternating tetrapod groups, L1/R2/L3/R4 against the other four.
-            wave = phase + (math.pi if ((i // 2 + i % 2) % 2) else 0)
-            lift = (1 - math.cos(wave)) * 0.5
-            hip = rig.pose.bones[names[0]]
-            knee = rig.pose.bones[names[1]]
-            tip = rig.pose.bones[names[2]]
-            if walking:
-                # Solve the two distal segments analytically. Each planted toe
-                # stays above the dais, with an alternating lifted swing phase.
-                inward = paths[i][1] - paths[i][3]
-                inward.z = 0
-                offset = (0.5 if ((i // 2 + i % 2) % 2) else 0) + (i // 2) * 0.035
-                forward, height = toe_motion((frame - 1) / (length - 1) + offset)
-                bpy.context.view_layer.update()
-                # The proximal joint follows the foot sweep instead of waving
-                # on an unrelated sine. Distal IK keeps the contact planted.
-                origin = hip.head.copy()
-                rest = hip.bone
-                direction = (
-                    paths[i][1]
-                    - paths[i][0]
-                    + Vector((0, forward * 0.3, height * 0.08))
-                )
-                rotation = (rest.tail_local - rest.head_local).rotation_difference(
-                    direction
-                )
-                matrix = rotation.to_matrix().to_4x4() @ rest.matrix_local
-                matrix.translation = origin
-                hip.matrix = matrix
-                bpy.context.view_layer.update()
-                start = knee.head.copy()
-                foot = (
-                    paths[i][3]
-                    + inward.normalized() * 0.38
-                    + Vector((0, forward, height))
-                )
-                delta = foot - start
-                distance = delta.length
-                axis = delta.normalized()
-                l1, l2 = (
-                    (paths[i][2] - paths[i][1]).length,
-                    (paths[i][3] - paths[i][2]).length,
-                )
-                assert abs(l1 - l2) < distance < l1 + l2, (
-                    f"Walk target outside limb reach: {i} {frame} {distance} {l1 + l2}"
-                )
-                along = (l1 * l1 - l2 * l2 + distance * distance) / (2 * distance)
-                bend = paths[i][2] - paths[i][1]
-                bend = (bend - axis * bend.dot(axis)).normalized()
-                joint = (
-                    start
-                    + axis * along
-                    + bend * math.sqrt(max(0, l1 * l1 - along * along))
-                )
-                for pose, origin, destination in (
-                    (knee, start, joint),
-                    (tip, joint, foot),
-                ):
-                    rest = pose.bone
-                    rotation = (rest.tail_local - rest.head_local).rotation_difference(
-                        destination - origin
-                    )
-                    matrix = rotation.to_matrix().to_4x4() @ rest.matrix_local
-                    matrix.translation = origin
-                    pose.matrix = matrix
-                    bpy.context.view_layer.update()
-            else:
-                hip.rotation_euler.z = sign * 0.012 * math.sin(wave)
-                hip.rotation_euler.x = 0.008 * math.sin(wave)
-                knee.rotation_euler.x = -0.009 * lift
-                tip.rotation_euler.x = 0.008 * lift
-        for bone in rig.pose.bones:
-            bone.keyframe_insert("rotation_euler", frame=frame, group=bone.name)
-            bone.keyframe_insert("location", frame=frame, group=bone.name)
-    # Set linear interpolation so baked transforms match the procedural curve.
-    for layer in action.layers:
-        for strip in layer.strips:
-            for slot in action.slots:
-                bag = strip.channelbag(slot)
-                if bag:
-                    for curve in bag.fcurves:
-                        for key in curve.keyframe_points:
-                            key.interpolation = "LINEAR"
-    action.use_fake_user = True
-    return action
-
-
-idle = animate("Idle", 97)
-walk = animate("Walk", 49, True)
+idle = bake_clip(rig, paths, bone_names, "Idle", 97)
+walk = bake_clip(rig, paths, bone_names, "Walk", 49, True)
 validate(rig)
 validate_gait(rig)
 rig.animation_data.action = idle
@@ -513,128 +411,7 @@ bpy.ops.export_scene.gltf(
 )
 
 
-# Independent scene: concentric black stone, suspended silk and a violet rim.
-def cylinder(name, radius, depth, z, mat):
-    bpy.ops.mesh.primitive_cylinder_add(
-        vertices=128, radius=radius, depth=depth, location=(0, 0, z)
-    )
-    obj = move_to(bpy.context.object, stage)
-    obj.name = name
-    obj.data.materials.append(mat)
-    bevel = obj.modifiers.new("Soft stone edges", "BEVEL")
-    bevel.width, bevel.segments = 0.035, 3
-    obj.modifiers.new("Stone normals", "WEIGHTED_NORMAL")
-    return obj
-
-
-def thread(name, points, radius, mat):
-    curve = bpy.data.curves.new(name, "CURVE")
-    curve.dimensions = "3D"
-    curve.bevel_depth = radius
-    curve.bevel_resolution = 2
-    spline = curve.splines.new("POLY")
-    spline.points.add(len(points) - 1)
-    for point, xyzv in zip(spline.points, points):
-        point.co = (*xyzv, 1)
-    obj = bpy.data.objects.new(name, curve)
-    stage.objects.link(obj)
-    obj.data.materials.append(mat)
-    return obj
-
-
-cylinder("Basalt dais", 3.30, 0.24, -0.19, slate)
-cylinder("Dark horizon", 200, 0.15, -0.40, slate)
-for radius in (2.65, 2.76, 3.12):
-    thread(
-        "Engraved circuit",
-        [
-            (
-                radius * math.cos(t * math.tau / 256),
-                radius * math.sin(t * math.tau / 256),
-                -0.058,
-            )
-            for t in range(257)
-        ],
-        0.007,
-        silk,
-    )
-thread(
-    "Violet rim",
-    [
-        (
-            3.25 * math.cos(t * math.tau / 256),
-            3.25 * math.sin(t * math.tau / 256),
-            -0.08,
-        )
-        for t in range(257)
-    ],
-    0.012,
-    violet,
-)
-# A quiet radial silk lattice behind the character, with deliberately sagging strands.
-for i in range(16):
-    theta = i * math.tau / 16
-    thread(
-        "Radial silk",
-        [(r * math.cos(theta), r * math.sin(theta), -0.055) for r in (2.8, 3.3, 4.3)],
-        0.0035,
-        silk,
-    )
-for radius in (3.55, 4.15):
-    points = []
-    for i in range(16):
-        a, b = (
-            Vector(
-                (
-                    radius * math.cos(i * math.tau / 16),
-                    radius * math.sin(i * math.tau / 16),
-                    0.0,
-                )
-            ),
-            Vector(
-                (
-                    radius * math.cos((i + 1) * math.tau / 16),
-                    radius * math.sin((i + 1) * math.tau / 16),
-                    0.0,
-                )
-            ),
-        )
-        for j in range(9):
-            t = j / 8
-            pt = a.lerp(b, t)
-            pt.z = -0.05 - 0.07 * math.sin(t * math.pi)
-            points.append(pt)
-    points.append(points[0])
-    thread("Spun perimeter", points, 0.004, silk)
-
-
-def aim(obj, point):
-    obj.rotation_euler = (
-        (Vector(point) - obj.location).to_track_quat("-Z", "Y").to_euler()
-    )
-
-
-def area(name, position, color, energy, size, target=(0, 0, 0)):
-    data = bpy.data.lights.new(name, "AREA")
-    data.energy, data.color, data.shape, data.size = energy, color, "DISK", size
-    obj = bpy.data.objects.new(name, data)
-    stage.objects.link(obj)
-    obj.location = position
-    aim(obj, target)
-    return obj
-
-
-area("Soft silver key", (1, 1, 6), (0.72, 0.86, 1), 650, 5)
-area("Mint rim", (-4, 1, 3), (0.16, 1, 0.67), 700, 4)
-area("Violet fill", (3, -2, 2.5), (0.46, 0.22, 1), 500, 3)
-area("Front softbox", (0, -5, 4), (0.7, 0.88, 0.96), 250, 4)
-camera_data = bpy.data.cameras.new("Portrait camera")
-camera = bpy.data.objects.new("Portrait camera", camera_data)
-stage.objects.link(camera)
-camera.location = (3.5, -6.8, 8.6)
-aim(camera, (0, 0, 0.20))
-camera_data.type = "ORTHO"
-camera_data.ortho_scale = 10.7
+camera = build_stage(stage, {"slate": slate, "silk": silk, "violet": violet})
 scene = bpy.context.scene
 scene.camera = camera
 scene.world.color = (0.025, 0.025, 0.025)
