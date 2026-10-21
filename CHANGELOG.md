@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.37.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.36.0...v2.37.0) (2026-10-21)
+
+
+### Features
+
+* **screensaver:** add animated Aranea spider and complete structural cleanup ([#206](https://github.com/AraneaDev/aranea-desktop/issues/206)) ([3f036a7](https://github.com/AraneaDev/aranea-desktop/commit/3f036a7b6c55f1b507c90de41d3059513dd2a057))
+
 ## [2.36.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.35.1...v2.36.0) (2026-10-21)
 
 
