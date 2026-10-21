@@ -33,6 +33,19 @@ owned link and resolves the command through bounded `bash -lc`, matching upstrea
 idle launch. `integration.reachable: false` means automatic activation has not
 been established, even when manual Preview is accepted.
 
+Enable the **Session** integration through Settings when inactive. A scene Apply
+or Preview never enables idle or changes pause flags. Automatic launch still
+requires Omarchy's idle service to be enabled and unpaused.
+
+The scene catalog offers Silk Journey (Chromium/WebGL), Silk Chamber (mpv), and
+Omarchy (stock). Selection/shuffle lives in Aranea's separate screensaver config;
+timing remains in Omarchy. The supervisor uses one scene across active monitors,
+exact Wayland class `org.omarchy.screensaver`, and bounded readiness/cleanup.
+Supervised web sessions use Chromium kiosk mode; legacy standalone Preview keeps
+app mode. Hyprland placement/restoration uses fixed allowlisted typed Lua calls
+with encoded data literals, passed as separate `hyprctl` argv. Catalog text is
+never executed. See the [model guide](../../branding/3d/README.md#picker-and-automatic-sessions).
+
 `aranea-screensaver configure-idle SCREENSAVER_SECONDS LOCK_SECONDS --json` and
 Settings `configure screensaver-timing SCREENSAVER_SECONDS LOCK_SECONDS --json`
 save two inactivity deadlines in the XDG Omarchy `shell.json`. Both count from

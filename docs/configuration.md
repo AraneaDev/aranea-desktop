@@ -49,6 +49,27 @@ until edited. The initial 15/20-minute user configuration is preserved until sav
 If reload or readback fails, the draft and diagnostic stay visible for correction.
 Stay awake and screensaver-off indicators explain pauses without toggling them.
 Automatic activation requires the installed, reachable Aranea session integration.
+A full install manages that launcher; enable the **Session** integration in Settings
+if it is inactive. Omarchy's idle service remains responsible for activation and
+locking. Stay awake or screensaver-off can pause automatic activation.
+
+The initial catalog contains **Silk Journey** (local Chromium/WebGL), **Silk Chamber**
+(local mpv video), and **Omarchy** (the packaged terminal saver). The owner uses
+one selected scene across active monitors. Shuffle chooses from available Aranea
+scenes once per automatic session, avoids the previous scene when possible, and
+excludes Omarchy. Missing renderer dependencies disable only the affected scene.
+
+Read selection, catalog availability, launcher reachability and configured timing
+without launching a renderer:
+
+```bash
+scripts/aranea-screensaver status --json
+scripts/aranea-screensaver list --json
+```
+
+Saved selection lives in `~/.config/aranea/screensaver.json`; timing stays in
+Omarchy's `shell.json`. See the [session integration guide](../integrations/session/README.md#automatic-screensavers-and-timing)
+for launcher ownership, fallback and reload behavior.
 
 ### Choose fonts
 

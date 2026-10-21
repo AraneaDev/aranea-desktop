@@ -82,9 +82,9 @@ Move the mouse, click, or press a key to close. Launch-time mouse movement is
 ignored for 1.5 seconds. The controls load independently of the 3D renderer so
 Escape still works if rendering fails. Your normal browser profile is unused.
 
-Rendering targets 30 fps and caps the canvas at 2.1 million pixels. This is a
-manual preview; automatic idle activation is not installed, and existing
-screensaver and lock configuration is unchanged.
+Rendering targets 30 fps and caps the canvas at 2.1 million pixels. The command
+above remains a standalone preview. Automatic sessions and the Settings Preview
+button instead use the managed supervisor described below.
 
 The previous rendered loop remains available as a lightweight alternative:
 
@@ -106,6 +106,36 @@ python3 tests/spider-live.test.py
 python3 tests/spider-gait.test.py
 bash tests/spider-preview.test.sh
 ```
+
+## Picker and automatic sessions
+
+Open **Settings → Aranea → Screensavers** to choose **Silk Journey** (the live
+journey), **Silk Chamber** (the rendered loop), or classic **Omarchy**. Select a
+single scene or shuffle available Aranea scenes. **Apply scene** saves selection;
+**Preview** starts the highlighted scene without saving it or changing timing.
+Accepted Preview hides Settings; reopen it to inspect asynchronous startup errors.
+Acceptance alone does not establish that the renderer is ready.
+
+Full installation provides a ledger-managed launcher for the Session integration.
+While Aranea is active it starts one supervised scene across active monitors;
+Omarchy retains control of inactivity, Stay awake, wake and lock. The supervised
+web renderer uses Chromium kiosk mode to preserve the exact Wayland class
+`org.omarchy.screensaver`; the standalone `preview` command retains Chromium app
+mode. Both use an isolated temporary profile and local assets. The video renderer
+uses mpv with an owned input script and readiness socket.
+
+The supervisor waits for renderer readiness, dismisses all owned surfaces together,
+and restores the previous focus/workspaces. Pointer motion, clicks or ordinary
+keys dismiss after launch grace. Cleanup owns only the session's processes,
+profiles, socket and asset server. Before any custom surface maps, an unavailable
+automatic scene can delegate to Omarchy; after mapping, failure ends that session.
+Manual Preview reports failure rather than switching to a different scene.
+
+Scene Apply and Preview preserve the current idle deadlines. The separate timing
+controls support whole minutes or Disabled, while retaining exact preexisting
+seconds until edited. Both deadlines count from last activity. See
+[configuration](../../docs/configuration.md#choose-screensavers-and-timing) and
+[session integration](../../integrations/session/README.md#automatic-screensavers-and-timing).
 
 ## Rebuild
 

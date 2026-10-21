@@ -34,6 +34,7 @@ SH
 cat >"$bin/magick" <<'SH'
 #!/usr/bin/env bash
 [[ "${MAGICK_FAILS:-0}" == 1 ]] && exit 1
+printf '%s\n' "$@" >"$ARANEA_TEST_SANDBOX/hero-args"
 printf 'built\n' >"${@: -1}"
 SH
 # Writes <surface>.png, except for the surfaces listed in CAPTURE_FAILS. Like
@@ -47,6 +48,7 @@ cat >"$bin/fake-surface" <<'SH'
 if [[ "${CAPTURE_TIMER_INACTIVE:-0}" != 1 ]]; then
   [[ -f "$ARANEA_TEST_SANDBOX/timer-paused" ]] || exit 8
 fi
+printf '%s\n' "$1" >>"$ARANEA_TEST_SANDBOX/surface-calls"
 [[ " ${CAPTURE_FAILS:-} " == *" $1 "* ]] && exit 1
 printf 'new %s\n' "$1" >"$2/$1.png"
 [[ " ${CAPTURE_FAIL_AFTER_WRITE:-} " == *" $1 "* ]] && exit 1
@@ -175,6 +177,7 @@ seed_real() {
   printf 'hidden\n' >"$inbox/.3-1.json"
   printf 'hidden image\n' >"$images/.3-1-0.png"
   : >"$ARANEA_TEST_SANDBOX/guard.log"
+  : >"$ARANEA_TEST_SANDBOX/surface-calls"
   rm -f "$ARANEA_TEST_SANDBOX/shell-stuck" "$ARANEA_TEST_SANDBOX/list-fails"
   touch "$ARANEA_TEST_SANDBOX/shell-running"
   cp -pR "$inbox"/. "$real/inbox/"
@@ -262,6 +265,12 @@ errors="$(run_batch)" || status=$?
   exit 1
 }
 [[ "$(cat "$out/osd.png")" == "new osd" ]]
+mapfile -t captured_surfaces <"$ARANEA_TEST_SANDBOX/surface-calls"
+[[ "${#captured_surfaces[@]}" == 47 ]]
+[[ "${captured_surfaces[*]:2:5}" == 'settings settings-scaling settings-schedule settings-screensavers menu-search' ]]
+mapfile -t hero_inputs < <(grep '\.png$' "$ARANEA_TEST_SANDBOX/hero-args")
+[[ "${#hero_inputs[@]}" == 39 ]]
+[[ "${hero_inputs[*]:3:5}" == "$out/settings.png $out/settings-scaling.png $out/settings-schedule.png $out/settings-screensavers.png $out/menu-search.png" ]]
 [[ "$(cat "$out/hero-showcase.gif")" == "built" ]]
 assert_real_back 'clean batch'
 assert_no_backup 'clean batch'

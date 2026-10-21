@@ -28,14 +28,16 @@ Static fallback: [desktop capture](screenshots/desktop.png) · [full showcase GI
 
 The original Aranea spider is now a rigged 3D model with a live cyberpunk
 screensaver: suspended bridges, silk descents, and occasional kanji projections
-and particle effects. Preview it from the checkout:
+and particle effects. In **Settings → Aranea → Screensavers**, choose **Silk Journey**,
+the lightweight **Silk Chamber** video, or classic **Omarchy**. Apply a single scene
+or shuffle the Aranea scenes; Preview leaves your saved selection unchanged.
+Move the pointer, click, or press a key to return.
 
-```bash
-scripts/aranea-screensaver preview
-```
-
-Move the mouse or press Escape to close. See the [model and screensaver guide](branding/3d/README.md)
-for editable assets, requirements, and the rendered video alternative.
+Automatic activation uses the managed session integration and Omarchy's idle
+service. Scene selection and idle/lock timing have separate Apply controls.
+See the [configuration guide](docs/configuration.md#choose-screensavers-and-timing)
+and [model and screensaver guide](branding/3d/README.md) for setup, requirements,
+and standalone preview commands.
 
 ## Install
 
@@ -181,6 +183,8 @@ demonstration data; every desktop backdrop uses Silken Vault.
 | ![Desktop](screenshots/desktop.png) | ![Appearance settings on the desktop wallpaper](screenshots/settings.png) | ![Display scaling settings](screenshots/settings-scaling.png) |
 
 ![Daily wallpaper schedule](screenshots/settings-schedule.png)
+
+![Screensaver picker and idle timing](screenshots/settings-screensavers.png)
 
 ### Command center
 

@@ -168,7 +168,7 @@ when saved. Motion has a separate on/off control in Appearance.
 ## Desktop settings
 
 **Command center → Settings → Aranea** opens a centered window with Appearance,
-Display, Schedule, Integrations, and Notifications pages. Longer pages scroll
+Display, Schedule, Integrations, Screensavers, and Notifications pages. Longer pages scroll
 inside the window, and navigation retains your drafts.
 
 Wallpaper and display scale use explicit **Apply** and **Discard** controls.
@@ -178,6 +178,19 @@ and Do not disturb apply immediately. The Appearance wallpaper chooser stays
 collapsed until you request it; font choices offer search and preview samples.
 Display accepts decimal scales and distinguishes effective scaling from whether
 it was saved for later sessions.
+
+## Screensavers
+
+**Settings → Aranea → Screensavers** offers Silk Journey, the live 3D spider;
+Silk Chamber, the lightweight video loop; and Omarchy, the stock saver. Choose
+one scene or shuffle available Aranea scenes. **Apply scene** saves that choice;
+**Preview** opens fullscreen without saving. Move the pointer, click, or press
+a key to return after the launch grace period.
+
+Automatic sessions use the managed session integration while Aranea is active.
+Omarchy retains inactivity, Stay awake, wake and lock control. Screensaver and
+lock deadlines both count from last activity; edit them with the separate
+**Apply timing** controls. See [screensaver configuration](configuration.md#choose-screensavers-and-timing).
 
 ## Project workspaces
 
