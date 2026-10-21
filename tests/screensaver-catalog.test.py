@@ -12,6 +12,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
@@ -57,6 +58,12 @@ class CatalogTests(unittest.TestCase):
         os.environ["PATH"] = str(self.bin)
         self.addCleanup(os.environ.__setitem__, "PATH", self.old_path)
         self.config = self.base / "config"
+        self.packaged = self.base / "omarchy"
+        self.idle_service = self.packaged / "shell/plugins/services/idle/Service.qml"
+        self.idle_service.parent.mkdir(parents=True)
+        # Status probes only this file's presence; it never loads QML.
+        self.idle_service.write_text("// Test host presence fixture.\n")
+        self.enterContext(patch.dict(os.environ, OMARCHY_PATH=str(self.packaged)))
 
     def load(self):
         return self.catalog_api.load_catalog(self.repo)
@@ -88,6 +95,26 @@ class CatalogTests(unittest.TestCase):
             },
         )
         self.assertFalse(self.config.exists())
+
+    def test_absent_host_keeps_pause_indicators_unknown_without_creating_state(self):
+        self.idle_service.unlink()
+        snapshot = self.cli("status", "--json")
+        self.assertEqual(snapshot.returncode, 0, snapshot.stderr)
+        state = json.loads(snapshot.stdout)
+        self.assertEqual(
+            state["idle"],
+            {
+                "screensaverSeconds": 150,
+                "lockSeconds": 300,
+                "stayAwake": None,
+                "screensaverOff": None,
+                "error": None,
+            },
+        )
+        self.assertEqual(state["availability"], "available")
+        self.assertFalse(self.config.exists())
+        self.assertFalse((self.base / "state").exists())
+        self.assertFalse((self.base / "home").exists())
 
     def test_three_entries_and_projection(self):
         scenes = self.load()
@@ -326,6 +353,7 @@ class CatalogTests(unittest.TestCase):
     def cli(self, *args):
         env = dict(
             os.environ,
+            HOME=str(self.base / "home"),
             XDG_CONFIG_HOME=str(self.config),
             XDG_STATE_HOME=str(self.base / "state"),
             XDG_RUNTIME_DIR=str(self.base / "runtime"),
