@@ -8,8 +8,11 @@ follows the provider id, the limit-window and balance normalisation, the day and
 30 s clock, the IPC target `omarchy.agents` with `open`/`close`/`show`/`hide`/`toggle`/`refresh`/
 `next`, self-hiding when no agent has usage, sync, and the bar entry's settings handed to Main)
 and draws it with the pure `AgentsDropdown` view inside the shared `KeyboardPanelFrame`.
-`Main.qml` (agent discovery, watching and cross-device sync) and `Agent.qml` (the per-agent usage
-record watcher) are stock, unchanged apart from docs and qmllint scoping.
+`Main.qml` retains agent discovery, watching and cross-device sync lifecycle; `Agent.qml`
+retains the per-agent usage record watcher. `AgentFleetAggregation.js` owns the pure fleet
+reduction. Main passes sanitized device identities, recent calendar dates and timestamps;
+it keeps scan parsing and publishes the resulting aggregate. Device counters add, account
+counters take maxima, and active dates union with the widest legacy count as a floor.
 
 The bar button keeps its glyph, clicks and alarm state, with `AgentsRing` drawn over the glyph
 slot: it fills with the current agent's fullest limit window, in the accent below 80%, amber from

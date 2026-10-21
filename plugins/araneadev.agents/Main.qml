@@ -5,6 +5,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "AgentFleetAggregation.js" as AgentFleetAggregation
 
 // The display side of agent usage. All extraction lives behind
 // omarchy-agent-usage-update, which writes one JSON record per agent into
@@ -658,152 +659,17 @@ Item {
     return result
   }
 
-  // A zeroed input/output/cache token bucket.
-  function emptyTokenBucket() {
-    return {
-      inputTokens: 0,
-      outputTokens: 0,
-      cacheReadInputTokens: 0,
-      cacheCreationInputTokens: 0
-    }
-  }
-
-  // Device-scoped stats add up across machines; account-scoped stats
-  // (Fireworks' billing API) are replicas of the same upstream truth on
-  // every synced device, so the widest value wins; summing them would
-  // double every token per machine.
-  function combineNumber(additive, current, value) {
-    return additive ? numberValue(current) + numberValue(value) : Math.max(numberValue(current), numberValue(value))
-  }
-
-  // Combines every numeric key of source into target with combineNumber.
-  function combineObjectNumbers(additive, target, source) {
-    if (!source)
-      return
-    for (let key in source)
-      target[key] = combineNumber(additive, target[key], source[key])
-  }
-
-  // Merges every device's snapshot into one aggregate record per provider.
+  // Supplies runtime identity, calendar and clock inputs to the pure reducer.
   function aggregateSnapshots(snapshots) {
-    var dates = recentDateStrings()
-    var devices = {}
-    var providers = {}
-
-    function providerAcc(id) {
-      if (providers[id])
-        return providers[id]
-      var recentByDay = {}
-      for (let d = 0; d < dates.length; d++)
-        recentByDay[dates[d]] = 0
-      providers[id] = {
-        providerId: id,
-        providerName: "",
-        ready: false,
-        hasLocalStats: false,
-        hasPromptStats: false,
-        todayPrompts: 0,
-        todaySessions: 0,
-        todayTotalTokens: 0,
-        todayTokensByModel: ({}),
-        recentByDay: recentByDay,
-        totalPrompts: 0,
-        totalSessions: 0,
-        activeDays: 0,
-        activeDates: ({}),
-        modelUsage: ({}),
-        devices: ({})
-      }
-      return providers[id]
-    }
-
+    var normalized = []
     for (let i = 0; i < snapshots.length; i++) {
       let snapshot = snapshots[i]
-      let device = safeDeviceId(snapshot.deviceId || "device")
-      devices[device] = true
-      let snapshotProviders = snapshot.providers || {}
-      for (let providerId in snapshotProviders) {
-        let stats = snapshotProviders[providerId] || {}
-        let acc = providerAcc(String(providerId))
-        acc.devices[device] = true
-        if (stats.providerName && acc.providerName === "")
-          acc.providerName = String(stats.providerName)
-        acc.ready = acc.ready || stats.ready === true
-        acc.hasLocalStats = acc.hasLocalStats || stats.hasLocalStats !== false
-        // Snapshots from before the field existed only came from agents that
-        // count prompts, so a missing value reads as true.
-        acc.hasPromptStats = acc.hasPromptStats || stats.hasPromptStats !== false
-        let additive = String(stats.scope || "device") !== "account"
-        acc.todayPrompts = combineNumber(additive, acc.todayPrompts, stats.todayPrompts)
-        acc.todaySessions = combineNumber(additive, acc.todaySessions, stats.todaySessions)
-        acc.todayTotalTokens = combineNumber(additive, acc.todayTotalTokens, stats.todayTotalTokens)
-        acc.totalPrompts = combineNumber(additive, acc.totalPrompts, stats.totalPrompts)
-        acc.totalSessions = combineNumber(additive, acc.totalSessions, stats.totalSessions)
-        // Active days overlap between machines, so union the dates rather than
-        // summing counts. Snapshots written before activeDates existed only
-        // carry a count; the widest one stands in for them.
-        let activeDates = Array.isArray(stats.activeDates) ? stats.activeDates : []
-        for (let ad = 0; ad < activeDates.length; ad++)
-          acc.activeDates[String(activeDates[ad])] = true
-        acc.activeDays = Math.max(acc.activeDays, numberValue(stats.activeDays))
-        combineObjectNumbers(additive, acc.todayTokensByModel, stats.todayTokensByModel || {})
-
-        let recent = Array.isArray(stats.recentDays) ? stats.recentDays : []
-        for (let r = 0; r < recent.length; r++) {
-          let day = recent[r] || {}
-          let date = String(day.date || "")
-          if (acc.recentByDay[date] !== undefined)
-            acc.recentByDay[date] = combineNumber(additive, acc.recentByDay[date], day.messageCount)
-        }
-
-        let usage = stats.modelUsage || {}
-        for (let modelId in usage) {
-          let bucket = acc.modelUsage[modelId]
-          if (!bucket)
-            bucket = acc.modelUsage[modelId] = emptyTokenBucket()
-          combineObjectNumbers(additive, bucket, usage[modelId] || {})
-        }
-      }
+      normalized.push({
+        deviceId: safeDeviceId(snapshot.deviceId || "device"),
+        providers: snapshot.providers
+      })
     }
-
-    var outProviders = {}
-    for (let id in providers) {
-      let acc = providers[id]
-      let recentDays = []
-      for (let di = 0; di < dates.length; di++)
-        recentDays.push({
-          date: dates[di],
-          messageCount: acc.recentByDay[dates[di]] || 0
-        })
-      let providerDevices = Object.keys(acc.devices).sort()
-      outProviders[id] = {
-        providerId: acc.providerId,
-        providerName: acc.providerName,
-        ready: acc.ready || providerDevices.length > 0,
-        hasLocalStats: acc.hasLocalStats,
-        hasPromptStats: acc.hasPromptStats,
-        todayPrompts: acc.todayPrompts,
-        todaySessions: acc.todaySessions,
-        todayTotalTokens: acc.todayTotalTokens,
-        todayTokensByModel: acc.todayTokensByModel,
-        recentDays: recentDays,
-        totalPrompts: acc.totalPrompts,
-        totalSessions: acc.totalSessions,
-        activeDays: Math.max(acc.activeDays, Object.keys(acc.activeDates).length),
-        modelUsage: acc.modelUsage,
-        deviceCount: providerDevices.length,
-        devices: providerDevices
-      }
-    }
-
-    return {
-      schemaVersion: 1,
-      updatedAt: new Date().toISOString(),
-      updatedAtMs: Date.now(),
-      deviceCount: Object.keys(devices).length,
-      devices: Object.keys(devices).sort(),
-      providers: outProviders
-    }
+    return AgentFleetAggregation.aggregateSnapshots(normalized, recentDateStrings(), new Date().toISOString(), Date.now())
   }
 
   // Snapshots keep the field names older Omarchy versions wrote, so a fleet

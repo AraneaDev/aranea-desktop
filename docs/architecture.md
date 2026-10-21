@@ -97,6 +97,11 @@ resets at their existing close-handler positions. Closing stops future polls;
 an in-flight read still applies, without adding closed-panel graph samples.
 The Panel retains pages, window lifecycle, credentials, network actions, and IPC.
 
+Agents keeps fleet reduction in `AgentFleetAggregation.js`: provider accumulator creation,
+snapshot merging and projection preserve incoming scope, calendar order and legacy
+count fallbacks. `Main.qml` supplies sanitized device identities, recent dates and
+timestamps, and retains scan parsing, filesystem/process lifecycle and aggregate publication.
+
 `repair-shell-config` removes redundant child entries only when their host is
 present. The bar exposes Notifications, Agents, Network, Audio, and System,
 with a disclosed tray and a conditional Health issue shortcut.
