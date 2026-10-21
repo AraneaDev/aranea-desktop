@@ -1,0 +1,21 @@
+{
+  "source": "branding/marks/aranea-glyph.svg",
+  "legs": 8,
+  "bones": 26,
+  "clips": {
+    "Idle": {
+      "frames": 97,
+      "fps": 24
+    },
+    "Walk": {
+      "frames": 49,
+      "fps": 24
+    }
+  },
+  "blender": "4.5.11 LTS",
+  "scene": "Silk Chamber",
+  "preview_action": "Walk",
+  "walk_world_speed": 0.22000000000000003,
+  "render_frames": 24,
+  "render_fps": 12.0
+}

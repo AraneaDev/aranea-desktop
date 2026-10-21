@@ -457,12 +457,20 @@ grep -Fq 'omarchy restart shell' "$ARANEA_TEST_SANDBOX/guard.log" || {
 }
 
 # --- an interrupted restore can be run again without losing anything
-# restore_parked_inbox and its helpers are top-level functions; load them.
+# Load the root shell lifecycle helpers and the production transaction library.
 eval "$(sed -n '/^notification_state_dir=/p; /^notification_inbox_dir=/p; /^notification_images_dir=/p' "$capture")"
-for helper in omarchy_shell_config stop_omarchy_shell dir_entries restore_parked_inbox remove_empty_backup; do
+for helper in omarchy_shell_config stop_omarchy_shell; do
   eval "$(sed -n "/^$helper() {\$/,/^}\$/p" "$capture")"
   declare -F "$helper" >/dev/null || {
     echo "capture-screenshots must define $helper" >&2
+    exit 1
+  }
+done
+# shellcheck source=scripts/lib/capture-notifications.sh
+source "$repo_root/scripts/lib/capture-notifications.sh"
+for helper in dir_entries park_notification_inbox restore_parked_inbox remove_empty_backup; do
+  declare -F "$helper" >/dev/null || {
+    echo "capture-notifications.sh must define $helper" >&2
     exit 1
   }
 done

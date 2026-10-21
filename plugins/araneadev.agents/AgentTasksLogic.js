@@ -72,6 +72,171 @@ function reportTime(receivedAt, now) {
   }
 }
 
+/** Resolve exact project, checkout and path without inferring registration.
+ * @private
+ * @param {TaskData} association - reported checkout association
+ * @param {Array<TaskData>} projects - registered projects
+ * @returns {TaskData} matched project, checkout and registration eligibility
+ */
+function registeredCheckout(association, projects) {
+  var p = projects.filter(function (p) {
+    return p.id === association.projectId
+  })[0]
+  var co =
+    p &&
+    (p.checkouts || []).filter(function (/** @type {TaskData} */ c) {
+      return c.id === association.checkoutId && c.path === association.cwd
+    })[0]
+  return { project: p, checkout: co, assigned: association.status === "registered" && !!co }
+}
+
+/** Choose local inspection and guarded external actions independently of display text.
+ * @private
+ * @param {TaskData} task - projected owner task
+ * @param {boolean} assigned - exact registered checkout eligibility
+ * @param {string} state - effective display state
+ * @param {string} freshness - effective connection freshness
+ * @returns {TaskData} primary, secondary and dismissal controls
+ */
+function taskNavigation(task, assigned, state, freshness) {
+  var canFocus = assigned && task.nativeSessionEligible === true && freshness === "connected"
+  var canReopen = assigned && task.nativeSessionEligible === true && !!task.resumeCommand
+  var primary = { kind: "", label: "Session not available", local: false }
+  var secondary = { kind: "", label: "" }
+  if (state === "finished")
+    primary = { kind: "inspect-result", label: "View reported result", local: true }
+  else if (state === "failed") {
+    primary = { kind: "inspect-failure", label: "Inspect failure", local: true }
+    if (canReopen) secondary = { kind: "reopen", label: "Reopen session" }
+  } else if (state === "ready-for-review") {
+    if (assigned) primary = { kind: "open-checkout", label: "Open checkout", local: false }
+  } else if (state === "connection-lost" || state === "ended") {
+    if (canReopen) primary = { kind: "reopen", label: "Reopen session", local: false }
+  } else if (state === "working" || state === "needs-input") {
+    if (canFocus)
+      primary = {
+        kind: "focus",
+        label: state === "needs-input" ? "Open session" : "Go to session",
+        local: false
+      }
+    else if (canReopen) primary = { kind: "reopen", label: "Reopen session", local: false }
+  }
+  return {
+    primary: primary,
+    secondary: secondary,
+    canDismiss:
+      freshness === "connection-lost" ||
+      state === "ended" ||
+      task.reportedState === "finished" ||
+      (["ready-for-review", "failed"].indexOf(task.reportedState) >= 0 &&
+        (task.blockers || []).length === 0)
+  }
+}
+
+/** Project bounded presentation fields from exact registration and navigation policy.
+ * @private
+ * @param {TaskData} task - projected owner task
+ * @param {Array<TaskData>} projects - registered projects
+ * @param {{[key:string]:string}} labels - lifecycle captions
+ * @param {{[key:string]:number}} priorities - attention ordering
+ * @param {number} [now] - injected wall clock for receipt ages
+ * @returns {TaskData} immutable task row
+ */
+function taskRow(task, projects, labels, priorities, now) {
+  var a = task.association || {}
+  var registration = registeredCheckout(a, projects)
+  var p = registration.project
+  var co = registration.checkout
+  var assigned = registration.assigned
+  var state = task.displayState || task.reportedState
+  var freshness = task.freshness || "unconfirmed"
+  var attention =
+    ["needs-input", "ready-for-review", "failed"].indexOf(state) >= 0 &&
+    freshness !== "connection-lost"
+  var verification = task.verification || {}
+  var report = reportTime(task.lastReceivedAt, now)
+  var navigation = taskNavigation(task, assigned, state, freshness)
+  var context = [
+    assigned
+      ? text(p.name, 256)
+      : a.status === "unassigned"
+        ? "Unassigned checkout"
+        : "Checkout not available",
+    assigned ? text(co.branch, 512) : "",
+    text(a.cwd, 4096)
+  ]
+    .filter(Boolean)
+    .join(" · ")
+  return {
+    key: task.taskId,
+    reportedState: task.reportedState,
+    hasBlockers: (task.blockers || []).length > 0,
+    providerLabel:
+      task.provider === "claude"
+        ? "Claude Code"
+        : task.provider === "codex"
+          ? "Codex"
+          : text(task.provider, 80),
+    summary: text(task.description, 512) || "Agent task",
+    stateLabel: labels[state] || "Status not reported",
+    reportedLabel: labels[task.reportedState] || "Status not reported",
+    lastReceivedAt: report.lastReceivedAt,
+    lastReportTime: report.lastReportTime,
+    lastReportLabel: report.lastReportLabel,
+    priority: priorities[state] === undefined ? 7 : priorities[state],
+    attention: attention,
+    freshnessLabel:
+      freshness === "connected"
+        ? "Connected"
+        : freshness === "connection-lost"
+          ? "Connection lost"
+          : "Connection not confirmed",
+    context: context,
+    path: text(a.cwd),
+    branch: assigned ? text(co.branch, 512) : "",
+    projectLabel: assigned ? text(p.name, 256) : "",
+    associationLabel: assigned
+      ? "Registered checkout"
+      : a.status === "unassigned"
+        ? "Unassigned checkout"
+        : "Checkout not available",
+    assigned: assigned,
+    result: text(task.result),
+    question: text(task.question),
+    diagnostics: (task.diagnostics || [])
+      .map(function (/** @type {TaskData} */ d) {
+        return text(d.summary)
+      })
+      .join("\n")
+      .slice(0, 4096),
+    blockers: (task.blockers || [])
+      .map(function (/** @type {TaskData} */ b) {
+        return text(b.summary || b.question)
+      })
+      .filter(Boolean)
+      .join("\n")
+      .slice(0, 4096),
+    verificationLabel:
+      verification.status === "reported-pass"
+        ? "Verification reported passed"
+        : verification.status === "reported-fail"
+          ? "Verification reported failed"
+          : "Verification not reported",
+    verificationSummary: text(verification.summary),
+    verificationCommands: (verification.commands || [])
+      .map(function (/** @type {any} */ c) {
+        return text(c, 512)
+      })
+      .join("\n"),
+    primary: navigation.primary,
+    secondary: navigation.secondary,
+    canDismiss: navigation.canDismiss,
+    resumeCommand: text(task.resumeCommand, 512),
+    nativeId: text(task.providerSessionId, 256),
+    epoch: text(task.producerEpoch, 256)
+  }
+}
+
 /** Build attention-first rows using exact registered checkout identities.
  * @param {TaskData} snapshot - projected owner state
  * @param {TaskData} [registry] - read-only project snapshot
@@ -105,129 +270,7 @@ function rows(snapshot, registry, now) {
   var tasks = (snapshot || {}).tasks || []
   return tasks
     .map(function (task) {
-      var a = task.association || {}
-      var p = projects.filter(function (p) {
-        return p.id === a.projectId
-      })[0]
-      var co =
-        p &&
-        (p.checkouts || []).filter(function (/** @type {TaskData} */ c) {
-          return c.id === a.checkoutId && c.path === a.cwd
-        })[0]
-      var assigned = a.status === "registered" && !!co
-      var state = task.displayState || task.reportedState
-      var freshness = task.freshness || "unconfirmed"
-      var attention =
-        ["needs-input", "ready-for-review", "failed"].indexOf(state) >= 0 &&
-        freshness !== "connection-lost"
-      var verification = task.verification || {}
-      var report = reportTime(task.lastReceivedAt, now)
-      var canFocus = assigned && task.nativeSessionEligible === true && freshness === "connected"
-      var canReopen = assigned && task.nativeSessionEligible === true && !!task.resumeCommand
-      var primary = { kind: "", label: "Session not available", local: false }
-      var secondary = { kind: "", label: "" }
-      if (state === "finished")
-        primary = { kind: "inspect-result", label: "View reported result", local: true }
-      else if (state === "failed") {
-        primary = { kind: "inspect-failure", label: "Inspect failure", local: true }
-        if (canReopen) secondary = { kind: "reopen", label: "Reopen session" }
-      } else if (state === "ready-for-review") {
-        if (assigned) primary = { kind: "open-checkout", label: "Open checkout", local: false }
-      } else if (state === "connection-lost" || state === "ended") {
-        if (canReopen) primary = { kind: "reopen", label: "Reopen session", local: false }
-      } else if (state === "working" || state === "needs-input") {
-        if (canFocus)
-          primary = {
-            kind: "focus",
-            label: state === "needs-input" ? "Open session" : "Go to session",
-            local: false
-          }
-        else if (canReopen) primary = { kind: "reopen", label: "Reopen session", local: false }
-      }
-      var context = [
-        assigned
-          ? text(p.name, 256)
-          : a.status === "unassigned"
-            ? "Unassigned checkout"
-            : "Checkout not available",
-        assigned ? text(co.branch, 512) : "",
-        text(a.cwd, 4096)
-      ]
-        .filter(Boolean)
-        .join(" · ")
-      return {
-        key: task.taskId,
-        reportedState: task.reportedState,
-        hasBlockers: (task.blockers || []).length > 0,
-        providerLabel:
-          task.provider === "claude"
-            ? "Claude Code"
-            : task.provider === "codex"
-              ? "Codex"
-              : text(task.provider, 80),
-        summary: text(task.description, 512) || "Agent task",
-        stateLabel: labels[state] || "Status not reported",
-        reportedLabel: labels[task.reportedState] || "Status not reported",
-        lastReceivedAt: report.lastReceivedAt,
-        lastReportTime: report.lastReportTime,
-        lastReportLabel: report.lastReportLabel,
-        priority: priorities[state] === undefined ? 7 : priorities[state],
-        attention: attention,
-        freshnessLabel:
-          freshness === "connected"
-            ? "Connected"
-            : freshness === "connection-lost"
-              ? "Connection lost"
-              : "Connection not confirmed",
-        context: context,
-        path: text(a.cwd),
-        branch: assigned ? text(co.branch, 512) : "",
-        projectLabel: assigned ? text(p.name, 256) : "",
-        associationLabel: assigned
-          ? "Registered checkout"
-          : a.status === "unassigned"
-            ? "Unassigned checkout"
-            : "Checkout not available",
-        assigned: assigned,
-        result: text(task.result),
-        question: text(task.question),
-        diagnostics: (task.diagnostics || [])
-          .map(function (/** @type {TaskData} */ d) {
-            return text(d.summary)
-          })
-          .join("\n")
-          .slice(0, 4096),
-        blockers: (task.blockers || [])
-          .map(function (/** @type {TaskData} */ b) {
-            return text(b.summary || b.question)
-          })
-          .filter(Boolean)
-          .join("\n")
-          .slice(0, 4096),
-        verificationLabel:
-          verification.status === "reported-pass"
-            ? "Verification reported passed"
-            : verification.status === "reported-fail"
-              ? "Verification reported failed"
-              : "Verification not reported",
-        verificationSummary: text(verification.summary),
-        verificationCommands: (verification.commands || [])
-          .map(function (/** @type {any} */ c) {
-            return text(c, 512)
-          })
-          .join("\n"),
-        primary: primary,
-        secondary: secondary,
-        canDismiss:
-          freshness === "connection-lost" ||
-          state === "ended" ||
-          task.reportedState === "finished" ||
-          (["ready-for-review", "failed"].indexOf(task.reportedState) >= 0 &&
-            (task.blockers || []).length === 0),
-        resumeCommand: text(task.resumeCommand, 512),
-        nativeId: text(task.providerSessionId, 256),
-        epoch: text(task.producerEpoch, 256)
-      }
+      return taskRow(task, projects, labels, priorities, now)
     })
     .sort(function (a, b) {
       return a.priority - b.priority || String(a.key).localeCompare(String(b.key))

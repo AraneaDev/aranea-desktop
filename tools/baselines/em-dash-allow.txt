@@ -1,4 +1,5 @@
 README.md
+branding/3d/live/vendor/three.core.js
 docs/cinematic-precision.md
 gtk.css
 integrations/icons/README.md

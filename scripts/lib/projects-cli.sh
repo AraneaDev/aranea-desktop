@@ -229,12 +229,8 @@ JSON
 }
 
 # Parse all public syntax before crossing registry or desktop boundaries.
-projects_cli_main() {
-  cli_json=false cli_operation=aranea cli_operation_id='' cli_checkout_id='' cli_project_id='' cli_state='' cli_snapshot=''
-  cli_activation_id='' cli_environment_id='' cli_environment_target=null cli_environment_session='' cli_acceptance_unknown=false cli_environment_workspace=0
-  local -a words=() paths=() discovery_args=()
-  local arg command option value root_id='' path='' args='{}' action='' separate=false current=false new_role=null retry_role=null reobserve_role=null roles=null agent=null
-  local -A supplied=()
+# Writes the command/options/paths owned by projects_cli_main through dynamic scope.
+projects_cli_parse() {
   for arg in "$@"; do
     if [[ "$arg" == --json ]]; then cli_json=true; else words+=("$arg"); fi
   done
@@ -393,6 +389,88 @@ projects_cli_main() {
     relocate) [[ -n "$path" && -n "$cli_checkout_id" ]] || projects_cli_usage ;;
     configure) [[ ${#supplied[@]} -gt 0 ]] || projects_cli_usage ;;
   esac
+}
+
+# Scan approved roots and emit review candidates without registering them.
+# Reads main-owned root_id/discovery_args and the selected registry snapshot.
+projects_cli_discover() {
+  local root line scan_result outcome=observed
+  while IFS= read -r root; do discovery_args+=(--root "$(jq -r . <<<"$root")"); done < <(jq -c --arg id "$root_id" '.roots[]|select($id=="" or .id==$id)|.path' <<<"$cli_state")
+  [[ ${#discovery_args[@]} -gt 0 ]] || projects_cli_fail ROOT_CHOICE_REQUIRED 'Choose an approved discovery root.' 'Add a root with aranea projects roots add PATH.' 3
+  scan_result=$(mktemp)
+  if ! "$script_dir/aranea-project-discover" "${discovery_args[@]}" --json >"$scan_result"; then outcome=partial; fi
+  while IFS= read -r line; do
+    if [[ $(jq -r .event <<<"$line") == candidate ]]; then
+      # Ignored and fully registered groups stay outside the review list;
+      # partially registered groups retain individually selectable siblings.
+      jq -e --argjson candidate "$(jq -c .candidate <<<"$line")" '. as $registry |
+        any(.ignored[];.path==$candidate.path or .commonDir==$candidate.commonDir) or
+        ([$candidate.path, ($candidate.checkouts[]?.path)] | unique |
+          all(.[]; . as $path | any($registry.projects[];
+            .commonDir==$candidate.commonDir and any(.checkouts[];.path==$path))))' <<<"$cli_state" >/dev/null && continue
+      projects_cli_event step observed candidate 'Discovered repository; registration requires explicit selection.' '' "$line"
+    elif [[ $(jq -r .outcome <<<"$line") == partial ]]; then outcome=partial; fi
+  done <"$scan_result"
+  local summary='{}' exit_code=0
+  [[ ! -s "$scan_result" ]] || summary=$(tail -n 1 "$scan_result")
+  rm -f -- "$scan_result"
+  [[ "$outcome" != partial ]] || exit_code=1
+  projects_cli_finish "$outcome" '' 'Discovery completed.' "$summary" "$exit_code"
+}
+
+# Submit once accepted; retry only explicit readiness refusals, then observe.
+# Reads main-owned Open options; accepted IDs remain in shared cli_operation_id.
+projects_cli_open() {
+  projects_cli_validate_checkout
+  projects_cli_require omarchy-shell timeout
+  projects_cli_snapshot
+  jq -e '.availability.compositor==true' <<<"$cli_snapshot" >/dev/null || projects_cli_fail COMPOSITOR_UNAVAILABLE 'Workspace opening requires a live compositor.' 'Start a supported desktop session and retry.'
+  local payload response ready_deadline=$((SECONDS + 5))
+  payload=$(jq -cn --arg projectId "$cli_project_id" --arg checkoutId "$cli_checkout_id" --argjson separate "$separate" --argjson current "$current" --arg new "$new_role" --arg retry "$retry_role" --arg reobserve "$reobserve_role" --arg roles "$roles" --arg agent "$agent" '{projectId:$projectId,checkoutId:$checkoutId,separate:$separate,useCurrentWorkspace:$current} + (if $new=="null" then {} else {newWindowRole:$new} end) + (if $retry=="null" then {} else {retryRole:$retry} end) + (if $reobserve=="null" then {} else {reobserveRole:$reobserve} end) + (if $roles=="null" then {} else {roles:($roles|fromjson)} end) + (if $agent=="null" then {} else {agentId:$agent} end)')
+  local preparing=false
+  while true; do
+    if [[ "$preparing" == true ]] && ((SECONDS >= ready_deadline)); then projects_cli_internal_error "$response"; fi
+    if ! response=$(projects_cli_ipc aranea.projects request "$payload"); then projects_cli_fail OWNER_UNAVAILABLE 'Submission could not be confirmed; it may have been accepted.' 'Inspect owner state before any new submission.'; fi
+    if ! jq -e -s 'length==1 and (.[0]|type=="object")' <<<"$response" >/dev/null 2>&1; then
+      projects_cli_fail OWNER_UNAVAILABLE 'Submission could not be confirmed; it may have been accepted.' 'Inspect owner state before any new submission.'
+    fi
+    if jq -e '.ok==true and has("error") and .error==null and (.operationId|type=="string" and length>0)' <<<"$response" >/dev/null 2>&1; then
+      cli_operation_id=$(jq -r .operationId <<<"$response")
+      break
+    fi
+    if ! jq -e '.ok==false and has("operationId") and .operationId==null and (.error|type=="object") and all(.error.code,.error.message,.error.recovery; type=="string" and length>0)' <<<"$response" >/dev/null 2>&1; then
+      projects_cli_fail OWNER_UNAVAILABLE 'Submission could not be confirmed; it may have been accepted.' 'Inspect owner state before any new submission.'
+    fi
+    if jq -e '.ok==false and has("operationId") and .operationId==null and .error.code=="OWNER_NOT_READY"' <<<"$response" >/dev/null 2>&1 && ((SECONDS < ready_deadline)); then
+      preparing=true
+      sleep 0.25
+    else projects_cli_internal_error "$response"; fi
+  done
+  projects_cli_event step accepted request 'Owner accepted the operation; observation follows.' '' "$response"
+  projects_cli_observe
+}
+
+# Summon the selected project and report only the exact capture readback.
+projects_cli_details() {
+  projects_cli_require omarchy-shell timeout
+  local payload readback
+  payload=$(jq -cn --arg projectId "$cli_project_id" '{projectId:$projectId}')
+  projects_cli_ipc shell summon araneadev.projects "$payload" >/dev/null || projects_cli_fail OWNER_UNAVAILABLE 'Projects could not be summoned.' 'Activate Aranea and retry.'
+  if readback=$(projects_cli_ipc aranea.projects.capture captureSnapshot) && jq -e --arg id "$cli_project_id" '.opened==true and .projectId==$id' <<<"$readback" >/dev/null 2>&1; then
+    projects_cli_finish observed '' 'Project details observed.' "$(jq -cn --arg id "$cli_project_id" '{projectId:$id,accepted:true}')"
+  fi
+  projects_cli_finish partial DETAILS_UNCONFIRMED 'Projects accepted the summon; the exact destination is unconfirmed.' "$(jq -cn --arg id "$cli_project_id" '{projectId:$id,accepted:true,recovery:"Install/activate the Projects component and retry."}')" 1
+}
+
+# Own command state, validate syntax, then sequence registry and owner dispatch.
+projects_cli_main() {
+  cli_json=false cli_operation=aranea cli_operation_id='' cli_checkout_id='' cli_project_id='' cli_state='' cli_snapshot=''
+  cli_activation_id='' cli_environment_id='' cli_environment_target=null cli_environment_session='' cli_acceptance_unknown=false cli_environment_workspace=0
+  # These locals intentionally flow through parse and dispatch by Bash dynamic scope.
+  local -a words=() paths=() discovery_args=()
+  local arg command option value root_id='' path='' args='{}' action='' separate=false current=false new_role=null retry_role=null reobserve_role=null roles=null agent=null
+  local -A supplied=()
+  projects_cli_parse "$@"
   projects_cli_event started '' '' 'Starting project command.' '' '{}'
   if [[ "$command" == desktop || "$command" == operation ]]; then
     projects_cli_require omarchy-shell timeout
@@ -427,69 +505,9 @@ projects_cli_main() {
     list) projects_cli_finish observed '' 'Registered projects.' "$(jq -c '{revision,projects}' <<<"$cli_state")" ;;
     inspect) projects_cli_finish observed '' 'Registered project.' "$(jq -cn --argjson project "$cli_project" '{project:$project}')" ;;
     ignored) projects_cli_finish observed '' 'Ignored candidates.' "$(jq -c '{revision,ignored}' <<<"$cli_state")" ;;
-    discover)
-      local root line scan_result outcome=observed
-      while IFS= read -r root; do discovery_args+=(--root "$(jq -r . <<<"$root")"); done < <(jq -c --arg id "$root_id" '.roots[]|select($id=="" or .id==$id)|.path' <<<"$cli_state")
-      [[ ${#discovery_args[@]} -gt 0 ]] || projects_cli_fail ROOT_CHOICE_REQUIRED 'Choose an approved discovery root.' 'Add a root with aranea projects roots add PATH.' 3
-      scan_result=$(mktemp)
-      if ! "$script_dir/aranea-project-discover" "${discovery_args[@]}" --json >"$scan_result"; then outcome=partial; fi
-      while IFS= read -r line; do
-        if [[ $(jq -r .event <<<"$line") == candidate ]]; then
-          # Ignored and fully registered groups stay outside the review list;
-          # partially registered groups retain individually selectable siblings.
-          jq -e --argjson candidate "$(jq -c .candidate <<<"$line")" '. as $registry |
-            any(.ignored[];.path==$candidate.path or .commonDir==$candidate.commonDir) or
-            ([$candidate.path, ($candidate.checkouts[]?.path)] | unique |
-              all(.[]; . as $path | any($registry.projects[];
-                .commonDir==$candidate.commonDir and any(.checkouts[];.path==$path))))' <<<"$cli_state" >/dev/null && continue
-          projects_cli_event step observed candidate 'Discovered repository; registration requires explicit selection.' '' "$line"
-        elif [[ $(jq -r .outcome <<<"$line") == partial ]]; then outcome=partial; fi
-      done <"$scan_result"
-      local summary='{}' exit_code=0
-      [[ ! -s "$scan_result" ]] || summary=$(tail -n 1 "$scan_result")
-      rm -f -- "$scan_result"
-      [[ "$outcome" != partial ]] || exit_code=1
-      projects_cli_finish "$outcome" '' 'Discovery completed.' "$summary" "$exit_code"
-      ;;
-    open)
-      projects_cli_validate_checkout
-      projects_cli_require omarchy-shell timeout
-      projects_cli_snapshot
-      jq -e '.availability.compositor==true' <<<"$cli_snapshot" >/dev/null || projects_cli_fail COMPOSITOR_UNAVAILABLE 'Workspace opening requires a live compositor.' 'Start a supported desktop session and retry.'
-      local payload response ready_deadline=$((SECONDS + 5))
-      payload=$(jq -cn --arg projectId "$cli_project_id" --arg checkoutId "$cli_checkout_id" --argjson separate "$separate" --argjson current "$current" --arg new "$new_role" --arg retry "$retry_role" --arg reobserve "$reobserve_role" --arg roles "$roles" --arg agent "$agent" '{projectId:$projectId,checkoutId:$checkoutId,separate:$separate,useCurrentWorkspace:$current} + (if $new=="null" then {} else {newWindowRole:$new} end) + (if $retry=="null" then {} else {retryRole:$retry} end) + (if $reobserve=="null" then {} else {reobserveRole:$reobserve} end) + (if $roles=="null" then {} else {roles:($roles|fromjson)} end) + (if $agent=="null" then {} else {agentId:$agent} end)')
-      local preparing=false
-      while true; do
-        if [[ "$preparing" == true ]] && ((SECONDS >= ready_deadline)); then projects_cli_internal_error "$response"; fi
-        if ! response=$(projects_cli_ipc aranea.projects request "$payload"); then projects_cli_fail OWNER_UNAVAILABLE 'Submission could not be confirmed; it may have been accepted.' 'Inspect owner state before any new submission.'; fi
-        if ! jq -e -s 'length==1 and (.[0]|type=="object")' <<<"$response" >/dev/null 2>&1; then
-          projects_cli_fail OWNER_UNAVAILABLE 'Submission could not be confirmed; it may have been accepted.' 'Inspect owner state before any new submission.'
-        fi
-        if jq -e '.ok==true and has("error") and .error==null and (.operationId|type=="string" and length>0)' <<<"$response" >/dev/null 2>&1; then
-          cli_operation_id=$(jq -r .operationId <<<"$response")
-          break
-        fi
-        if ! jq -e '.ok==false and has("operationId") and .operationId==null and (.error|type=="object") and all(.error.code,.error.message,.error.recovery; type=="string" and length>0)' <<<"$response" >/dev/null 2>&1; then
-          projects_cli_fail OWNER_UNAVAILABLE 'Submission could not be confirmed; it may have been accepted.' 'Inspect owner state before any new submission.'
-        fi
-        if jq -e '.ok==false and has("operationId") and .operationId==null and .error.code=="OWNER_NOT_READY"' <<<"$response" >/dev/null 2>&1 && ((SECONDS < ready_deadline)); then
-          preparing=true
-          sleep 0.25
-        else projects_cli_internal_error "$response"; fi
-      done
-      projects_cli_event step accepted request 'Owner accepted the operation; observation follows.' '' "$response"
-      projects_cli_observe
-      ;;
-    details)
-      projects_cli_require omarchy-shell timeout
-      local payload readback
-      payload=$(jq -cn --arg projectId "$cli_project_id" '{projectId:$projectId}')
-      projects_cli_ipc shell summon araneadev.projects "$payload" >/dev/null || projects_cli_fail OWNER_UNAVAILABLE 'Projects could not be summoned.' 'Activate Aranea and retry.'
-      if readback=$(projects_cli_ipc aranea.projects.capture captureSnapshot) && jq -e --arg id "$cli_project_id" '.opened==true and .projectId==$id' <<<"$readback" >/dev/null 2>&1; then
-        projects_cli_finish observed '' 'Project details observed.' "$(jq -cn --arg id "$cli_project_id" '{projectId:$id,accepted:true}')"
-      fi
-      projects_cli_finish partial DETAILS_UNCONFIRMED 'Projects accepted the summon; the exact destination is unconfirmed.' "$(jq -cn --arg id "$cli_project_id" '{projectId:$id,accepted:true,recovery:"Install/activate the Projects component and retry."}')" 1
-      ;;
+    discover) projects_cli_discover ;;
+    open) projects_cli_open ;;
+    details) projects_cli_details ;;
     register)
       action=register
       args=$(jq -cn --args '{paths:$ARGS.positional}' -- "${paths[@]}")

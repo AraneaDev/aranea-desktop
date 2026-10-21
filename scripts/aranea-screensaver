@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Preview the live spider journey or the rendered loop; idle timers are unchanged.
+# Usage: scripts/aranea-screensaver preview | video | --help
+set -euo pipefail
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+case "${1:---help}" in
+  -h | --help)
+    printf 'Usage: %s preview | video\n\nLive silk-lit journey, or the rendered walking loop. Move the mouse, click, or press Escape to close.\n' "${0##*/}"
+    exit 0
+    ;;
+  preview)
+    [[ $# == 1 ]] || {
+      echo "preview takes no arguments" >&2
+      exit 2
+    }
+    command -v python3 >/dev/null || {
+      echo "Python 3 is required for the live preview." >&2
+      exit 1
+    }
+    exec python3 "$repo_root/tools/spider/preview.py"
+    ;;
+  video) [[ $# == 1 ]] || {
+    echo 'video takes no arguments' >&2
+    exit 2
+  } ;;
+  *)
+    echo 'Usage: aranea-screensaver preview | video' >&2
+    exit 2
+    ;;
+esac
+video="$repo_root/branding/3d/silk-chamber.mp4"
+[[ -s "$video" ]] || {
+  echo 'The Silk Chamber render is missing. See branding/3d/README.md.' >&2
+  exit 1
+}
+command -v mpv >/dev/null || {
+  echo 'mpv is required for the screensaver preview.' >&2
+  exit 1
+}
+exec mpv --no-config --load-scripts=no --ytdl=no --no-audio --no-osc \
+  --input-default-bindings=no --input-conf=/dev/null --input-terminal=no \
+  --no-resume-playback --save-position-on-quit=no --stop-screensaver=no \
+  --fullscreen --loop-file=inf --cursor-autohide=always \
+  --title='Aranea · Silk Chamber' --wayland-app-id=org.aranea.spider-preview --x11-name=org.aranea.spider-preview \
+  --script="$repo_root/branding/3d/preview.lua" -- "$video"

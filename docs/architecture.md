@@ -53,6 +53,12 @@ keyboard frames, and motion/focus primitives accept explicit properties and
 signals. Hosts keep cursor identity, focus policy, activation, and lifecycle.
 `RuntimePaths.qml` centralizes state and branding paths.
 
+Wallpaper schedule mutations (`configure`, `on`, and `off`) share a lock beside
+the schedule configuration. `aranea-wallpaper` acquires it before reading saved
+entries or timer runtime state and retains it through commit or exact rollback.
+This also serializes Settings saves with direct CLI changes; status remains a
+read-only observation.
+
 Extract repeated, stable contracts. Leave one-off interactions or behavior tied
 to a particular service in the owning plugin. Window visibility must not become
 the lifetime of an accepted background operation.
@@ -82,6 +88,29 @@ forwarders. It retains visibility and polling gates, cursor/input policy, text
 reflow hover suppression, brightness, monitor/scale operations, IPC, and
 hosted/standalone lifecycle. Closing either popup leaves accepted commands and
 their confirmation reads alive.
+
+Network keeps `NetworkTelemetry.qml` as a persistent child for its connection
+read process, 1.5-second polling, throughput and ping measurements, and Link
+graph history. The Panel passes its open state and band-change suppression,
+keeps public aliases and sample forwarders, and invokes measurement and graph
+resets at their existing close-handler positions. Closing stops future polls;
+an in-flight read still applies, without adding closed-panel graph samples.
+The Panel retains pages, window lifecycle, credentials, network actions, and IPC.
+
+Agents keeps fleet reduction in `AgentFleetAggregation.js`: provider accumulator creation,
+snapshot merging and projection preserve incoming scope, calendar order and legacy
+count fallbacks. `Main.qml` supplies sanitized device identities, recent dates and
+timestamps, and retains scan parsing, filesystem/process lifecycle and aggregate publication.
+
+Bar keeps `BarForegroundController.qml` as a persistent child for wallpaper
+contrast probes, their 120 ms debounce, the wallpaper watcher, retained color,
+and foreground animation restoration. The root supplies edge, size, and theme
+colors and preserves transparency state and refresh methods through aliases and
+forwarders. Transparency applies before the asynchronous result; opaque resets
+and valid results restore animation after two deferred turns. In-flight probes
+survive visibility and transparency changes, and overlapping refreshes retain
+the existing skip behavior. Layout, dragging, surface composition, and plugin
+API ownership stay in `Bar.qml`.
 
 `repair-shell-config` removes redundant child entries only when their host is
 present. The bar exposes Notifications, Agents, Network, Audio, and System,
@@ -130,6 +159,12 @@ renderer. Placement, pointer gates, cursor state, and lifecycle stay in hosts.
 | `ProjectRuntime.qml`       | Compositor snapshots, process identity, exact focus readback      |
 | Project-action backend     | Headless definitions, transient services, retained run evidence   |
 | Agent activity store/owner | Reported task state, provider evidence, serialized navigation     |
+
+The public CLI keeps syntax validation, discovery, Open submission, and details
+readback in private helpers within `scripts/lib/projects-cli.sh`.
+`projects_cli_main` owns command state shared through Bash dynamic scope and
+sequences dependencies, registry reads, and dispatch. The persistent owner
+retains launch and observation authority.
 
 Discovery and ordinary Open do not execute repository scripts. Registered IDs
 and canonical paths are shared across CLI, search, details, and workspace views.
@@ -186,7 +221,7 @@ node tools/js-facade-generator.mjs --check
 
 For example, `MenuSearch.js` owns search and `MenuTree.js` owns traversal.
 Shared throughput graphs use `GraphLogic.js` for bounded sample history and plot
-math, `LinkGraph.qml` for presentation, and host-owned live sampling. History
+math, `LinkGraph.qml` for presentation, and plugin-owned live sampling. History
 resets when the interface changes; illustrative capture names do not turn graph
 samples into invented telemetry.
 

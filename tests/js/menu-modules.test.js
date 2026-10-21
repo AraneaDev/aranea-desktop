@@ -222,3 +222,107 @@ test("settings route preserves user overrides and unrelated commands", () => {
   assert.equal(merged.items["setup.custom"].action, "custom")
   assert.equal(merged.itemOrder.filter((id) => id === "aranea.settings").length, 1)
 })
+
+for (const [name, model] of [
+  ["module", parsing],
+  ["facade", facade]
+]) {
+  test(`${name} merges partial overrides without changing first-seen order or input items`, () => {
+    const defaults = [
+      { id: "apps", parent: "root", label: "Apps", provider: "apps", aliases: ["launch"] },
+      { id: "root", parent: "", label: "Custom root" },
+      { id: "apps", description: "Applications" },
+      { id: "", label: "Ignored" }
+    ]
+    const user = [
+      { id: "apps", label: "Launch" },
+      { id: "extra", parent: "root" }
+    ]
+    const before = JSON.stringify([defaults, user])
+    const result = model.mergeMenuSources(defaults, user)
+    assert.deepEqual(plain(result.itemOrder), ["apps", "root", "extra"])
+    assert.deepEqual(plain(result.items.apps), {
+      id: "apps",
+      parent: "root",
+      label: "Launch",
+      provider: "apps",
+      aliases: ["launch"],
+      description: "Applications",
+      order: 0
+    })
+    assert.equal(result.items.root.label, "Custom root")
+    assert.equal(result.items.root.order, 1)
+    assert.equal(result.items.extra.order, 2)
+    assert.equal(JSON.stringify([defaults, user]), before)
+  })
+
+  test(`${name} exempts custom stock IDs from regrouping and relabeling`, () => {
+    const defaults = parsing.parseMenuJsonc(`{
+      "apps": {}, "learn": {}, "trigger": {}, "style": {}, "setup": {},
+      "install": {}, "remove": {}, "update": {}, "about": {}, "system": {},
+      "install.package": {"action": "install-package"}
+    }`)
+    const user = ["learn", "trigger", "style", "setup", "install", "remove", "update"].map(
+      (id) => ({ id, label: `My ${id}`, parent: "apps" })
+    )
+    user.push(
+      { id: "aranea.settings", label: "My Aranea", parent: "apps" },
+      { id: "about", label: "My About", parent: "apps" }
+    )
+    const before = JSON.stringify([defaults, user])
+    const result = model.mergeMenuSources(defaults, user, true, true)
+    assert.deepEqual(plain(result.itemOrder), [
+      "root",
+      "apps",
+      "trigger",
+      "software",
+      "settings",
+      "learn",
+      "system",
+      "style",
+      "setup",
+      "install",
+      "remove",
+      "update",
+      "about",
+      "install.package",
+      "aranea.settings",
+      "aranea.projects"
+    ])
+    for (const item of user) {
+      assert.equal(result.items[item.id].label, item.label)
+      assert.equal(result.items[item.id].parent, "apps")
+    }
+    assert.equal(result.items["install.package"].parent, "install")
+    assert.equal(result.items["install.package"].action, "install-package")
+    assert.equal(JSON.stringify([defaults, user]), before)
+    for (const [index, id] of result.itemOrder.entries())
+      assert.equal(result.items[id].order, index)
+  })
+
+  test(`${name} injects missing plugin destinations and preserves existing Projects`, () => {
+    const result = model.mergeMenuSources([], [], true, true)
+    assert.deepEqual(plain(result.itemOrder), ["root", "aranea.settings", "aranea.projects"])
+    assert.equal(result.items["aranea.projects"].parent, "root")
+    assert.equal(
+      result.items["aranea.projects"].action,
+      "omarchy-shell shell summon araneadev.projects"
+    )
+    assert.equal(
+      result.items["aranea.projects"].when,
+      'test -f "$HOME/.config/omarchy/plugins/araneadev.projects/manifest.json"'
+    )
+    assert.deepEqual(plain(model.mergeMenuSources([], []).itemOrder), ["root"])
+    const custom = [{ id: "aranea.projects", parent: "apps", action: "my-projects" }]
+    const overridden = model.mergeMenuSources(
+      custom,
+      [{ id: "aranea.projects", label: "Mine" }],
+      false,
+      true
+    )
+    assert.deepEqual(plain(overridden.itemOrder), ["root", "aranea.projects"])
+    assert.equal(overridden.items["aranea.projects"].action, "my-projects")
+    assert.equal(overridden.items["aranea.projects"].label, "Mine")
+    assert.equal(overridden.items["aranea.projects"].parent, "apps")
+  })
+}

@@ -3,3 +3,7 @@ docs/superpowers/
 node_modules/
 coverage/
 __pycache__/
+
+# Regenerable 3D render intermediates and Blender editor backups.
+branding/3d/frames/
+branding/3d/*.blend[0-9]

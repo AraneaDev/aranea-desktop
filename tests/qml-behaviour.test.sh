@@ -52,6 +52,7 @@ sandbox_on_exit cleanup
 # Runs one test file; prints its result and returns non-zero when it failed.
 run_test() {
   local test_file="$1" name plugin waited=0 status=0
+  local state_home="$XDG_STATE_HOME"
   name="$(basename "$test_file" .qml)"
   # Short path: the quickshell IPC socket path is limited to 108 bytes.
   run_dir="$(mktemp -d /tmp/aranea-qt.XXXXXX)"
@@ -63,7 +64,7 @@ run_test() {
   ln -s "$repo_root/tests/qml/fixtures" "$run_dir/cfg/fixtures"
   for plugin in "$repo_root"/plugins/araneadev.*; do
     [[ -d "$plugin" ]] || continue
-    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == health-alerts || "$name" == clock-civil-dates || "$name" == worldclock-panel || ("$name" == clock-embedded-controllers || "$name" == unified-clock || "$name" == clock-production-loader) || "$name" == updates-production-host || "$name" == production-widget-panels) ]]; then
+    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == network-telemetry-panel || "$name" == health-alerts || "$name" == clock-civil-dates || "$name" == worldclock-panel || ("$name" == clock-embedded-controllers || "$name" == unified-clock || "$name" == clock-production-loader) || "$name" == updates-production-host || "$name" == production-widget-panels) ]]; then
       # Adapt only native windows/attached layer-shell state. Placement, mask,
       # motion, coordinator, focus timer and production panel content stay real.
       mkdir -p "$run_dir/cfg/plugins/araneadev.shared"
@@ -106,7 +107,7 @@ source = source.replace('WlrLayershell.', 'nativeLayer.')
 source = source.replace('    anchors {', '    nativeAnchors {')
 pathlib.Path(sys.argv[2]).write_text(source)
 PYOSDWINDOW
-    elif [[ "$plugin" == */araneadev.bar && ("$name" == sudo-relay || "$name" == clock-aliases) ]]; then
+    elif [[ "$plugin" == */araneadev.bar && ("$name" == sudo-relay || "$name" == clock-aliases || "$name" == bar-foreground) ]]; then
       mkdir -p "$run_dir/cfg/plugins/araneadev.bar"
       for source in "$plugin"/*; do
         [[ "${source##*/}" == Bar.qml ]] && continue
@@ -174,6 +175,22 @@ CLOCKCOMMAND
       ln -s "$run_dir/display-bin/clock-command" "$run_dir/display-bin/$display_command"
     done
   fi
+  if [[ "$name" == network-telemetry-panel || "$name" == network-telemetry ]]; then
+    # Fake only command I/O; production telemetry and host lifecycle remain real.
+    for display_command in network-fixture omarchy-network-status omarchy-network-band omarchy-dns nmcli ip busctl; do
+      ln -s "$repo_root/tests/qml/fixtures/network-command.py" "$run_dir/display-bin/$display_command"
+    done
+  fi
+  if [[ "$name" == bar-foreground || "$name" == bar-foreground-controller ]]; then
+    # Exercise real Process/Timer/FileView ownership with only command I/O faked.
+    # This watcher needs a file where other fixtures expect a directory.
+    state_home="$run_dir/state"
+    mkdir -p "$state_home/omarchy"
+    printf 'initial\n' >"$state_home/omarchy/current"
+    for display_command in omarchy-bar-text-color bar-foreground-fixture; do
+      ln -s "$repo_root/tests/qml/fixtures/bar-foreground-command.py" "$run_dir/display-bin/$display_command"
+    done
+  fi
   # Replace the entire native sudo helper; never execute a grant or policy command.
   mkdir -p "$run_dir/sudo-bin" "$run_dir/sudo-state"
   if [[ "$name" == sudo-widget || "$name" == sudo-relay ]]; then
@@ -189,7 +206,7 @@ CLOCKCOMMAND
   (cd "$run_dir" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
     -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE QT_QPA_PLATFORM=offscreen \
     PATH="$run_dir/sudo-bin:$run_dir/display-bin:$PATH" OMARCHY_PATH="${shell_dir%/shell}" ARANEA_SUDO_FIXTURE_ROOT="$run_dir/sudo-state" ARANEA_DISPLAY_FIXTURE_ROOT="$run_dir/display-state" \
-    ARANEA_CLOCK_TEST_PLUGIN_ROOT="$run_dir/external/plugins" XDG_RUNTIME_DIR="$run_dir/run" XDG_CACHE_HOME="$run_dir/cache" \
+    ARANEA_CLOCK_TEST_PLUGIN_ROOT="$run_dir/external/plugins" XDG_RUNTIME_DIR="$run_dir/run" XDG_CACHE_HOME="$run_dir/cache" XDG_STATE_HOME="$state_home" \
     "$quickshell_bin" -p "$run_dir/cfg") >"$run_dir/log" 2>&1 &
   qs_pid=$!
   while ((waited < timeout_s * 5)); do

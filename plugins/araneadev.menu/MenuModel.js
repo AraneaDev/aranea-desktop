@@ -866,7 +866,7 @@ function parseMenuJsonc(raw) {
 }
 
 /**
- * Merges user items over default items key by key, adding a root item if missing.
+ * Merges user overrides, applies stock menu policy, and assigns stable item order.
  * @param {Array<MenuItem>} defaultItems - items from the shipped menu
  * @param {Array<MenuItem>} userItems - items from the user extension file
  * @param {boolean} [settingsAvailable] - whether the settings plugin manifest is installed
@@ -874,25 +874,38 @@ function parseMenuJsonc(raw) {
  * @returns {{items: ItemMap, itemOrder: Array<string>}} items by id and their order
  */
 function mergeMenuSources(defaultItems, userItems, settingsAvailable, projectsAvailable) {
-  /** @type {{[key: string]: *}} */
-  var nextItems = {}
-  var nextOrder = []
   var customIds = (userItems || []).map(function (entry) {
     return entry.id
   })
-  var settings = settingsAvailable
-    ? [
-        normalizeItem("aranea.settings", {
-          parent: "root",
-          label: "Settings",
-          icon: "aranea-brand",
-          description: "Wallpaper, motion, schedule, integrations and notifications",
-          aliases: ["settings", "aranea-settings"],
-          action: 'omarchy-shell shell summon araneadev.settings \'{"section":"appearance"}\'',
-          when: 'test -f "$HOME/.config/omarchy/plugins/araneadev.settings/manifest.json"'
-        })
-      ]
-    : []
+  var merged = mergeItemSources(defaultItems, userItems)
+  var nextItems = merged.items
+  var nextOrder = applySettingsDestination(
+    nextItems,
+    merged.itemOrder,
+    customIds,
+    settingsAvailable
+  )
+  nextOrder = foldStockCommandCenter(nextItems, nextOrder, customIds, settingsAvailable)
+  ensureBuiltinDestinations(nextItems, nextOrder, projectsAvailable)
+  for (var i = 0; i < nextOrder.length; i++) nextItems[nextOrder[i]].order = i
+
+  return {
+    items: nextItems,
+    itemOrder: nextOrder
+  }
+}
+
+/**
+ * Copies item fields in source order, keeping the first position of each id.
+ * @private
+ * @param {Array<MenuItem>} defaultItems - items from the shipped menu
+ * @param {Array<MenuItem>} userItems - user overrides applied after the defaults
+ * @returns {{items: ItemMap, itemOrder: Array<string>}} fresh items and first-seen order
+ */
+function mergeItemSources(defaultItems, userItems) {
+  /** @type {{[key: string]: *}} */
+  var nextItems = {}
+  var nextOrder = []
   var sources = [defaultItems || [], userItems || []]
 
   for (var s = 0; s < sources.length; s++) {
@@ -912,6 +925,32 @@ function mergeMenuSources(defaultItems, userItems, settingsAvailable, projectsAv
     }
   }
 
+  return { items: nextItems, itemOrder: nextOrder }
+}
+
+/**
+ * Inserts Settings, replacing an uncustomized root About in its existing slot.
+ * @private
+ * @param {ItemMap} nextItems - merged items to update
+ * @param {Array<string>} nextOrder - current item order
+ * @param {Array<string>} customIds - ids supplied by the user
+ * @param {boolean} [settingsAvailable] - whether Settings is installed
+ * @returns {Array<string>} the updated order
+ */
+function applySettingsDestination(nextItems, nextOrder, customIds, settingsAvailable) {
+  var settings = settingsAvailable
+    ? [
+        normalizeItem("aranea.settings", {
+          parent: "root",
+          label: "Settings",
+          icon: "aranea-brand",
+          description: "Wallpaper, motion, schedule, integrations and notifications",
+          aliases: ["settings", "aranea-settings"],
+          action: 'omarchy-shell shell summon araneadev.settings \'{"section":"appearance"}\'',
+          when: 'test -f "$HOME/.config/omarchy/plugins/araneadev.settings/manifest.json"'
+        })
+      ]
+    : []
   if (settings.length) {
     if (!nextItems["aranea.settings"]) nextItems["aranea.settings"] = settings[0]
     if (nextItems.about && nextItems.about.parent === "root" && customIds.indexOf("about") < 0) {
@@ -926,6 +965,19 @@ function mergeMenuSources(defaultItems, userItems, settingsAvailable, projectsAv
     }
   }
 
+  return nextOrder
+}
+
+/**
+ * Groups a complete stock command center without rewriting user destinations.
+ * @private
+ * @param {ItemMap} nextItems - merged items to update, retaining ids and descendants
+ * @param {Array<string>} nextOrder - current item order
+ * @param {Array<string>} customIds - ids exempt from stock reparenting and relabeling
+ * @param {boolean} [settingsAvailable] - whether About was replaced by Settings
+ * @returns {Array<string>} the grouped order, or the unchanged order when incomplete
+ */
+function foldStockCommandCenter(nextItems, nextOrder, customIds, settingsAvailable) {
   // Fold the complete stock command center, keeping IDs and descendants intact
   // for direct routes, providers, search, and user extensions.
   var stockSections = [
@@ -994,6 +1046,18 @@ function mergeMenuSources(defaultItems, userItems, settingsAvailable, projectsAv
     )
   }
 
+  return nextOrder
+}
+
+/**
+ * Adds missing Projects and root destinations without replacing existing items.
+ * @private
+ * @param {ItemMap} nextItems - merged items to update
+ * @param {Array<string>} nextOrder - current item order, updated in place
+ * @param {boolean} [projectsAvailable] - whether standalone Projects is installed
+ * @returns {void}
+ */
+function ensureBuiltinDestinations(nextItems, nextOrder, projectsAvailable) {
   if (projectsAvailable && !nextItems["aranea.projects"]) {
     nextItems["aranea.projects"] = normalizeItem("aranea.projects", {
       parent: "root",
@@ -1025,12 +1089,6 @@ function mergeMenuSources(defaultItems, userItems, settingsAvailable, projectsAv
       provider: ""
     }
     nextOrder.unshift("root")
-  }
-  for (var k3 = 0; k3 < nextOrder.length; k3++) nextItems[nextOrder[k3]].order = k3
-
-  return {
-    items: nextItems,
-    itemOrder: nextOrder
   }
 }
 

@@ -4,14 +4,22 @@
 # showcase GIF has the right frame count and each frame matches its still,
 # the capture never disables the notifications plugin or types real text,
 # the real inbox/clipboard/picker state is always restored (trap ordering
-# and swap-flag guards checked directly in the script), and the polkit shot
+# and swap-flag guards checked in the script and its library), and the polkit shot
 # is a harmless cancelled request.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
 capture_script="$repo_root/scripts/capture-screenshots"
+notification_library="$repo_root/scripts/lib/capture-notifications.sh"
+capture_sources=("$capture_script" "$notification_library")
 readme="$repo_root/README.md"
+
+# Inspect the canonical helpers used by the entry script; trap ownership and
+# capture orchestration stay in the entry script.
+test -f "$notification_library"
+# shellcheck disable=SC2016 # a literal, not an expansion
+grep -Fxq 'source "$repo_root/scripts/lib/capture-notifications.sh"' "$capture_script"
 
 mapfile -t surfaces < <(
   sed -n 's/^all_surfaces=(\(.*\))$/\1/p' "$capture_script" | tr ' ' '\n'
@@ -62,7 +70,7 @@ grep -Fq 'trap cleanup_health_probe EXIT' "$capture_script"
 # The bell belongs in every capture: never disable the notifications plugin
 # (the host rewrites a disabled clone's bar entry). The real inbox is parked
 # for the batch instead, so badges show capture data only.
-if grep -Eq 'plugin (disable|enable) araneadev.notifications' "$capture_script"; then
+if grep -Eq 'plugin (disable|enable) araneadev.notifications' "${capture_sources[@]}"; then
   echo "capture must not toggle the notifications plugin" >&2
   exit 1
 fi
@@ -82,7 +90,7 @@ grep -Fq 'omarchy-shell health status' "$capture_script"
 
 # Capture windows are closed by address, never as "the active window": focus
 # may have moved to the user's own window (closing it once killed a session).
-if grep -Fq 'hl.dsp.window.close()' "$capture_script"; then
+if grep -Fq 'hl.dsp.window.close()' "${capture_sources[@]}"; then
   echo "capture must never close the active window" >&2
   exit 1
 fi
@@ -95,7 +103,7 @@ grep -Fq 'pkexec /usr/bin/true' "$capture_script"
 grep -Fq 'wtype -k Escape' "$capture_script"
 grep -Fq 'omarchy-polkit' "$capture_script"
 # Only single named keys (Tab, Escape) are ever sent; no text.
-if grep -E '^\s*wtype |[;&|(] *wtype ' "$capture_script" | grep -Ev 'wtype -k (Tab|Escape)( |$)'; then
+if grep -hE '^\s*wtype |[;&|(] *wtype ' "${capture_sources[@]}" | grep -Ev 'wtype -k (Tab|Escape)( |$)'; then
   echo "capture must never type text" >&2
   exit 1
 fi
@@ -127,8 +135,8 @@ grep -Fq 'if ((! inbox_swapped)); then' "$capture_script"
 # a restart sweeps images whose entry is parked), so images are parked too,
 # the shell is never asked to clear the inbox, parked files are copied (not
 # moved) back, and the backup is kept unless every file is verified back.
-park_body="$(sed -n '/^park_notification_inbox() {$/,/^}$/p' "$capture_script")"
-restore_body="$(sed -n '/^restore_parked_inbox() {$/,/^}$/p' "$capture_script")"
+park_body="$(sed -n '/^park_notification_inbox() {$/,/^}$/p' "$notification_library")"
+restore_body="$(sed -n '/^restore_parked_inbox() {$/,/^}$/p' "$notification_library")"
 grep -Fq 'stop_omarchy_shell' <<<"$park_body"
 grep -Fq 'stop_omarchy_shell' <<<"$restore_body"
 grep -Fq 'images' <<<"$park_body"
@@ -136,7 +144,7 @@ grep -Fq 'images' <<<"$park_body"
 # in which a parked inbox is not restored), never by the caller afterwards.
 # shellcheck disable=SC2016 # a literal, not an expansion
 grep -Fq 'printf -v "$flag" 1' <<<"$park_body"
-if grep -Eq '^ *(batch|inbox)_swapped=1' "$capture_script"; then
+if grep -Eq '^ *(batch|inbox)_swapped=1' "${capture_sources[@]}"; then
   echo "the inbox swapped flags are set inside park_notification_inbox" >&2
   exit 1
 fi
@@ -152,16 +160,16 @@ grep -Fq 'park_notification_inbox "$batch_inbox_backup" batch_swapped' "$capture
 grep -Fq 'restore_parked_inbox "$batch_inbox_backup"' "$capture_script"
 # shellcheck disable=SC2016 # literals, not expansions
 grep -Fq 'restore_parked_inbox "$inbox_backup"' "$capture_script"
-grep -Fq 'your notifications are kept in' "$capture_script"
+grep -Fq 'your notifications are kept in' "$notification_library"
 # The verified backup is handed off by rename before it is deleted, so a
 # rerun after an interrupted delete finds no backup and touches nothing.
 # shellcheck disable=SC2016 # a literal, not an expansion
 grep -Fq 'if ! mv -- "$backup" "$backup.restored"; then' <<<"$restore_body"
-if grep -Fq 'notifications clear' "$capture_script"; then
+if grep -Fq 'notifications clear' "${capture_sources[@]}"; then
   echo "park and restore must never ask the shell to clear the inbox" >&2
   exit 1
 fi
-if grep -Eq 'quickshell kill .*\|\| true' "$capture_script"; then
+if grep -Eq 'quickshell kill .*\|\| true' "${capture_sources[@]}"; then
   echo "a failed shell stop must never be ignored" >&2
   exit 1
 fi
