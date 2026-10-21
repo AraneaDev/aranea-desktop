@@ -48,6 +48,8 @@ class Compositor:
         value = self.read("locked")
         if type(value) is not bool:
             raise ValueError("Lock state unavailable")
+        if value:
+            (self.root / "lock-observed").write_text(str(time.monotonic()))
         return value
 
     def monitors(self):
@@ -110,6 +112,8 @@ behavior = json.loads((root / "behavior").read_text())
 if behavior == "slow-map" or (behavior == "second-slow" and screen == "HDMI-A-1"): time.sleep(3)
 child = {"pid":os.getpid(),"address":hex(os.getpid()),"class":"org.omarchy.screensaver","mapped":behavior != "no-map","monitor":1 if screen == "DP-1" else 2,"workspace":{"name":"special:screensaver-" + screen},"screen":screen,"url":url}
 (root / ("child-"+screen)).write_text(json.dumps(child))
+if behavior == "stubborn-removed" and screen == "HDMI-A-1":
+    signal.signal(signal.SIGTERM, lambda *_: (root / "removed-term").write_text(str(time.monotonic())))
 if behavior == "orphan":
     p = subprocess.Popen([sys.executable,"-c","import signal,time;signal.signal(signal.SIGTERM,signal.SIG_IGN);time.sleep(90)"])
     (root / "descendant").write_text(str(p.pid))
@@ -349,6 +353,26 @@ class SessionTests(unittest.TestCase):
         self.assertTrue(self.api.session_status()["ready"])
         self.event("dismiss")
         self.assert_closed(process)
+
+    def test_removed_stubborn_renderer_does_not_delay_lock_observation(self):
+        self.write("behavior", "stubborn-removed")
+        process = self.start()
+        self.ready()
+        survivor = json.loads((self.root / "child-DP-1").read_text())["pid"]
+        removed = json.loads((self.root / "child-HDMI-A-1").read_text())["pid"]
+        self.write("monitors", [Compositor(self.root).monitors()[0]])
+        wait_for(lambda: (self.root / "removed-term").exists())
+        # The removed real child received TERM but ignores it. A surviving
+        # surface is still running when the lock changes during its grace.
+        os.kill(removed, 0)
+        os.kill(survivor, 0)
+        changed = time.monotonic()
+        self.write("locked", True)
+        wait_for(lambda: (self.root / "lock-observed").exists(), timeout=2)
+        observed = float((self.root / "lock-observed").read_text())
+        self.assertLess(observed - changed, 0.9)
+        self.assert_closed(process)
+        self.assertIn("locked", (self.root / "error").read_text().lower())
 
     def test_failure_exit_and_sigterm_cleanup(self):
         for action in ("failed", "exit", "signal"):

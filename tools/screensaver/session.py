@@ -17,6 +17,7 @@ import sys
 import tempfile
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from tools.screensaver.catalog import choose_scene, load_catalog, validate_id
@@ -129,6 +130,10 @@ class Supervisor:
         self.stop = threading.Event()
         self.control_done = threading.Event()
         self.children = {}
+        self.retired = {}
+        # At most 64 validated monitors; retirement waits must never block the
+        # observation loop or queue behind another removed monitor's grace.
+        self.retirement_pool = ThreadPoolExecutor(max_workers=64)
         self.expected = {}
         self.ready = set()
         self.server = None
@@ -197,7 +202,9 @@ class Supervisor:
                 self.ready.discard(name)
                 child = self.children.get(name)
                 if child:
-                    terminate_group(child)
+                    self.retired[name] = self.retirement_pool.submit(
+                        terminate_group, child
+                    )
         return bool(self.expected)
 
     def mapped_client(self, owned):
@@ -247,14 +254,22 @@ class Supervisor:
         except (OSError, ValueError):
             pass  # A lost compositor must not prevent process and IPC cleanup.
 
+    def cleanup_children(self):
+        # Stop surviving surfaces first. Retirement jobs exclusively own their
+        # records until complete; join them before profiles/sockets disappear.
+        for name, child in self.children.items():
+            if name not in self.retired:
+                terminate_group(child)
+        for retirement in self.retired.values():
+            retirement.result()
+
     @contextlib.contextmanager
     def resources(self):
         with tempfile.TemporaryDirectory(prefix="session-", dir=self.root) as temporary:
             try:
                 yield Path(temporary)
             finally:
-                for child in self.children.values():
-                    terminate_group(child)
+                self.cleanup_children()
                 if self.server:
                     self.server.shutdown()
 
@@ -437,8 +452,10 @@ class Supervisor:
             raise
         finally:
             self.stop.set()
-            for child in self.children.values():
-                terminate_group(child)
+            try:
+                self.cleanup_children()
+            finally:
+                self.retirement_pool.shutdown(wait=True)
             if self.server:
                 self.server.shutdown()
             self.hypr.deadline = None
