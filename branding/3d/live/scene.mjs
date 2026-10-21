@@ -27,6 +27,7 @@ try {
 } catch (error) {
   document.getElementById("status").textContent =
     "Unable to start 3D preview. Press Escape to close."
+  document.body.dataset.error = "Unable to start 3D preview"
   throw error
 }
 renderer.toneMapping = THREE.ACESFilmicToneMapping
@@ -167,6 +168,6 @@ try {
 } catch (error) {
   document.getElementById("status").textContent =
     "Unable to load the spider scene. Press Escape to close."
-  document.body.dataset.error = String(error)
+  document.body.dataset.error = "Unable to load the local scene"
   console.error(error)
 }

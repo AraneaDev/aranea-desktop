@@ -1,18 +1,43 @@
 // Independent of the 3D module, so Escape works even if WebGL or loading fails.
 ;(() => {
   const options = new URLSearchParams(window.location.search)
-  let closed = false
+  const screenId = options.get("screen") || "legacy"
+  let closed = false,
+    ready = false,
+    failed = false
+  async function notify(kind, message) {
+    try {
+      await fetch(`/__${kind}`, {
+        method: "POST",
+        headers: { "X-Aranea-Session": options.get("session") || "" },
+        body: JSON.stringify(message ? { screenId, message } : { screenId })
+      })
+    } catch {
+      /* The session server may already be closing. */
+    }
+  }
+  function failure() {
+    if (failed) return
+    failed = true
+    void notify("failed", "Unable to render the local scene.")
+  }
+  window.addEventListener("error", failure)
+  window.addEventListener("unhandledrejection", failure)
+  const observer = new MutationObserver(() => {
+    if (document.body.dataset.error) failure()
+    if (!ready && document.body.dataset.ready === "true") {
+      ready = true
+      void notify("ready")
+    }
+  })
+  observer.observe(document.body, {
+    attributes: true,
+    attributeFilter: ["data-ready", "data-error"]
+  })
   async function dismiss() {
     if (closed) return
     closed = true
-    try {
-      await fetch("/__dismiss", {
-        method: "POST",
-        headers: { "X-Aranea-Session": options.get("session") || "" }
-      })
-    } catch {
-      /* The preview server may already be closing. */
-    }
+    await notify("dismiss")
     window.close()
   }
   window.addEventListener("keydown", dismiss)
@@ -28,6 +53,7 @@
   })
   setTimeout(() => {
     if (document.body.dataset.ready !== "true") {
+      failure()
       document.getElementById("status").textContent =
         "Unable to start the preview. Press Escape to close."
     }
