@@ -3,10 +3,9 @@ const assert = require("node:assert/strict")
 const fs = require("node:fs")
 const { test } = require("node:test")
 const source = fs.readFileSync("plugins/araneadev.bar/Bar.qml", "utf8")
-const body = source.slice(
-  source.indexOf("  function moduleTargetClickable("),
-  source.indexOf("  // Format a color")
-)
+const body = ["moduleTargetClickable", "moduleTargetContainsPoint", "moduleClickTargetAt"]
+  .map((name) => source.match(new RegExp(`  function ${name}\\([^)]*\\) \\{[\\s\\S]*?\\n  \\}`))[0])
+  .join("\n")
 const makeRouter = new Function("clickTargets", body + "\n return {moduleClickTargetAt};")
 
 /**

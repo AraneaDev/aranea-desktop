@@ -69,11 +69,11 @@ Item {
   // Canonical id of the center module the center section is anchored on ("" for none).
   property string centerAnchor: ""
   // Whether transparency was requested; the surface follows it, the foreground refines it.
-  property bool requestedTransparent: false
+  property alias requestedTransparent: foregroundController.requestedTransparent
   // True once the contrast probe returned a foreground color to use over the wallpaper.
-  property bool useTransparentForeground: false
+  property alias useTransparentForeground: foregroundController.useTransparentForeground
   // Whether the bar surface is drawn transparent right now.
-  property bool transparent: false
+  property alias transparent: foregroundController.transparent
   // True while the pointer is over the center section.
   property bool centerSectionHovered: false
   // One bar surface exists per monitor and each reports into this count, so a
@@ -101,13 +101,13 @@ Item {
   // Contrast color passed to omarchy-bar-text-color as the alternative foreground.
   property color themeContrastForeground: Commons.Color.background
   // Foreground picked by the contrast probe for the transparent bar.
-  property color transparentForeground: Commons.Color.bar.text
+  property alias transparentForeground: foregroundController.transparentForeground
   // Theme foreground for widgets, independent of the transparency probe.
   property color foreground: themeForeground
   // Foreground actually used on the bar: the probed color when transparent, else the theme's.
   property color barForeground: useTransparentForeground ? transparentForeground : themeForeground
   // Turned off briefly so a foreground switch jumps instead of animating.
-  property bool foregroundAnimationEnabled: true
+  property alias foregroundAnimationEnabled: foregroundController.foregroundAnimationEnabled
   // Whether Aranea motion is on (shared Aranea.MotionState preference).
   property bool motionEnabled: Aranea.MotionState.motionEnabled
   // Bar background color, from the Color singleton.
@@ -1413,98 +1413,38 @@ Item {
     return true
   }
 
-  // Format a color (or color string) as #rrggbb.
+  // Persistent contrast ownership is independent of bar surfaces and visibility.
+  BarForegroundController {
+    id: foregroundController
+    position: root.position
+    barSize: root.barSize
+    themeForeground: root.themeForeground
+    themeContrastForeground: root.themeContrastForeground
+  }
+
+  // Preserve the bar's color formatter for existing callers.
   function colorHex(colorValue) {
-    var c = colorValue
-    if (typeof c === "string")
-      c = Qt.color(c)
-    function hexChannel(value) {
-      var s = Math.round(Util.clamp(value, 0, 1) * 255).toString(16)
-      return s.length < 2 ? "0" + s : s
-    }
-    return "#" + hexChannel(c.r) + hexChannel(c.g) + hexChannel(c.b)
+    return foregroundController.colorHex(colorValue)
   }
 
-  // Request a transparent or opaque bar; transparent applies at once, then the contrast probe refines the foreground.
+  // Request transparency synchronously; the controller refines foreground later.
   function setRequestedTransparency(value: bool): void {
-    var nextTransparent = value
-    requestedTransparent = nextTransparent
-    if (!nextTransparent) {
-      foregroundAnimationEnabled = false
-      useTransparentForeground = false
-      transparent = false
-      transparentForeground = themeForeground
-      restoreForegroundAnimation()
-      return
-    }
-    // The surface must become transparent immediately.  The contrast-color
-    // probe is asynchronous and should only refine the foreground color; it
-    // must not leave an opaque bar behind while it runs or if it is delayed.
-    transparent = true
-    scheduleTransparentForegroundRefresh()
+    foregroundController.setRequestedTransparency(value)
   }
 
-  // Re-enable foreground animation two event-loop turns later, after the color jump has settled.
+  // Preserve the two-turn animation restoration entry point.
   function restoreForegroundAnimation(): void {
-    Qt.callLater(function () {
-      Qt.callLater(function () {
-        root.foregroundAnimationEnabled = true
-      })
-    })
+    foregroundController.restoreForegroundAnimation()
   }
 
-  // Restart the debounce for the contrast probe, or reset the foreground when not transparent.
+  // Preserve refresh entry points for existing bar callers.
   function scheduleTransparentForegroundRefresh() {
-    if (!requestedTransparent) {
-      transparentForeground = themeForeground
-      return
-    }
-    transparentForegroundTimer.restart()
+    foregroundController.scheduleTransparentForegroundRefresh()
   }
 
-  // Run omarchy-bar-text-color to pick a readable foreground over the wallpaper behind the bar.
+  // Run a contrast probe unless opaque or a probe is already in flight.
   function refreshTransparentForeground(): void {
-    if (!requestedTransparent || transparentForegroundProc.running)
-      return
-    transparentForegroundProc.command = ["omarchy-bar-text-color", root.position, String(root.barSize), colorHex(root.themeForeground), colorHex(root.themeContrastForeground)]
-    transparentForegroundProc.running = true
-  }
-
-  onRequestedTransparentChanged: scheduleTransparentForegroundRefresh()
-  onPositionChanged: scheduleTransparentForegroundRefresh()
-  onThemeForegroundChanged: scheduleTransparentForegroundRefresh()
-  onThemeContrastForegroundChanged: scheduleTransparentForegroundRefresh()
-
-  Timer {
-    id: transparentForegroundTimer
-    interval: 120
-    repeat: false
-    onTriggered: root.refreshTransparentForeground()
-  }
-
-  Process {
-    id: transparentForegroundProc
-    stdout: SplitParser {
-      onRead: function (line) {
-        var value = String(line || "").trim()
-        if (!/^#[0-9A-Fa-f]{6}$/.test(value))
-          return
-        root.foregroundAnimationEnabled = false
-        root.transparentForeground = value
-        if (root.requestedTransparent) {
-          root.useTransparentForeground = true
-          root.transparent = true
-        }
-        root.restoreForegroundAnimation()
-      }
-    }
-  }
-
-  FileView {
-    path: Aranea.RuntimePaths.omarchyStateRoot + "/current"
-    watchChanges: true
-    printErrors: false
-    onFileChanged: root.scheduleTransparentForegroundRefresh()
+    foregroundController.refreshTransparentForeground()
   }
 
   // Start a Process unless it is already running.

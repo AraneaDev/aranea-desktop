@@ -25,7 +25,7 @@
 1	plugins/araneadev.bar/Bar.qml:missing-property:Member "implicitWidth" not found on type "QObject"
 2	plugins/araneadev.bar/Bar.qml:missing-property:Member "sizeHorizontal" not found on type "QObject"
 2	plugins/araneadev.bar/Bar.qml:missing-property:Member "sizeVertical" not found on type "QObject"
-2	plugins/araneadev.bar/Bar.qml:missing-property:Member "text" not found on type "QObject"
+1	plugins/araneadev.bar/Bar.qml:missing-property:Member "text" not found on type "QObject"
 1	plugins/araneadev.bar/Bar.qml:missing-property:Member "xs" not found on type "QObject"
 3	plugins/araneadev.bar/Bar.qml:uncreatable-type:Type PanelWindow is not creatable.
 105	plugins/araneadev.bar/Bar.qml:unqualified:Unqualified access

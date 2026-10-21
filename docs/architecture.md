@@ -102,6 +102,16 @@ snapshot merging and projection preserve incoming scope, calendar order and lega
 count fallbacks. `Main.qml` supplies sanitized device identities, recent dates and
 timestamps, and retains scan parsing, filesystem/process lifecycle and aggregate publication.
 
+Bar keeps `BarForegroundController.qml` as a persistent child for wallpaper
+contrast probes, their 120 ms debounce, the wallpaper watcher, retained color,
+and foreground animation restoration. The root supplies edge, size, and theme
+colors and preserves transparency state and refresh methods through aliases and
+forwarders. Transparency applies before the asynchronous result; opaque resets
+and valid results restore animation after two deferred turns. In-flight probes
+survive visibility and transparency changes, and overlapping refreshes retain
+the existing skip behavior. Layout, dragging, surface composition, and plugin
+API ownership stay in `Bar.qml`.
+
 `repair-shell-config` removes redundant child entries only when their host is
 present. The bar exposes Notifications, Agents, Network, Audio, and System,
 with a disclosed tray and a conditional Health issue shortcut.

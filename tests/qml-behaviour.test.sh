@@ -106,7 +106,7 @@ source = source.replace('WlrLayershell.', 'nativeLayer.')
 source = source.replace('    anchors {', '    nativeAnchors {')
 pathlib.Path(sys.argv[2]).write_text(source)
 PYOSDWINDOW
-    elif [[ "$plugin" == */araneadev.bar && ("$name" == sudo-relay || "$name" == clock-aliases) ]]; then
+    elif [[ "$plugin" == */araneadev.bar && ("$name" == sudo-relay || "$name" == clock-aliases || "$name" == bar-foreground) ]]; then
       mkdir -p "$run_dir/cfg/plugins/araneadev.bar"
       for source in "$plugin"/*; do
         [[ "${source##*/}" == Bar.qml ]] && continue
@@ -178,6 +178,14 @@ CLOCKCOMMAND
     # Fake only command I/O; production telemetry and host lifecycle remain real.
     for display_command in network-fixture omarchy-network-status omarchy-network-band omarchy-dns nmcli ip busctl; do
       ln -s "$repo_root/tests/qml/fixtures/network-command.py" "$run_dir/display-bin/$display_command"
+    done
+  fi
+  if [[ "$name" == bar-foreground || "$name" == bar-foreground-controller ]]; then
+    # Exercise real Process/Timer/FileView ownership with only command I/O faked.
+    mkdir -p "$XDG_STATE_HOME/omarchy"
+    printf 'initial\n' >"$XDG_STATE_HOME/omarchy/current"
+    for display_command in omarchy-bar-text-color bar-foreground-fixture; do
+      ln -s "$repo_root/tests/qml/fixtures/bar-foreground-command.py" "$run_dir/display-bin/$display_command"
     done
   fi
   # Replace the entire native sudo helper; never execute a grant or policy command.
