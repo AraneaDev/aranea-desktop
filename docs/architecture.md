@@ -150,6 +150,12 @@ renderer. Placement, pointer gates, cursor state, and lifecycle stay in hosts.
 | Project-action backend     | Headless definitions, transient services, retained run evidence   |
 | Agent activity store/owner | Reported task state, provider evidence, serialized navigation     |
 
+The public CLI keeps syntax validation, discovery, Open submission, and details
+readback in private helpers within `scripts/lib/projects-cli.sh`.
+`projects_cli_main` owns command state shared through Bash dynamic scope and
+sequences dependencies, registry reads, and dispatch. The persistent owner
+retains launch and observation authority.
+
 Discovery and ordinary Open do not execute repository scripts. Registered IDs
 and canonical paths are shared across CLI, search, details, and workspace views.
 Project associations persist; process/window ownership bindings remain in memory
