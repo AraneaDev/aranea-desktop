@@ -147,6 +147,10 @@ Start at the [documentation hub](docs/README.md), or go directly to your task:
 | Browse the visual system and assets             | [Visual language](docs/visual-language.md) · [Fonts](fonts/README.md) · [Icons](docs/icons.md)              |
 | Develop, test, capture, or release              | [Development](docs/development.md) · [Architecture](docs/architecture.md) · [Contributing](CONTRIBUTING.md) |
 
+Helpers run from the checkout's `scripts/` directory or from the installed
+`~/.config/omarchy/themes/aranea/scripts/` directory. The installed `aranea`
+command manages projects, actions, and opt-in local agent reporting.
+
 ### Get help
 
 Run `scripts/aranea-doctor` for installation diagnostics. Its `--fix` option
