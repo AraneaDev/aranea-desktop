@@ -62,7 +62,15 @@ cmp "$TMPDIR/before" "$ARANEA_STATE_ROOT/agent-activity.json"
 deliver '{"hook_event_name":"PostToolUse","turn_id":"two","tool_name":"request_user_input","tool_use_id":"q"}'
 cmp "$TMPDIR/before" "$ARANEA_STATE_ROOT/agent-activity.json"
 deliver '{"hook_event_name":"SessionEnd","reason":"other"}'
-snap | jq -e '.state.sessions[0].connection.connected==false and .state.tasks[-1].reportedState=="working"' >/dev/null
+# Retained tasks sort by whole-second receive time and random task ID. Resolve
+# the exact current turn; same-second parent/child reports need not precede it.
+snap | jq -e '.state as $s | $s.sessions[0].nativeMetadata.currentTaskId as $current |
+  $s.sessions[0].connection.connected==false and
+  ([$s.tasks[] | select(.taskId==$current)] |
+    length==1 and .[0].description=="Next" and .[0].reportedState=="working")' >/dev/null || {
+  echo 'FAIL Codex SessionEnd changed the current turn or left its session connected'
+  exit 1
+}
 # Retained old turn identities cannot allocate a fresh task when receipts expire.
 jq '.sessions[0].receipts=[] | .sessions[0].nativeMetadata.callbackOwners=[]' "$ARANEA_STATE_ROOT/agent-activity.json" >"$TMPDIR/expired"
 mv "$TMPDIR/expired" "$ARANEA_STATE_ROOT/agent-activity.json"

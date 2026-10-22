@@ -109,35 +109,17 @@ ShellRoot {
         catalogAvailable: true,
         selectedId: 'silk-journey',
         mode: 'single',
-        choices: [
-          {
-            id: 'silk-journey',
-            label: 'Silk Journey',
-            description: 'A silken journey through the quiet web.',
-            renderer: 'web',
-            thumbnail: Quickshell.env('ARANEA_SETTINGS_RENDER_ROOT') + '/branding/3d/live/preview.png',
+        choices: JSON.parse(Quickshell.env('ARANEA_SETTINGS_RENDER_SCREENSAVERS') || '{"scenes":[]}').scenes.map(function (scene) {
+          return {
+            id: scene.id,
+            label: scene.label,
+            description: scene.description,
+            renderer: scene.renderer,
+            thumbnail: scene.thumbnail ? Quickshell.env('ARANEA_SETTINGS_RENDER_ROOT') + '/' + scene.thumbnail : null,
             available: true,
-            shuffleEligible: true
-          },
-          {
-            id: 'silk-chamber',
-            label: 'Silk Chamber',
-            description: 'A chamber of luminous threads.',
-            renderer: 'video',
-            thumbnail: Quickshell.env('ARANEA_SETTINGS_RENDER_ROOT') + '/branding/3d/silk-chamber.png',
-            available: true,
-            shuffleEligible: true
-          },
-          {
-            id: 'omarchy',
-            label: 'Omarchy',
-            description: 'The classic Omarchy screensaver.',
-            renderer: 'stock',
-            thumbnail: null,
-            available: true,
-            shuffleEligible: false
+            shuffleEligible: scene.renderer !== 'stock'
           }
-        ],
+        }),
         idle: {
           screensaverSeconds: 900,
           lockSeconds: 1200,

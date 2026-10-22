@@ -37,8 +37,10 @@ Enable the **Session** integration through Settings when inactive. A scene Apply
 or Preview never enables idle or changes pause flags. Automatic launch still
 requires Omarchy's idle service to be enabled and unpaused.
 
-The scene catalog offers Silk Journey (Chromium/WebGL), Silk Chamber (mpv), and
-Omarchy (stock). Selection/shuffle lives in Aranea's separate screensaver config;
+The picker offers six Chromium/WebGL scenes: Silk Journey, Neon Weaver, Spiderfall,
+Kanji Drift, Silken Flow, and Neon Depths. The first three feature the spider.
+Silk Chamber remains an experiment; Omarchy's terminal saver is an automatic
+availability fallback rather than a picker entry. Selection/shuffle lives in Aranea's separate screensaver config;
 timing remains in Omarchy. The supervisor uses one scene across active monitors,
 exact Wayland class `org.omarchy.screensaver`, and bounded readiness/cleanup.
 Supervised web sessions use Chromium kiosk mode; legacy standalone Preview keeps

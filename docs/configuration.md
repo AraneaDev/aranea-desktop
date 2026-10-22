@@ -53,11 +53,17 @@ A full install manages that launcher; enable the **Session** integration in Sett
 if it is inactive. Omarchy's idle service remains responsible for activation and
 locking. Stay awake or screensaver-off can pause automatic activation.
 
-The initial catalog contains **Silk Journey** (local Chromium/WebGL), **Silk Chamber**
-(local mpv video), and **Omarchy** (the packaged terminal saver). The owner uses
-one selected scene across active monitors. Shuffle chooses from available Aranea
-scenes once per automatic session, avoids the previous scene when possible, and
-excludes Omarchy. Missing renderer dependencies disable only the affected scene.
+The collection contains six local Chromium/WebGL scenes. **Silk Journey**,
+**Neon Weaver**, and **Spiderfall** feature the spider; **Kanji Drift**, **Silken Flow**,
+and **Neon Depths** do not. Each has its own animated environment and preview.
+The owner uses one selected scene across active monitors. Shuffle chooses from
+available scenes once per automatic session and avoids the previous scene when possible.
+Missing renderer dependencies disable affected scenes; automatic launch can fall
+back to Omarchy's packaged terminal saver without adding it to the picker.
+
+**Silk Chamber** remains an experimental standalone video, outside the collection.
+An old Silk Chamber or Omarchy selection resolves to Silk Journey without rewriting
+saved preferences; **Apply scene** saves your next explicit choice.
 
 Read selection, catalog availability, launcher reachability and configured timing
 without launching a renderer:

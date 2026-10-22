@@ -1,4 +1,4 @@
-# Aranea spider: Silk Chamber
+# Aranea spider and screensaver collection
 
 An original articulated 3D interpretation of the Aranea spider. The split
 carapace, triangular reactor and abdomen shield come from the canonical
@@ -109,8 +109,11 @@ bash tests/spider-preview.test.sh
 
 ## Picker and automatic sessions
 
-Open **Settings → Aranea → Screensavers** to choose **Silk Journey** (the live
-journey), **Silk Chamber** (the rendered loop), or classic **Omarchy**. Select a
+Open **Settings → Aranea → Screensavers** to choose one of six live scenes:
+**Silk Journey**, **Neon Weaver**, and **Spiderfall** feature the spider;
+**Kanji Drift**, **Silken Flow**, and **Neon Depths** do not. All use the local
+Chromium/WebGL renderer and Aranea's dark, mint and violet palette.
+Silk Chamber remains a standalone rendering experiment outside the picker. Select a
 single scene or shuffle available Aranea scenes. **Apply scene** saves selection;
 **Preview** starts the highlighted scene without saving it or changing timing.
 Accepted Preview hides Settings; reopen it to inspect asynchronous startup errors.

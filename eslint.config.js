@@ -70,7 +70,11 @@ module.exports = [
     rules: { ...js.configs.recommended.rules }
   },
   {
-    files: ["branding/3d/live/*.mjs", "branding/3d/live/dismiss.js"],
+    files: [
+      "branding/3d/live/*.mjs",
+      "branding/3d/live/dismiss.js",
+      "branding/3d/collection/**/*.mjs"
+    ],
     languageOptions: { ecmaVersion: 2023, sourceType: "module", globals: { ...globals.browser } },
     rules: { ...js.configs.recommended.rules }
   },

@@ -24,13 +24,13 @@ Static fallback: [desktop capture](screenshots/desktop.png) · [full showcase GI
 
 [Install](#install) · [Daily controls](#daily-controls) · [Projects and agents](#projects-and-agents) · [Gallery](#gallery) · [Documentation](#documentation)
 
-## Spider screensaver
+## Screensavers
 
-The original Aranea spider is now a rigged 3D model with a live cyberpunk
-screensaver: suspended bridges, silk descents, and occasional kanji projections
-and particle effects. In **Settings → Aranea → Screensavers**, choose **Silk Journey**,
-the lightweight **Silk Chamber** video, or classic **Omarchy**. Apply a single scene
-or shuffle the Aranea scenes; Preview leaves your saved selection unchanged.
+Six live screensavers share Aranea's dark, mint and violet palette. **Silk Journey**,
+**Neon Weaver**, and **Spiderfall** feature the rigged spider. **Kanji Drift**,
+**Silken Flow**, and **Neon Depths** explore glyphs, luminous ribbons, and a cyberpunk
+city without it. In **Settings → Aranea → Screensavers**, apply a single scene
+or shuffle the collection; Preview leaves your saved selection unchanged.
 Move the pointer, click, or press a key to return.
 
 Automatic activation uses the managed session integration and Omarchy's idle

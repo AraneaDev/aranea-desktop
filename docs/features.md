@@ -181,9 +181,10 @@ it was saved for later sessions.
 
 ## Screensavers
 
-**Settings → Aranea → Screensavers** offers Silk Journey, the live 3D spider;
-Silk Chamber, the lightweight video loop; and Omarchy, the stock saver. Choose
-one scene or shuffle available Aranea scenes. **Apply scene** saves that choice;
+**Settings → Aranea → Screensavers** offers six live scenes: Silk Journey, Neon Weaver,
+and Spiderfall with the spider; Kanji Drift, Silken Flow, and Neon Depths without it.
+All share Aranea's dark palette and mint/violet lighting. Choose
+one scene or shuffle available scenes. **Apply scene** saves that choice;
 **Preview** opens fullscreen without saving. Move the pointer, click, or press
 a key to return after the launch grace period.
 

@@ -503,7 +503,7 @@ def start_session(
         if any(c.get("class") == APP_ID and c.get("mapped") for c in hypr.clients()):
             raise ValueError("Screensaver busy: existing packaged or unowned surface")
         catalog = load_catalog(REPO)
-        prefs = read_preferences()
+        prefs = read_preferences(catalog=catalog)
         if scene_id is not None:
             validate_id(scene_id)
             prefs = {"selectedId": scene_id, "mode": "single"}
@@ -518,8 +518,8 @@ def start_session(
         except ValueError:
             if preview:
                 raise
-            scene = next(s for s in catalog if s.renderer == "stock")
-        if scene.renderer == "stock":
+            scene = next((s for s in catalog if s.renderer == "stock"), None)
+        if scene is None or scene.renderer == "stock":
             if hypr.locked():
                 raise ValueError("Session locked")
             if not os.access(STOCK_LAUNCHER, os.X_OK):

@@ -111,6 +111,7 @@ fi
   QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR=1 ARANEA_REDUCED_MOTION=1 \
   HOME="$work/home" XDG_CONFIG_HOME="$work/home/.config" XDG_DATA_HOME="$work/home/.local/share" XDG_RUNTIME_DIR="$work/run" XDG_CACHE_HOME="$work/cache" XDG_STATE_HOME="$work/state" \
   ARANEA_SETTINGS_RENDER_ROOT="$repo_root" ARANEA_SETTINGS_RENDER_FIXTURE="$fixture" \
+  ARANEA_SETTINGS_RENDER_SCREENSAVERS="$(cat "$repo_root/branding/screensavers/catalog.json")" \
   ARANEA_SETTINGS_RENDER_WIDTH="$width" ARANEA_SETTINGS_RENDER_HEIGHT="$height" \
   ARANEA_PROJECT_RENDER_COUNT="$project_count" \
   ARANEA_SETTINGS_RENDER_OUTPUT="$work/grab.png" \

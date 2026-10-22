@@ -24,9 +24,26 @@ ShellRoot {
     path: Quickshell.env("ARANEA_SUDO_FIXTURE_ROOT") + "/calls"
     blockLoading: true
   }
-  FileView {
-    id: delayFile
-    path: Quickshell.env("ARANEA_SUDO_FIXTURE_ROOT") + "/delay"
+  // Control only the inert command boundary, never the production coalescer.
+  Process {
+    id: fixtureControl
+    property var completed: null
+    onExited: function (code) {
+      t.equal(code, 0, "native probe fixture control succeeds")
+      if (code !== 0) {
+        t.done()
+        return
+      }
+      var next = completed
+      completed = null
+      next()
+    }
+  }
+  // Complete an explicit fixture gate operation before advancing the scenario.
+  function controlProbe(action, next) {
+    fixtureControl.completed = next
+    fixtureControl.command = ["omarchy-sudo-passwordless", "--fixture-" + action]
+    fixtureControl.running = true
   }
   FileView {
     id: failFile
@@ -102,23 +119,35 @@ ShellRoot {
           return !native.granted
         }, 3000, "native revoke disables the observed grant", function () {
           t.check(calls().indexOf("omarchy-sudo-passwordless --disable") >= 0, "native toggle dispatches revoke through the whole helper")
-          delayFile.setText("1")
-          testRoot.probes = probeCount()
-          widget.refresh()
+          // Observe the real Process lifecycle as well as its command log. A
+          // revoke may still have a queued status refresh when granted changes.
+          var statusProbe = t.childrenOf(native).filter(function (child) {
+            return child.command && child.command.length === 2 && child.command[0] === "omarchy-sudo-passwordless" && child.command[1] === "--active"
+          })[0]
+          t.check(!!statusProbe, "native status probe process is observable")
           t.waitFor(function () {
-            return probeCount() > testRoot.probes
-          }, 2000, "slow native probe starts", function () {
-            widget.refresh()
-            widget.refresh()
-            widget.refresh()
-            t.waitFor(function () {
-              return probeCount() >= testRoot.probes + 2
-            }, 4000, "queued native refresh starts after the busy probe", function () {
-              t.step(650, function () {
-                t.equal(probeCount() - testRoot.probes, 2, "busy refreshes coalesce to one pending native probe")
-                t.check(!native.granted && native.interactive && !native.concealed, "expired or inactive state remains an accessible toggle")
-                t.check(calls().indexOf(" --enable") < 0, "fixture never invokes a grant operation")
-                t.done()
+            return !statusProbe.running && !native.refreshPending
+          }, 2000, "previous native probes drain before the coalescing scenario", function () {
+            controlProbe("arm", function () {
+              testRoot.probes = probeCount()
+              widget.refresh()
+              t.waitFor(function () {
+                return probeCount() === testRoot.probes + 1 && statusProbe.running
+              }, 2000, "held native probe starts", function () {
+                widget.refresh()
+                widget.refresh()
+                widget.refresh()
+                t.check(native.refreshPending, "busy refresh burst queues a native probe")
+                controlProbe("release", function () {
+                  t.waitFor(function () {
+                    return probeCount() >= testRoot.probes + 2 && !statusProbe.running && !native.refreshPending
+                  }, 4000, "queued native refresh completes and drains", function () {
+                    t.equal(probeCount() - testRoot.probes, 2, "busy refreshes coalesce to one pending native probe")
+                    t.check(!native.granted && native.interactive && !native.concealed, "expired or inactive state remains an accessible toggle")
+                    t.check(calls().indexOf(" --enable") < 0, "fixture never invokes a grant operation")
+                    t.done()
+                  })
+                })
               })
             })
           })
