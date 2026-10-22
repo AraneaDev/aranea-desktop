@@ -103,11 +103,15 @@ if [[ "$1" == mutate ]]; then
     native_state=$(printf '%s\n%s\n' "$request" "$state" | jq -cs '.[0].args as $a | .[1] | if ($a.payload.session_id|type) == "string" then .sessions |= map(select(.provider == $a.provider and .providerSessionId == $a.payload.session_id)) else . end')
     normalized=$(agent_hooks_prepare_request "$request" "$native_state" "$context" "$native_provider") || respond_error ADAPTER_UNSUPPORTED 'Native provider request is unsupported.'
     # Validate mapping, exact provider and its canonical fingerprint in one pass.
-    hash=$(run_filter -Sce --arg operation normalized-fingerprint --arg activity_provider "$native_provider" <<<"$normalized" 2>/dev/null | sha256sum | cut -d' ' -f1) || respond_error INVALID_REQUEST 'Native mapping returned an invalid request.'
-    if ! agent_activity_is_replay "$normalized" "$native_state" "$hash"; then
-      normalized=$(agent_activity_prepare "$normalized") || respond_error ASSOCIATION_MISMATCH 'Native checkout path is invalid.'
+    normalized_identity=$(run_filter -Sce --arg operation normalized-fingerprint --arg activity_provider "$native_provider" <<<"$normalized" 2>/dev/null) || respond_error INVALID_REQUEST 'Native mapping returned an invalid request.'
+    # Restore the canonical final LF consumed by SHA, then reuse the compact
+    # identity without repeatedly parsing retained native callback metadata.
+    hash=$(printf '%s\n' "$normalized_identity" | sha256sum | cut -d' ' -f1)
+    if ! agent_activity_is_replay "$normalized_identity" "$native_state" "$hash"; then
+      normalized=$(agent_activity_prepare "$normalized" "$normalized_identity") || respond_error ASSOCIATION_MISMATCH 'Native checkout path is invalid.'
     fi
-    request=$(jq -c '{action:"native",args:{normalized:.}}' <<<"$normalized")
+    # The normalized JSON was validated above; wrapping needs no JSON parse.
+    printf -v request '{"action":"native","args":{"normalized":%s}}' "$normalized"
   else
     # Fingerprint the original validated request: canonical path preparation must
     # not change duplicate identity when the original path later disappears.

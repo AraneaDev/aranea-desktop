@@ -26,6 +26,16 @@ for mutation in '.provenance.startTime="0"' '.provenance.bootId="wrong"' '.prove
   result=$(jq "$mutation" <<<"$query" | "$helper")
   jq -e '.ok and (.verified|not)' <<<"$result" >/dev/null
 done
+# Packed separators and failed ancestor decoding must not forge a trusted header.
+packed=$(jq --argjson parent "$parent" --arg hostStart "$host_start" '. as $proof | .bootId=([.bootId,.pid,.startTime]|map(tostring)|join("\u0000")) | .pid=$proof.executable | .startTime=$proof.commandHash | .executable=$parent | .commandHash=$hostStart | .ancestors=[]' <<<"$evidence")
+if agent_hooks_validate_provenance "$packed" 2>/dev/null; then
+  echo 'FAIL packed separators forged process evidence'
+  exit 1
+fi
+if agent_hooks_validate_provenance "$(jq '.ancestors=null' <<<"$evidence")" 2>/dev/null; then
+  echo 'FAIL malformed ancestry accepted'
+  exit 1
+fi
 echo 'PASS native boot/PID/start/executable/hash/ancestry and terminal-parent direction'
 
 # A Codex claim must never borrow a Claude executable's proof.
