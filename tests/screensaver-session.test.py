@@ -97,6 +97,21 @@ class Compositor:
             self.focus = value
             (self.root / "focus").write_text(value)
 
+    def refresh_pointer(self, addresses):
+        history = self.root / "state/aranea/screensaver-last.json"
+        record = {
+            "addresses": addresses,
+            "history": json.loads(history.read_text()) if history.exists() else None,
+        }
+        with (self.root / "pointer-refreshes").open("a") as stream:
+            stream.write(json.dumps(record) + "\n")
+        failure = self.root / "refresh-failure"
+        if failure.exists() and len(
+            (self.root / "pointer-refreshes").read_text().splitlines()
+        ) == int(failure.read_text() or "1"):
+            raise ValueError("Pointer refresh unavailable")
+        return True
+
     def close(self):
         (self.root / "event-closed").touch()
 
@@ -196,6 +211,98 @@ assert(chunk, problem)
 chunk()
 assert(seen)
 """
+
+
+LUA_REFRESH = r"""local fixture = assert(load("return " .. arg[2]))()
+local p = {x=123.75, y=-45.125}
+local monitor = {name="DP-1"}
+local workspace = {name="special:screensaver-DP-1"}
+local window = {address="0xbeef", class="org.omarchy.screensaver", mapped=true,
+  visible=true, hidden=false, fullscreen=2, monitor=monitor, workspace=workspace}
+for _, key in ipairs({"address", "class", "mapped", "visible", "hidden", "fullscreen"}) do
+  if fixture[key] ~= nil then window[key] = fixture[key] end
+end
+monitor.active_special_workspace = workspace
+workspace.fullscreen_window = window
+if fixture.ordinary_workspace then monitor.active_special_workspace = nil end
+if fixture.no_fullscreen then workspace.fullscreen_window = nil end
+if fixture.foreign_monitor then window.monitor = {} end
+if fixture.foreign_workspace then window.workspace = {} end
+local moves = 0
+local hl = {dsp={cursor={}}}
+function hl.get_cursor_pos() return {x=p.x, y=p.y} end
+function hl.get_monitor_at(point)
+  assert(point.x == p.x and point.y == p.y, "monitor lookup changed cursor coordinates")
+  if fixture.no_monitor then return nil end
+  return monitor
+end
+function hl.dsp.cursor.move(value)
+  assert(type(value) == "table" and type(value.x) == "number" and type(value.y) == "number")
+  local count = 0
+  for key in pairs(value) do assert(key == "x" or key == "y"); count = count + 1 end
+  assert(count == 2, "unexpected cursor constructor field")
+  assert(value.x == p.x and value.y == p.y, "cursor coordinates changed")
+  return {cursor_move=value}
+end
+function hl.dispatch(action)
+  assert(action.cursor_move, "unexpected dispatch")
+  moves = moves + 1
+  assert(moves == 1, "multiple pointer refreshes")
+  io.write("MOVE ", action.cursor_move.x, " ", action.cursor_move.y, "\n")
+end
+local env = setmetatable({hl=hl}, {__index=_G})
+local chunk, problem = load(arg[1], "hyprctl-eval", "t", env)
+assert(chunk, problem)
+chunk()
+io.write("RESULT ", moves == 1 and "refreshed" or "skipped", "\n")
+"""
+
+
+def lua_fixture(value):
+    """Encode inert fixture values independently of the production Lua encoder."""
+    if isinstance(value, dict):
+        return (
+            "{"
+            + ",".join(
+                "[" + lua_fixture(key) + "]=" + lua_fixture(item)
+                for key, item in value.items()
+            )
+            + "}"
+        )
+    if isinstance(value, str):
+        return '"' + "".join(f"\\{byte:03d}" for byte in value.encode()) + '"'
+    if type(value) is bool:
+        return "true" if value else "false"
+    return str(value)
+
+
+def native_eval(compositor, argv):
+    """Run the production eval chunk in a typed compositor fixture using real Lua."""
+    assert len(argv) == 3
+    with (compositor.root / "eval-argv").open("a") as stream:
+        stream.write(json.dumps(argv[1:]) + "\n")
+    fixture = compositor.root / "cursor-fixture"
+    values = json.loads(fixture.read_text()) if fixture.exists() else {}
+    result = subprocess.run(
+        ["lua", str(compositor.root / "refresh.lua"), argv[2], lua_fixture(values)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode:
+        sys.stderr.write(result.stderr)
+        raise SystemExit(7)
+    for line in result.stdout.splitlines():
+        if line.startswith("MOVE "):
+            with (compositor.root / "cursor-moves").open("a") as stream:
+                stream.write(
+                    json.dumps([float(number) for number in line.split()[1:]]) + "\n"
+                )
+        elif line.startswith("RESULT "):
+            value = line.removeprefix("RESULT ")
+            with (compositor.root / "eval-results").open("a") as stream:
+                stream.write(value + "\n")
+    print("ok")
 
 
 def native_dispatch(compositor, argv):
@@ -521,12 +628,13 @@ class SessionTests(unittest.TestCase):
 
     def native_boundary(self):
         (self.root / "dispatch.lua").write_text(LUA_DISPATCH)
+        (self.root / "refresh.lua").write_text(LUA_REFRESH)
         command = (
             "#!/usr/bin/env python3\n"
             + "import importlib.util, json, os, pathlib, sys\n"
             + f"spec=importlib.util.spec_from_file_location('fixture', {str(Path(__file__).resolve())!r})\n"
             + "module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)\nroot=pathlib.Path(os.environ['FIXTURE_ROOT']);compositor=module.Compositor(root)\n"
-            + "name=pathlib.Path(sys.argv[0]).name\nif name == 'omarchy-shell':\n print(json.dumps(compositor.read('locked')))\nelif sys.argv[1] == 'monitors': print(json.dumps(compositor.monitors()))\nelif sys.argv[1] == 'clients': print(json.dumps(compositor.clients()))\nelif sys.argv[1] == 'activewindow': print(json.dumps(compositor.active_window()))\nelif sys.argv[1] == 'dispatch': module.native_dispatch(compositor, sys.argv)\nelse: sys.exit(19)\n"
+            + "name=pathlib.Path(sys.argv[0]).name\nif name == 'omarchy-shell':\n print(json.dumps(compositor.read('locked')))\nelif sys.argv[1] == 'monitors': print(json.dumps(compositor.monitors()))\nelif sys.argv[1] == 'clients': print(json.dumps(compositor.clients()))\nelif sys.argv[1] == 'activewindow': print(json.dumps(compositor.active_window()))\nelif sys.argv[1] == 'dispatch': module.native_dispatch(compositor, sys.argv)\nelif sys.argv[1] == 'eval': module.native_eval(compositor, sys.argv)\nelse: sys.exit(19)\n"
         )
         for name in ("hyprctl", "omarchy-shell"):
             path = self.root / "bin" / name
@@ -642,6 +750,171 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(
             len((self.root / "dispatch-argv").read_text().splitlines()), len(expected)
         )
+
+    def test_web_pointer_refreshes_shown_surfaces_and_settles_once_after_ready(self):
+        self.write("behavior", "no-ready")
+        history = self.root / "state/aranea/screensaver-last.json"
+        history.parent.mkdir(parents=True)
+        previous = {"version": 1, "lastId": "silk-chamber"}
+        history.write_text(json.dumps(previous))
+        process = self.start()
+        wait_for(lambda: len(list(self.root.glob("child-*"))) == 2)
+        refreshes = lambda: [
+            json.loads(line)
+            for line in (self.root / "pointer-refreshes").read_text().splitlines()
+        ]
+        wait_for(
+            lambda: (self.root / "pointer-refreshes").exists() and len(refreshes()) == 2
+        )
+        children = {
+            path.name.removeprefix("child-"): json.loads(path.read_text())["address"]
+            for path in self.root.glob("child-*")
+        }
+        self.assertEqual(refreshes()[0]["addresses"], [children["DP-1"]])
+        self.assertEqual(set(refreshes()[1]["addresses"]), set(children.values()))
+        self.event("ready", "DP-1")
+        time.sleep(0.1)
+        self.assertFalse(self.api.session_status()["ready"])
+        self.assertEqual(len(refreshes()), 2)
+        self.event("ready", "HDMI-A-1")
+        self.ready()
+        records = [
+            json.loads(line)
+            for line in (self.root / "pointer-refreshes").read_text().splitlines()
+        ]
+        expected = {
+            json.loads(path.read_text())["address"]
+            for path in self.root.glob("child-*")
+        }
+        self.assertEqual(len(records), 3)
+        self.assertEqual(set(records[-1]["addresses"]), expected)
+        self.assertEqual(len(records[-1]["addresses"]), len(expected))
+        self.assertTrue(all(record["history"] == previous for record in records))
+        self.event("ready", "DP-1")
+        self.event("ready", "HDMI-A-1")
+        time.sleep(0.1)
+        self.assertEqual(
+            len((self.root / "pointer-refreshes").read_text().splitlines()), 3
+        )
+        self.event("dismiss")
+        self.assert_closed(process)
+
+    def test_pointer_refresh_failure_cleans_up_before_ready_or_history(self):
+        (self.root / "refresh-failure").touch()
+        process = self.start()
+        wait_for(
+            lambda: (
+                self.api.session_status().get("ready") or (self.root / "error").exists()
+            )
+        )
+        self.assertFalse(self.api.session_status()["ready"])
+        self.assert_closed(process)
+        self.assertIn("Pointer refresh unavailable", (self.root / "error").read_text())
+        self.assertFalse((self.root / "state/aranea/screensaver-last.json").exists())
+        self.assertTrue((self.root / "event-closed").exists())
+
+    def test_final_pointer_settling_failure_also_preserves_unready_history(self):
+        (self.root / "refresh-failure").write_text("3")
+        process = self.start()
+        wait_for(
+            lambda: (
+                self.api.session_status().get("ready") or (self.root / "error").exists()
+            )
+        )
+        self.assertFalse(self.api.session_status()["ready"])
+        self.assert_closed(process)
+        self.assertIn("Pointer refresh unavailable", (self.root / "error").read_text())
+        self.assertEqual(
+            len((self.root / "pointer-refreshes").read_text().splitlines()), 3
+        )
+        self.assertFalse((self.root / "state/aranea/screensaver-last.json").exists())
+
+    def test_native_pointer_refresh_guards_current_owned_fullscreen_surface(self):
+        from tools.screensaver.hyprland import Hyprland
+
+        self.native_boundary()
+        adapter = Hyprland()
+        cases = [
+            ({}, True),
+            ({"address": "0xcafe"}, False),
+            ({"class": "foreign"}, False),
+            ({"mapped": False}, False),
+            ({"visible": False}, False),
+            ({"hidden": True}, False),
+            ({"fullscreen": 0}, False),
+            ({"fullscreen": 1}, False),
+            ({"ordinary_workspace": True}, False),
+            ({"no_monitor": True}, False),
+            ({"no_fullscreen": True}, False),
+            ({"foreign_monitor": True}, False),
+            ({"foreign_workspace": True}, False),
+        ]
+        moves = 0
+        for fixture, refreshed in cases:
+            with self.subTest(fixture=fixture):
+                self.write("cursor-fixture", fixture)
+                adapter.refresh_pointer(["0xbeef", "0xAB12"])
+                moves += int(refreshed)
+                actual = (self.root / "cursor-moves").read_text().splitlines()
+                self.assertEqual(
+                    [json.loads(line) for line in actual], [[123.75, -45.125]] * moves
+                )
+                self.assertEqual(
+                    (self.root / "eval-results").read_text().splitlines()[-1],
+                    "refreshed" if refreshed else "skipped",
+                )
+        calls = [
+            json.loads(line)
+            for line in (self.root / "eval-argv").read_text().splitlines()
+        ]
+        self.assertEqual(len(calls), len(cases))
+        self.assertTrue(all(call[0] == "eval" and len(call) == 2 for call in calls))
+        self.assertFalse((self.root / "dispatch-argv").exists())
+
+    def test_native_pointer_refresh_accepts_one_and_sixty_four_addresses(self):
+        from tools.screensaver.hyprland import Hyprland
+
+        self.native_boundary()
+        adapter = Hyprland()
+        for addresses in (
+            ["0xbeef"],
+            ["0xbeef"] + [hex(index + 256) for index in range(63)],
+        ):
+            adapter.refresh_pointer(addresses)
+        calls = [
+            json.loads(line)
+            for line in (self.root / "eval-argv").read_text().splitlines()
+        ]
+        self.assertEqual(len(calls), 2)
+        moves = [
+            json.loads(line)
+            for line in (self.root / "cursor-moves").read_text().splitlines()
+        ]
+        self.assertEqual(moves, [[123.75, -45.125], [123.75, -45.125]])
+
+    def test_native_pointer_addresses_reject_invalid_data_before_ipc(self):
+        from tools.screensaver.hyprland import Hyprland
+
+        self.native_boundary()
+        adapter = Hyprland()
+        invalid = [
+            [],
+            ["0xbeef"] * 65,
+            "0xbeef",
+            None,
+            [None],
+            [1],
+            ["beef"],
+            ["0x"],
+            ["0xbeef\n"],
+            ["0xbeef; print('INJECTED')"],
+            ['0xbeef"}; hl.dispatch({}); --'],
+        ]
+        for addresses in invalid:
+            with self.subTest(addresses=addresses):
+                with self.assertRaises((ValueError, TypeError)):
+                    adapter.refresh_pointer(addresses)
+        self.assertFalse((self.root / "eval-argv").exists())
 
     def test_detached_preview_accepts_before_ready_and_reports_live_state(self):
         self.native_boundary()
@@ -806,6 +1079,7 @@ class SessionTests(unittest.TestCase):
         config.write_text('{"version":1,"selectedId":"silk-chamber","mode":"single"}')
         process = self.start()
         self.ready()
+        self.assertFalse((self.root / "pointer-refreshes").exists())
         self.assertEqual(self.api.session_status()["sceneId"], "silk-chamber")
         self.assertEqual(len(list(self.root.glob("child-*"))), 2)
         os.kill(

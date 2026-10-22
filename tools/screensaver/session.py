@@ -222,6 +222,13 @@ class Supervisor:
                 continue
         return None
 
+    def refresh_pointer(self):
+        """Give visible web pages pointer focus during loading and after readiness settles."""
+        if self.scene.renderer == "web":
+            self.hypr.refresh_pointer(
+                [self.addresses[name] for name in self.expected if name in self.addresses]
+            )
+
     def restore(self):
         try:
             current = {m["name"]: m for m in self.hypr.monitors()}
@@ -416,6 +423,7 @@ class Supervisor:
                             "togglespecialworkspace", workspace.removeprefix("special:")
                         )
                         self.shown.add(name)
+                    self.refresh_pointer()
                 while not self.stop.is_set() and self.expected:
                     events = self.hypr.events()
                     if events or time.monotonic() - observed >= 0.5:
@@ -442,6 +450,7 @@ class Supervisor:
                                 self.ready.add(name)
                     if not self.state["ready"]:
                         if self.expected.keys() <= self.ready:
+                            self.refresh_pointer()
                             if not self.state["preview"]:
                                 write_last_scene(None, self.scene.id)
                             self.state["ready"] = True
