@@ -125,6 +125,33 @@ class Hyprland:
             expression = "hl.dsp.workspace.toggle_special(" + literal + ")"
         self.command(["hyprctl", "dispatch", expression])
 
+    def refresh_pointer(self, addresses):
+        """Retarget an owned fullscreen surface without moving or globally hiding the pointer."""
+        if (
+            not isinstance(addresses, (list, tuple))
+            or not 1 <= len(addresses) <= 64
+            or any(
+                not isinstance(address, str)
+                or not re.fullmatch(r"0x[0-9a-fA-F]+", address)
+                for address in addresses
+            )
+        ):
+            raise ValueError("Invalid owned window addresses")
+        owned = ", ".join("[" + lua_string(address) + "] = true" for address in addresses)
+        expression = (
+            "local owned = { " + owned + " }; "
+            "local p = hl.get_cursor_pos(); "
+            "local m = p and hl.get_monitor_at(p); "
+            "local ws = m and m.active_special_workspace; "
+            "local w = ws and ws.fullscreen_window; "
+            "if w and owned[w.address] and w.class == " + lua_string(APP_ID) + " "
+            "and w.mapped and w.visible and not w.hidden and w.fullscreen == 2 "
+            "and w.monitor == m and w.workspace == ws then "
+            "hl.dispatch(hl.dsp.cursor.move({ x = p.x, y = p.y })) end"
+        )
+        if self.command(["hyprctl", "eval", expression]) != "ok":
+            raise ValueError("Pointer targeting refresh unavailable")
+
     def subscribe(self):
         signature = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
         if not signature or "/" in signature or signature in (".", ".."):
