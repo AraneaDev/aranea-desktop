@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.38.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.37.0...v2.38.0) (2026-10-22)
+
+
+### Features
+
+* **screensaver:** add scene picker and idle timing controls ([1144b99](https://github.com/AraneaDev/aranea-desktop/commit/1144b9970b4e7c9e41143febf7412f6e9593b43c))
+* **screensaver:** curate six live Aranea scenes ([#210](https://github.com/AraneaDev/aranea-desktop/issues/210)) ([0c9d0ce](https://github.com/AraneaDev/aranea-desktop/commit/0c9d0ce76048e9d31dc793d9bfa57c6870e3ca26))
+
 ## [2.37.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.36.0...v2.37.0) (2026-10-21)
 
 
