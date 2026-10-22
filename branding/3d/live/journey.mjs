@@ -111,3 +111,26 @@ export function journey(seconds) {
   state.walk = Math.min(1, state.speed / 0.04)
   return state
 }
+
+// The chamber answers a silk transfer, then falls quiet while the spider walks.
+export function chamberBeat(seconds) {
+  const t = ((seconds % DURATION) + DURATION) % DURATION
+  const center = t < 100 ? 65 : 145
+  const distance = Math.abs(t - center)
+  return {
+    resonance: distance < 7 ? Math.cos(((distance / 7) * Math.PI) / 2) ** 2 : 0,
+    focusZ: center === 65 ? -6 : 10
+  }
+}
+
+export function writeChamberSignals(target, seconds) {
+  const count = target.length / 3,
+    perLane = count / 4
+  for (let i = 0; i < count; i++) {
+    const lane = Math.floor(i / perLane)
+    const u = (((i / perLane + seconds * (lane % 2 ? -0.055 : 0.055)) % 1) + 1) % 1
+    target[i * 3] = lane % 2 ? 2.12 : -2.12
+    target[i * 3 + 1] = lane < 2 ? 6.06 : -2.94
+    target[i * 3 + 2] = -13 + 31 * u
+  }
+}

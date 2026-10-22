@@ -54,6 +54,7 @@ resize()
 window.addEventListener("resize", resize)
 
 const {
+  updateChamber,
   silkMaterial,
   silkWeb,
   tetherGeometry,
@@ -99,6 +100,7 @@ try {
     lastFrame = now
     if (!still) elapsed += delta
     const state = journey(elapsed)
+    updateChamber(elapsed)
     walk.setEffectiveWeight(state.walk)
     idle.setEffectiveWeight(1 - state.walk)
     walk.setEffectiveTimeScale(Math.min(7, state.speed / WALK_SPEED))
@@ -154,7 +156,7 @@ try {
   }
   document.body.dataset.webgl = renderer.capabilities.isWebGL2 ? "2" : "1"
   draw(performance.now() + 34)
-  renderer.setAnimationLoop(draw)
+  if (!still) renderer.setAnimationLoop(draw)
   window.addEventListener(
     "pagehide",
     () => {

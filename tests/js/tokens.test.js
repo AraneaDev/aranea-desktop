@@ -1,5 +1,10 @@
 const assert = require("node:assert/strict")
 const { test } = require("node:test")
+const fs = require("node:fs")
+const os = require("node:os")
+const path = require("node:path")
+const { spawnSync } = require("node:child_process")
+const { crc32, deflateSync, inflateSync } = require("node:zlib")
 
 const generatorPromise = import("../../tools/token-generator.mjs")
 
@@ -180,4 +185,117 @@ test("renderQmlTokens projects spring tuning from canonical motion tokens", asyn
   assert.match(output, /readonly property real springStrength: 3/)
   assert.match(output, /readonly property real springDamping: 0.25/)
   assert.match(output, /readonly property real surfaceClosedScale: 0.96/)
+})
+
+/** Run the actual generator against private copies of its source inputs. */
+function generatorSandbox(t) {
+  const repo = path.resolve(__dirname, "../..")
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aranea-token-cli-"))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  for (const relative of [
+    "tools/token-generator.mjs",
+    "scripts/generate-tokens",
+    "design",
+    "branding/marks",
+    "integrations/icons/aranea",
+    "integrations/qt/kvantum/Aranea"
+  ]) {
+    const target = path.join(root, relative)
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    fs.cpSync(path.join(repo, relative), target, { recursive: true })
+  }
+  fs.symlinkSync(fs.realpathSync(path.join(repo, "node_modules")), path.join(root, "node_modules"))
+  return {
+    read: (relative) => fs.readFileSync(path.join(root, relative)),
+    write: (relative, content) => fs.writeFileSync(path.join(root, relative), content),
+    generate: (mode) =>
+      spawnSync("bash", ["scripts/generate-tokens", mode], {
+        cwd: root,
+        encoding: "utf8",
+        env: { ...process.env, ARANEA_RSVG_CONVERT: "rsvg-convert" }
+      })
+  }
+}
+
+/** Change rendered pixels without changing the raster canvas dimensions. */
+function changeMarkColors(sandbox) {
+  sandbox.write(
+    "design/tokens.toml",
+    sandbox
+      .read("design/tokens.toml")
+      .toString("utf8")
+      .replace(/^(mark_(?:start|mid|end)\s*=\s*)"[^"\n]+"/gm, '$1"#ff0000"')
+  )
+}
+
+/** Re-encode the same decoded PNG pixels with a different compression policy. */
+function uncompressedPng(png) {
+  const chunks = []
+  const imageData = []
+  for (let offset = 8; offset < png.length;) {
+    const end = offset + 12 + png.readUInt32BE(offset)
+    const chunk = png.subarray(offset, end)
+    if (chunk.toString("ascii", 4, 8) === "IDAT") imageData.push(chunk.subarray(8, -4))
+    else chunks.push(chunk)
+    offset = end
+  }
+  // Keep the decoded pixels identical, but vary the PNG encoding as rasterizer
+  // versions can. An uncompressed IDAT guarantees different bytes from rsvg.
+  const data = deflateSync(inflateSync(Buffer.concat(imageData)), { level: 0 })
+  const idat = Buffer.alloc(data.length + 12)
+  idat.writeUInt32BE(data.length)
+  idat.write("IDAT", 4, "ascii")
+  data.copy(idat, 8)
+  idat.writeUInt32BE(crc32(idat.subarray(4, -4)), idat.length - 4)
+  return Buffer.concat([png.subarray(0, 8), ...chunks.slice(0, -1), idat, chunks.at(-1)])
+}
+
+test("token CLI write refreshes same-sized raster pixels after mark token edits", (t) => {
+  const sandbox = generatorSandbox(t)
+  let result = sandbox.generate("--write")
+  assert.equal(result.status, 0, result.stderr)
+  const before = sandbox.read("unlock.png")
+  const manifest = sandbox.read("branding/raster-manifest.txt")
+  changeMarkColors(sandbox)
+
+  result = sandbox.generate("--write")
+  assert.equal(result.status, 0, result.stderr)
+  const after = sandbox.read("unlock.png")
+  assert.deepEqual(after.subarray(16, 24), before.subarray(16, 24))
+  assert.equal(after.equals(before), false, "changed mark colors must replace raster pixels")
+  assert.equal(sandbox.read("branding/raster-manifest.txt").equals(manifest), false)
+  result = sandbox.generate("--check")
+  assert.equal(result.status, 0, result.stderr)
+})
+
+test("token CLI check rejects same-sized raster when source inputs changed", (t) => {
+  const sandbox = generatorSandbox(t)
+  const initial = sandbox.generate("--write")
+  assert.equal(initial.status, 0, initial.stderr)
+  const before = sandbox.read("unlock.png")
+  const manifest = sandbox.read("branding/raster-manifest.txt")
+  changeMarkColors(sandbox)
+
+  const result = sandbox.generate("--check")
+  assert.equal(result.status, 1, result.stderr)
+  assert.match(result.stderr, /generated token output is stale: unlock\.png/)
+  assert.equal(sandbox.read("unlock.png").equals(before), true)
+  assert.deepEqual(sandbox.read("branding/raster-manifest.txt"), manifest)
+})
+
+test("token CLI check tolerates same-source PNG encoding differences while write replaces them", (t) => {
+  const sandbox = generatorSandbox(t)
+  let result = sandbox.generate("--write")
+  assert.equal(result.status, 0, result.stderr)
+  const expected = sandbox.read("unlock.png")
+  const alternative = uncompressedPng(expected)
+  assert.equal(alternative.equals(expected), false)
+  sandbox.write("unlock.png", alternative)
+
+  result = sandbox.generate("--check")
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(sandbox.read("unlock.png").equals(alternative), true)
+  result = sandbox.generate("--write")
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(sandbox.read("unlock.png").equals(expected), true)
 })

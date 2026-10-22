@@ -2,9 +2,10 @@
 # Activity filesystem preparation. The caller holds the activity lock throughout.
 
 # Canonicalize only exact existing directories, never infer a containing checkout.
+# A validated metadata-free request may supply inspection fields for native input.
 agent_activity_prepare() {
-  local request="$1" action item cwd canonical prepared index=0
-  action=$(jq -r .action <<<"$request")
+  local request="$1" inspection="${2:-$1}" action item cwd canonical prepared index=0
+  action=$(jq -r .action <<<"$inspection")
   prepared=$request
   if [[ "$action" == register ]]; then
     while IFS= read -r item; do
@@ -13,9 +14,9 @@ agent_activity_prepare() {
       [[ -d "$canonical" && ! "$canonical" =~ [[:cntrl:]] ]] || return 1
       prepared=$(jq -c --arg p "$canonical" --argjson i "$index" '.args.tasks[$i].cwd=$p' <<<"$prepared")
       index=$((index + 1))
-    done < <(jq -c '.args.tasks[]' <<<"$request")
-  elif [[ "$action" == report && $(jq -r .args.kind <<<"$request") == snapshot ]]; then
-    cwd=$(jq -r .args.payload.cwd <<<"$request")
+    done < <(jq -c '.args.tasks[]' <<<"$inspection")
+  elif [[ "$action" == report && $(jq -r .args.kind <<<"$inspection") == snapshot ]]; then
+    cwd=$(jq -r .args.payload.cwd <<<"$inspection")
     canonical=$(realpath -e -- "$cwd") || return 1
     [[ -d "$canonical" && ! "$canonical" =~ [[:cntrl:]] ]] || return 1
     prepared=$(jq -c --arg p "$canonical" '.args.payload.cwd=$p' <<<"$prepared")

@@ -37,7 +37,7 @@ expected_surfaces=(
   network vpn audio bluetooth agents
   power monitor tray tray-manage clock worldclock weather image-picker apps favorites recent
   dawn osd workspaces updates projects project-overview project-actions project-problem project-switcher project-review project-preferences
-  screensaver-silk-journey screensaver-neon-weaver screensaver-spiderfall screensaver-kanji-drift screensaver-silken-flow screensaver-neon-depths
+  screensaver-silk-journey screensaver-neon-weaver screensaver-spiderfall screensaver-kanji-drift screensaver-silken-flow screensaver-neon-depths screensaver-orbital-loom screensaver-blackglass-foundry screensaver-crystal-bloom
 )
 expected_hero_frames=(
   desktop menu menu-submenu settings settings-scaling settings-schedule settings-screensavers menu-search menu-input apps favorites recent
@@ -45,7 +45,7 @@ expected_hero_frames=(
   image-picker network vpn audio bluetooth agents projects project-overview project-actions project-switcher project-review power monitor tray tray-manage clock worldclock weather lock osd
 )
 [[ "${surfaces[*]}" == "${expected_surfaces[*]}" ]]
-[[ "${#surfaces[@]}" == 53 && "${#expected_hero_frames[@]}" == 39 ]]
+[[ "${#surfaces[@]}" == 56 && "${#expected_hero_frames[@]}" == 39 ]]
 
 for surface in "${surfaces[@]}"; do
   test -f "$repo_root/screenshots/$surface.png"

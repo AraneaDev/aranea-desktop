@@ -36,7 +36,7 @@ def preview_scene():
         True,
         ASSETS,
         ASSETS / "live/index.html",
-        (ASSETS / "live", ASSETS / "aranea-spider.glb"),
+        (ASSETS / "live", ASSETS / "aranea-spider.glb", ASSETS / "collection/materials.mjs"),
     )
 
 

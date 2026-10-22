@@ -5,7 +5,7 @@
 **A cyberpunk command center for Omarchy.**
 
 A coordinated desktop with a command center, grouped controls, project tools,
-thirty wallpapers, and six live screensavers. Obsidian, mint, violet, and the
+thirty wallpapers, and nine live screensavers. Obsidian, mint, violet, and the
 Aranea spider carry through the desktop, lock screen, and boot splash.
 
 [![Release](https://img.shields.io/github/v/release/AraneaDev/aranea-desktop?label=release)](https://github.com/AraneaDev/aranea-desktop/releases)
@@ -128,7 +128,7 @@ for standalone previews and asset development.
 
 The hero above tours the desktop. Browse the [complete gallery](docs/gallery.md)
 for panels, settings, projects, applications, the lock screen, boot splash,
-[all six screensavers](docs/gallery.md#screensavers), and all thirty wallpapers. Desktop captures use **Silken Vault**; agent usage
+[all nine screensavers](docs/gallery.md#screensavers), and all thirty wallpapers. Desktop captures use **Silken Vault**; agent usage
 captures use demonstration data.
 
 [![Desktop with Silken Vault](screenshots/desktop.png)](docs/gallery.md)

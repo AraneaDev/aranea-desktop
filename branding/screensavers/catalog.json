@@ -9,7 +9,11 @@
       "thumbnail": "branding/3d/live/preview.png",
       "root": "branding/3d",
       "entry": "branding/3d/live/index.html",
-      "publicPaths": ["branding/3d/live", "branding/3d/aranea-spider.glb"]
+      "publicPaths": [
+        "branding/3d/live",
+        "branding/3d/aranea-spider.glb",
+        "branding/3d/collection/materials.mjs"
+      ]
     },
     {
       "id": "neon-weaver",
@@ -24,7 +28,8 @@
         "branding/3d/live/vendor",
         "branding/3d/live/dismiss.js",
         "branding/3d/live/kanji.woff2",
-        "branding/3d/aranea-spider.glb"
+        "branding/3d/aranea-spider.glb",
+        "branding/3d/collection/materials.mjs"
       ]
     },
     {
@@ -40,7 +45,8 @@
         "branding/3d/live/vendor",
         "branding/3d/live/dismiss.js",
         "branding/3d/live/kanji.woff2",
-        "branding/3d/aranea-spider.glb"
+        "branding/3d/aranea-spider.glb",
+        "branding/3d/collection/materials.mjs"
       ]
     },
     {
@@ -55,7 +61,8 @@
         "branding/3d/collection/ambient",
         "branding/3d/live/vendor",
         "branding/3d/live/dismiss.js",
-        "branding/3d/live/kanji.woff2"
+        "branding/3d/live/kanji.woff2",
+        "branding/3d/collection/materials.mjs"
       ]
     },
     {
@@ -70,7 +77,8 @@
         "branding/3d/collection/ambient",
         "branding/3d/live/vendor",
         "branding/3d/live/dismiss.js",
-        "branding/3d/live/kanji.woff2"
+        "branding/3d/live/kanji.woff2",
+        "branding/3d/collection/materials.mjs"
       ]
     },
     {
@@ -85,7 +93,56 @@
         "branding/3d/collection/ambient",
         "branding/3d/live/vendor",
         "branding/3d/live/dismiss.js",
-        "branding/3d/live/kanji.woff2"
+        "branding/3d/live/kanji.woff2",
+        "branding/3d/collection/materials.mjs"
+      ]
+    },
+    {
+      "id": "orbital-loom",
+      "label": "Orbital Loom",
+      "description": "Celestial rings weave luminous orbital silk around an eclipsing core.",
+      "renderer": "web",
+      "thumbnail": "branding/3d/collection/ambient/orbital-loom.png",
+      "root": "branding/3d",
+      "entry": "branding/3d/collection/ambient/orbital-loom.html",
+      "publicPaths": [
+        "branding/3d/collection/ambient",
+        "branding/3d/live/vendor",
+        "branding/3d/live/dismiss.js",
+        "branding/3d/live/kanji.woff2",
+        "branding/3d/collection/materials.mjs"
+      ]
+    },
+    {
+      "id": "blackglass-foundry",
+      "label": "Blackglass Foundry",
+      "description": "Counterrotating obsidian machinery assembles around a surging molten core.",
+      "renderer": "web",
+      "thumbnail": "branding/3d/collection/ambient/blackglass-foundry.png",
+      "root": "branding/3d",
+      "entry": "branding/3d/collection/ambient/blackglass-foundry.html",
+      "publicPaths": [
+        "branding/3d/collection/ambient",
+        "branding/3d/live/vendor",
+        "branding/3d/live/dismiss.js",
+        "branding/3d/live/kanji.woff2",
+        "branding/3d/collection/materials.mjs"
+      ]
+    },
+    {
+      "id": "crystal-bloom",
+      "label": "Crystal Bloom",
+      "description": "Faceted mineral petals rise, scatter and reform around a luminous living heart.",
+      "renderer": "web",
+      "thumbnail": "branding/3d/collection/ambient/crystal-bloom.png",
+      "root": "branding/3d",
+      "entry": "branding/3d/collection/ambient/crystal-bloom.html",
+      "publicPaths": [
+        "branding/3d/collection/ambient",
+        "branding/3d/live/vendor",
+        "branding/3d/live/dismiss.js",
+        "branding/3d/live/kanji.woff2",
+        "branding/3d/collection/materials.mjs"
       ]
     }
   ]

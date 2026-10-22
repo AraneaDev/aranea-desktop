@@ -109,9 +109,10 @@ bash tests/spider-preview.test.sh
 
 ## Picker and automatic sessions
 
-Open **Settings → Aranea → Screensavers** to choose one of six live scenes:
+Open **Settings → Aranea → Screensavers** to choose one of nine live scenes:
 **Silk Journey**, **Neon Weaver**, and **Spiderfall** feature the spider;
-**Kanji Drift**, **Silken Flow**, and **Neon Depths** do not. All use the local
+**Kanji Drift**, **Silken Flow**, **Neon Depths**, **Orbital Loom**,
+**Blackglass Foundry**, and **Crystal Bloom** do not. All use the local
 Chromium/WebGL renderer and Aranea's dark, mint and violet palette.
 Silk Chamber remains a standalone rendering experiment outside the picker. Select a
 single scene or shuffle available Aranea scenes. **Apply scene** saves selection;

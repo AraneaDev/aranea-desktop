@@ -266,7 +266,7 @@ errors="$(run_batch)" || status=$?
 }
 [[ "$(cat "$out/osd.png")" == "new osd" ]]
 mapfile -t captured_surfaces <"$ARANEA_TEST_SANDBOX/surface-calls"
-[[ "${#captured_surfaces[@]}" == 53 ]]
+[[ "${#captured_surfaces[@]}" == 56 ]]
 [[ "${captured_surfaces[*]:2:5}" == 'settings settings-scaling settings-schedule settings-screensavers menu-search' ]]
 mapfile -t hero_inputs < <(grep '\.png$' "$ARANEA_TEST_SANDBOX/hero-args")
 [[ "${#hero_inputs[@]}" == 39 ]]

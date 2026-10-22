@@ -64,7 +64,8 @@ deliver() {
   local provider=$1 session=12345678-1234-1234-1234-123456789abc
   [[ "$provider" != codex ]] || session=abcdef12-1234-1234-1234-123456789abc
   rm -f "$TMPDIR/$provider.done"
-  jq -cn --arg cwd "$sibling" --arg session "$session" --argjson event "$2" '$event+{session_id:$session,cwd:$cwd}' >"$TMPDIR/$provider.event"
+  jq -cn --arg cwd "$sibling" --arg session "$session" --argjson event "$2" '$event+{session_id:$session,cwd:$cwd}' >"$TMPDIR/$provider.pending"
+  mv "$TMPDIR/$provider.pending" "$TMPDIR/$provider.event"
   for _ in {1..100}; do
     [[ ! -e "$TMPDIR/$provider.done" ]] || return 0
     sleep .05

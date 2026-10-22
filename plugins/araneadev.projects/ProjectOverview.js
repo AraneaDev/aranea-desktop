@@ -21,8 +21,33 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
   })[0]
   if (!checkout) return result
   if (git && git.projectId === project.id && git.checkoutId === checkoutId) result.git = git
-  var definitions = Records.definitions(actions, project.id)
-  var runs = Records.runs(actions, project.id, checkoutId)
+  var priority = function (/** @type {OverviewData} */ a, /** @type {OverviewData} */ b) {
+    return Number(b.active) - Number(a.active) || Number(b.attention) - Number(a.attention)
+  }
+  var actionsProjection = actionRows(project.id, checkoutId, actions, nowMs, priority)
+  result.services = actionsProjection.services
+  result.checks = actionsProjection.checks
+  var agentsProjection = agentRows(project, checkoutId, checkout.path, activity, nowMs)
+  result.agents = agentsProjection.agents
+  result.attention = actionsProjection.attention.concat(agentsProjection.attention)
+  result.workspaces = savedWorkspaceRows(project, checkoutId, runtime)
+  result.workspaces = environmentRows(project.id, runtime, priority).concat(result.workspaces)
+  return result
+}
+
+/** Project saved actions and retained runs, collecting attention before row sorting.
+ * @param {string} projectId - exact registered project
+ * @param {string} checkoutId - exact selected checkout
+ * @param {OverviewData} actions - shared action snapshot
+ * @param {number} nowMs - presentation clock
+ * @param {(a: OverviewData, b: OverviewData) => number} priority - presentation ordering
+ * @returns {OverviewData} service, check and insertion-ordered attention rows
+ */
+function actionRows(projectId, checkoutId, actions, nowMs, priority) {
+  /** @type {OverviewData} */
+  var result = { services: [], checks: [], attention: [] }
+  var definitions = Records.definitions(actions, projectId)
+  var runs = Records.runs(actions, projectId, checkoutId)
   var ids = definitions.map(function (d) {
     return d.id
   })
@@ -64,7 +89,7 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
           new Date(run.createdAt * 1000).toLocaleString()
         : "",
       target: {
-        projectId: project.id,
+        projectId: projectId,
         checkoutId: checkoutId,
         actionId: id,
         revision: definition ? definition.revision : null,
@@ -82,18 +107,29 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
     result[service ? "services" : "checks"].push(row)
     if (row.attention) result.attention.push(row)
   })
-  var priority = function (/** @type {OverviewData} */ a, /** @type {OverviewData} */ b) {
-    return Number(b.active) - Number(a.active) || Number(b.attention) - Number(a.attention)
-  }
   result.services.sort(priority)
   result.checks.sort(priority)
+  return result
+}
+
+/** Project reported agents with exact checkout and path associations.
+ * @param {OverviewData} project - selected registration
+ * @param {string} checkoutId - exact selected checkout
+ * @param {string} checkoutPath - exact registered checkout path
+ * @param {OverviewData} activity - shared task snapshot
+ * @param {number} nowMs - presentation clock
+ * @returns {OverviewData} agent and attention rows in task presentation order
+ */
+function agentRows(project, checkoutId, checkoutPath, activity, nowMs) {
+  /** @type {OverviewData} */
+  var result = { agents: [], attention: [] }
   var tasks = (activity.tasks || []).filter(function (/** @type {OverviewData} */ t) {
     var a = t.association || {}
     return (
       a.status === "registered" &&
       a.projectId === project.id &&
       a.checkoutId === checkoutId &&
-      a.cwd === checkout.path
+      a.cwd === checkoutPath
     )
   })
   result.agents = Tasks.rows({ tasks: tasks }, { projects: [project] }, nowMs).map(function (task) {
@@ -123,6 +159,16 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
     if (row.attention) result.attention.push(row)
     return row
   })
+  return result
+}
+
+/** Project legacy workspace bindings followed by distinct saved associations.
+ * @param {OverviewData} project - selected registration and associations
+ * @param {string} checkoutId - exact selected checkout
+ * @param {OverviewData} runtime - current owner snapshot
+ * @returns {Array<OverviewData>} saved workspace destinations in discovery order
+ */
+function savedWorkspaceRows(project, checkoutId, runtime) {
   /** @type {Array<OverviewData>} */
   var bindings = (runtime.bindings || []).filter(function (/** @type {OverviewData} */ b) {
     return (
@@ -145,7 +191,7 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
     )
       workspaces.push(association.workspaceId)
   })
-  result.workspaces = workspaces.map(function (id) {
+  return workspaces.map(function (id) {
     var rows = bindings.filter(function (/** @type {OverviewData} */ b) {
       return b.workspaceId === id
     })
@@ -170,10 +216,19 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
       controls: [{ method: "open", label: "Open workspace" }]
     }
   })
+}
+
+/** Project launched environments across the project's checkouts with role recovery.
+ * @param {string} projectId - exact registered project
+ * @param {OverviewData} runtime - current owner snapshot
+ * @param {(a: OverviewData, b: OverviewData) => number} priority - presentation ordering
+ * @returns {Array<OverviewData>} environment rows ordered by state then launch time
+ */
+function environmentRows(projectId, runtime, priority) {
   var environments = (runtime.environments || []).filter(function (/** @type {OverviewData} */ e) {
-    return e.projectId === project.id
+    return e.projectId === projectId
   })
-  var environmentRows = environments.map(function (/** @type {OverviewData} */ e) {
+  var rows = environments.map(function (/** @type {OverviewData} */ e) {
     var operations = (runtime.operations || [])
       .filter(function (/** @type {OverviewData} */ op) {
         return op.environmentId === e.id && !op.environmentReturn
@@ -234,7 +289,7 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
       status: statuses.join(" · "),
       detail: (e.checkoutSnapshot.branch || "detached") + " at launch · " + e.checkoutSnapshot.path,
       fullDetail: details.join("\n"),
-      target: { projectId: project.id, environmentId: e.id },
+      target: { projectId: projectId, environmentId: e.id },
       controls: controls,
       active: observed.length > 0,
       attention: raws.some(function (/** @type {string} */ value) {
@@ -243,11 +298,10 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
       createdAt: e.createdAt || 0
     }
   })
-  environmentRows.sort(function (/** @type {OverviewData} */ a, /** @type {OverviewData} */ b) {
+  rows.sort(function (/** @type {OverviewData} */ a, /** @type {OverviewData} */ b) {
     return priority(a, b) || b.createdAt - a.createdAt
   })
-  result.workspaces = environmentRows.concat(result.workspaces)
-  return result
+  return rows
 }
 
 /** Plain word for one role step status; the raw value stays in the data.

@@ -100,18 +100,28 @@ agent_hooks_provenance() {
 # Public read-only proof for later navigation: current provider and host identities.
 # A compositor window must still be independently proved by the desktop owner.
 agent_hooks_validate_provenance() {
-  local evidence="$1" provider="${2:-}" pid expected parent start item
-  [[ "$evidence" != null && $(jq -r .bootId <<<"$evidence") == "$(cat /proc/sys/kernel/random/boot_id)" ]] || return 1
-  pid=$(jq -r .pid <<<"$evidence")
-  expected=$(jq -r .startTime <<<"$evidence")
+  local evidence="$1" provider="${2:-}" pid expected parent start evidence_fd evidence_pid index
+  local -a identity
+  [[ "$evidence" != null ]] || return 1
+  # One parse preserves arbitrary path bytes. Keep the producer status so a
+  # malformed ancestor list cannot leave a trusted but incomplete header.
+  exec {evidence_fd}< <(jq -j '[.bootId,.pid,.startTime,.executable,.commandHash,(.ancestors[]|.pid,.startTime)] | if any(.[]; tostring|contains("\u0000")) then error("Invalid process evidence") else .[] | tostring,"\u0000" end' <<<"$evidence")
+  evidence_pid=$!
+  mapfile -d '' -t identity <&"$evidence_fd"
+  exec {evidence_fd}<&-
+  wait "$evidence_pid" || return 1
+  ((${#identity[@]} >= 5 && (${#identity[@]} - 5) % 2 == 0)) || return 1
+  [[ "${identity[0]}" == "$(cat /proc/sys/kernel/random/boot_id)" ]] || return 1
+  pid=${identity[1]}
+  expected=${identity[2]}
   read -r parent start < <(agent_hooks_process "$pid") || return 1
   [[ "$start" == "$expected" ]] && agent_hooks_provider_process "$pid" "$provider" || return 1
-  [[ "$(jq -r .executable <<<"$evidence")" == "$(readlink -f -- "/proc/$pid/exe")" && "$(jq -r .commandHash <<<"$evidence")" == "$(agent_hooks_command_hash "$pid")" ]] || return 1
-  while IFS= read -r item; do
-    [[ "$(jq -r .pid <<<"$item")" == "$parent" ]] || return 1
-    read -r parent start < <(agent_hooks_process "$(jq -r .pid <<<"$item")") || return 1
-    [[ "$start" == "$(jq -r .startTime <<<"$item")" ]] || return 1
-  done < <(jq -c '.ancestors[]' <<<"$evidence")
+  [[ "${identity[3]}" == "$(readlink -f -- "/proc/$pid/exe")" && "${identity[4]}" == "$(agent_hooks_command_hash "$pid")" ]] || return 1
+  for ((index = 5; index < ${#identity[@]}; index += 2)); do
+    [[ "${identity[index]}" == "$parent" ]] || return 1
+    read -r parent start < <(agent_hooks_process "${identity[index]}") || return 1
+    [[ "$start" == "${identity[index + 1]}" ]] || return 1
+  done
 }
 
 # Helpers must themselves occur in actual ancestry with the exact fixed argv.
