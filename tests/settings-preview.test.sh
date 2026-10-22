@@ -17,8 +17,10 @@ fi
 out="$ARANEA_TEST_SANDBOX/shots"
 ARANEA_SETTINGS_PREVIEW_QUICKSHELL="$quickshell_bin" "$repo_root/scripts/capture-screenshots" --surface settings-narrow --output "$out"
 [[ "$(magick identify -format '%wx%h' "$out/settings-narrow.png")" == 652x452 ]]
-ARANEA_SETTINGS_PREVIEW_QUICKSHELL="$quickshell_bin" "$repo_root/tools/render-settings-preview" --fixture scaling --output "$out/settings-scaling.png"
-[[ "$(magick identify -format '%wx%h' "$out/settings-scaling.png")" == 840x620 ]]
+for fixture in scaling screensavers; do
+  ARANEA_SETTINGS_PREVIEW_QUICKSHELL="$quickshell_bin" "$repo_root/tools/render-settings-preview" --fixture "$fixture" --output "$out/settings-$fixture.png"
+  [[ "$(magick identify -format '%wx%h' "$out/settings-$fixture.png")" == 840x620 ]]
+done
 for fixture in projects-empty projects-discovery projects-grouped projects-partial project-details project-launch-partial workspaces; do
   ARANEA_SETTINGS_PREVIEW_QUICKSHELL="$quickshell_bin" "$repo_root/scripts/capture-screenshots" --surface "$fixture" --output "$out"
   [[ -s "$out/$fixture.png" ]]

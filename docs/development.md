@@ -94,7 +94,7 @@ persistence, launch queues, and service ownership. For example, `EmojiCell` and
 
 ## Showcase captures
 
-The public batch produces 46 surface PNGs and a 38-frame hero GIF. It mixes live
+The public batch produces 47 surface PNGs and a 39-frame hero GIF. It mixes live
 shell captures with production QML rendered in isolated hosts; lock and boot
 previews never lock or reboot the active machine.
 
@@ -122,7 +122,10 @@ restarts, and restores the saved background once at the end. An active wallpaper
 timer is paused during the batch and resumed afterwards; its configuration stays
 unchanged. Workspaces and lock previews use the same
 image. Settings previews use Silken Vault, and
-`settings-schedule` shows the daily time/image editor. Nearby device names,
+`settings-schedule` shows the daily time/image editor. `settings-screensavers`
+uses the production picker with inert catalog assets, Silk Journey/single and
+900/1200-second timing. It follows Schedule in both the batch and hero; capture
+never starts a renderer or saves scene/timing preferences. Nearby device names,
 audio labels, provider details, and notification contents are staged for the
 showcase. Audio transport and agent refresh/selection are refused while their
 showcase fixtures are active. Wi-Fi QR codes are excluded.

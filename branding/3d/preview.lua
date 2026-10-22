@@ -15,7 +15,10 @@ for i, key in ipairs(keys) do
     mp.add_forced_key_binding(key, 'aranea-dismiss-' .. i, close)
 end
 mp.observe_property('mouse-pos', 'native', function(_, pos)
-    if not pos or not pos.x or not pos.y then return end
+    if not pos or pos.hover ~= true or not pos.x or not pos.y then
+        origin = nil
+        return
+    end
     if not armed or not origin then
         origin = {x = pos.x, y = pos.y}
         return

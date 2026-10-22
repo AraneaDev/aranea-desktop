@@ -159,6 +159,7 @@ case "$integration" in
     fi
     ;;
   session)
+    install_one "$repo_root/integrations/session/bin/omarchy-launch-screensaver" "$(xdg_bin_home)/omarchy-launch-screensaver"
     install_one "$repo_root/integrations/aranea-colors.css" "$config_root/omarchy/session/aranea-colors.css"
     install_one "$repo_root/integrations/session/omarchy.css" "$config_root/omarchy/session/aranea.css"
     ;;

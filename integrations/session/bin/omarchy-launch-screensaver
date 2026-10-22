@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Omarchy owns idle timing and lock. Route only active Aranea to its stable owner.
+set -euo pipefail
+if [[ $# -gt 1 || ($# == 1 && "$1" != force) ]]; then
+  echo 'Usage: omarchy-launch-screensaver [force]' >&2
+  exit 2
+fi
+theme_file="$HOME/.local/state/omarchy/current/theme.name"
+theme=''
+[[ ! -r "$theme_file" ]] || theme="$(<"$theme_file")"
+owner="$HOME/.config/omarchy/themes/aranea/scripts/aranea-screensaver"
+if [[ "${theme,,}" == aranea && -x "$owner" ]] && command -v python3 >/dev/null 2>&1; then
+  # The owner handles allowed availability fallback itself. Never retry a failed
+  # owner: locked/busy/runtime errors must end this activation attempt.
+  exec "$owner" start "$@"
+fi
+stock="${OMARCHY_PATH:-/usr/share/omarchy}/bin/omarchy-launch-screensaver"
+[[ -x "$stock" ]] || stock=/usr/bin/omarchy-launch-screensaver
+if [[ ! -x "$stock" || "$(readlink -f -- "$stock")" == "$(readlink -f -- "${BASH_SOURCE[0]}")" ]]; then
+  echo 'Packaged Omarchy screensaver launcher is unavailable or recursive' >&2
+  exit 1
+fi
+exec "$stock" "$@"

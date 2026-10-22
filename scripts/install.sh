@@ -220,8 +220,10 @@ if ((dry_run)); then
     if [[ "$profile" == full ]]; then
       if ((json_mode)); then
         json_step install ok install-terminal 'would install terminal integration'
+        json_step install ok install-session 'would install session integration'
       else
         say "would install terminal integration"
+        say "would install session integration"
       fi
     fi
   fi
@@ -306,6 +308,9 @@ else
       ((json_mode)) && json_step install running install-terminal 'install terminal integration'
       run "$theme_root/scripts/install-integration" terminal --yes
       ((json_mode)) && json_step install ok install-terminal 'terminal integration installed'
+      ((json_mode)) && json_step install running install-session 'install session integration'
+      run "$theme_root/scripts/install-integration" session --yes
+      ((json_mode)) && json_step install ok install-session 'session integration installed'
     fi
   fi
   if ((json_mode)); then

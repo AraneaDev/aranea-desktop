@@ -52,6 +52,7 @@ test("missing compositor removes only live records and app identities survive du
       "setting:schedule",
       "setting:integrations",
       "setting:notifications",
+      "setting:screensavers",
       "setting:projects"
     ]
   )
@@ -65,7 +66,14 @@ test("settings aliases discover scaling but dispatch only static section destina
   const display = records(data).find((r) => r.key === "setting:display")
   for (const alias of ["display", "scale", "scaling", "custom scale"])
     assert.ok(display && display.aliases.includes(alias))
-  for (const section of ["appearance", "display", "schedule", "integrations", "notifications"]) {
+  for (const section of [
+    "appearance",
+    "display",
+    "schedule",
+    "integrations",
+    "notifications",
+    "screensavers"
+  ]) {
     assert.deepEqual(dispatch(`setting:${section}`, data), {
       kind: "argv",
       argv: ["omarchy-shell", "shell", "summon", "araneadev.settings", JSON.stringify({ section })]

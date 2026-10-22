@@ -7,7 +7,7 @@ settings take effect immediately. Commands below run from a repository checkout;
 
 ## Aranea settings
 
-The settings window has five destinations:
+The settings window has six destinations:
 
 | Destination   | Change                                          | When it takes effect                                                   |
 | ------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
@@ -18,11 +18,58 @@ The settings window has five destinations:
 | Schedule      | Daily wallpaper entries.                        | **Save schedule** commits the draft.                                   |
 | Schedule      | Enable or disable the saved schedule.           | Immediately.                                                           |
 | Integrations  | Activate or deactivate a supported integration. | Immediately, after the operation completes.                            |
+| Screensavers  | Scene or shuffle; idle and lock deadlines.      | **Apply scene** and **Apply timing** save independently.               |
 | Notifications | Manual Do not disturb.                          | Immediately.                                                           |
 
 Navigating between pages keeps your drafts and scroll positions. Unavailable
 controls show an error and **Retry** without disabling unrelated preferences.
 Closing the window does not cancel an accepted integration installation.
+
+### Choose screensavers and timing
+
+Open **Settings → Screensavers**, or search for **screensaver**, **shuffle** or
+**lock** in the command center. Select a card to draft a single scene, or enable
+**Shuffle Aranea scenes**; shuffle excludes Omarchy. **Apply scene** saves the
+selection, while **Discard** restores the current owner choice. Unavailable scenes
+cannot be selected. **Preview** never saves either draft and hides Settings when
+the launch is accepted. Move the pointer, click, or press a key to dismiss the
+preview. Launch acceptance is not a rendered-frame confirmation; reopen Settings
+to read any startup error.
+
+Both timing deadlines count from last activity. Set whole minutes from 1 to 1440
+or explicitly choose **Disabled**. When both are enabled, lock must be later than
+the screensaver. **Apply timing** saves only timing; **Discard timing draft**
+restores the configured values. Existing precise seconds stay unchanged until
+that field is edited, including when the other duration is saved. Non-minute
+values are shown exactly in **Configured**, with the minutes field left blank
+until edited. The initial 15/20-minute user configuration is preserved until save.
+
+**Timing saved** confirms persistence and a successful shell reload request;
+**Configured** describes saved values, not independently verified running timers.
+If reload or readback fails, the draft and diagnostic stay visible for correction.
+Stay awake and screensaver-off indicators explain pauses without toggling them.
+Automatic activation requires the installed, reachable Aranea session integration.
+A full install manages that launcher; enable the **Session** integration in Settings
+if it is inactive. Omarchy's idle service remains responsible for activation and
+locking. Stay awake or screensaver-off can pause automatic activation.
+
+The initial catalog contains **Silk Journey** (local Chromium/WebGL), **Silk Chamber**
+(local mpv video), and **Omarchy** (the packaged terminal saver). The owner uses
+one selected scene across active monitors. Shuffle chooses from available Aranea
+scenes once per automatic session, avoids the previous scene when possible, and
+excludes Omarchy. Missing renderer dependencies disable only the affected scene.
+
+Read selection, catalog availability, launcher reachability and configured timing
+without launching a renderer:
+
+```bash
+scripts/aranea-screensaver status --json
+scripts/aranea-screensaver list --json
+```
+
+Saved selection lives in `~/.config/aranea/screensaver.json`; timing stays in
+Omarchy's `shell.json`. See the [session integration guide](../integrations/session/README.md#automatic-screensavers-and-timing)
+for launcher ownership, fallback and reload behavior.
 
 ### Choose fonts
 

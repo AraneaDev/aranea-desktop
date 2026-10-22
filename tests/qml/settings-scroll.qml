@@ -20,7 +20,7 @@ ShellRoot {
   // Repeat the matrix with a real wrapped read failure visible.
   property bool withError: false
   // Stable category identities used by the production host.
-  readonly property var sections: ['appearance', 'display', 'schedule', 'integrations', 'notifications']
+  readonly property var sections: ['appearance', 'display', 'schedule', 'integrations', 'notifications', 'screensavers']
   QmlTest {
     id: t
   }
@@ -97,6 +97,8 @@ ShellRoot {
       return t.findChild(surface, 'displayScaleApply')
     if (entry.section === 'schedule')
       return t.findChild(surface, 'scheduleSave')
+    if (entry.section === 'screensavers')
+      return t.findChild(surface, 'screensaverMinutes:lockSeconds')
     if (entry.section === 'integrations') {
       var actions = t.findChildren(surface, 'integrationAction')
       return actions[actions.length - 1]
@@ -106,10 +108,10 @@ ShellRoot {
   // Visit one size/page combination, allowing real layout and event delivery.
   function visit() {
     var size = sizes[sizeIndex]
-    var geometry = Logic.geometry(size[0] / size[2], size[1] / size[2], 1)
+    entry.section = sections[sectionIndex]
+    var geometry = Logic.geometry(size[0] / size[2], size[1] / size[2], 1, entry.section === 'screensavers' ? 620 : 460)
     surface.width = geometry.width
     surface.height = geometry.height
-    entry.section = sections[sectionIndex]
     if (entry.section === 'appearance') {
       var chooser = t.findChild(surface, 'wallpaperChoose')
       if (chooser.text === 'Choose wallpaper')
@@ -191,6 +193,32 @@ ShellRoot {
         availability: 'available'
       })
     entry.controller.state = {
+      screensaver: {
+        catalogAvailable: true,
+        selectedId: 'silk-journey',
+        mode: 'single',
+        choices: [
+          {
+            id: 'silk-journey',
+            label: 'Silk Journey',
+            available: true
+          },
+          {
+            id: 'silk-chamber',
+            label: 'Silk Chamber',
+            available: true
+          },
+          {
+            id: 'omarchy',
+            label: 'Omarchy',
+            available: true
+          }
+        ],
+        idle: {
+          screensaverSeconds: 900,
+          lockSeconds: 1200
+        }
+      },
       wallpapers: wallpapers,
       wallpapersAvailability: 'available',
       wallpaper: {

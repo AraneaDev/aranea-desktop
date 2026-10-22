@@ -44,8 +44,17 @@ Item {
       id: 'notifications',
       label: 'Notifications',
       icon: String.fromCodePoint(0xf009a)
+    },
+    {
+      id: 'screensavers',
+      label: strings.t('screensavers.title'),
+      icon: String.fromCodePoint(0xf0502)
     }
   ]
+  Commons.Translations {
+    id: strings
+    directory: Qt.resolvedUrl('i18n')
+  }
   // Request a category change without executing commands.
   function choose(section) {
     sectionRequested(section)

@@ -3,10 +3,13 @@
 import importlib.util
 import json
 import os
-from pathlib import Path
+import select
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
+from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location(
@@ -17,6 +20,47 @@ spec.loader.exec_module(preview)
 
 
 class PreviewTests(unittest.TestCase):
+    def test_serve_only_preserves_url_token_and_dismissal_lifetime(self):
+        child = subprocess.Popen(
+            ["python3", str(ROOT / "tools/spider/preview.py"), "--serve-only"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            self.assertTrue(select.select([child.stdout], [], [], 3)[0])
+            url = child.stdout.readline().strip()
+            parts = urlsplit(url)
+            self.assertEqual(parts.path, "/live/")
+            query = parse_qs(parts.query)
+            self.assertEqual(set(query), {"session"})
+            self.assertGreaterEqual(len(query["session"][0]), 24)
+            headers = {"X-Aranea-Session": query["session"][0]}
+            base = url.split("/live/")[0]
+            with urlopen(url) as response:
+                self.assertEqual(response.status, 200)
+            for event in ["ready", "failed"]:
+                with urlopen(
+                    Request(
+                        base + "/__" + event,
+                        data=b'{"screenId":"legacy"}',
+                        headers=headers,
+                    )
+                ) as response:
+                    self.assertEqual(response.status, 204)
+                self.assertIsNone(child.poll())
+            with urlopen(
+                Request(base + "/__dismiss", method="POST", headers=headers)
+            ) as response:
+                self.assertEqual(response.status, 204)
+            self.assertEqual(child.wait(timeout=3), 0)
+        finally:
+            if child.poll() is None:
+                child.terminate()
+                child.wait(timeout=3)
+            child.stdout.close()
+            child.stderr.close()
+
     def test_public_assets_only(self):
         for url in [
             "/live/",
@@ -74,6 +118,7 @@ if mode=='dismiss':
                     str(browser),
                 ],
                 env=env,
+                check=False,
                 capture_output=True,
                 text=True,
                 timeout=12,

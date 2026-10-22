@@ -119,6 +119,27 @@ with a disclosed tray and a conditional Health issue shortcut.
 semantic color. Agents persists `selectedProviderId` through inline settings;
 capture/showcase state cannot overwrite it.
 
+## Screensaver settings ownership
+
+`ScreensaversPage.qml` keeps independent scene/mode and exact-second timing drafts
+inside the persistent `SettingsSurface`. Selection and navigation have no command
+side effects. `SettingsLogic.command` allowlists catalog identities, modes and
+strict timing seconds; `SettingsController` alone owns processes, operation results
+and fresh readback. Scene Apply never changes timing; Preview saves neither draft.
+Accepted custom or delegated stock Preview hides the Settings overlay so renderer
+input is reachable, while the controller and drafts survive. Acceptance does not
+claim renderer readiness. Failed launches and reads retain actionable errors.
+
+Timing updates keep unedited precise seconds until their individual field is
+changed. The UI edits whole minutes or explicit zero/Disabled, with lock after
+screensaver when both are enabled. A reload acknowledgment confirms only the
+reload command; labels describe configured deadlines. Timing remains editable
+when scene state is unavailable. Capture transactions preserve both drafts, mode,
+selection, feedback and per-page gallery scroll, install inert owner snapshots,
+and block owner reads, saves and renderer starts. The offscreen Settings fixture
+renders the actual production surface; no new full capture manifest entry is
+claimed before its native screenshot exists.
+
 ## Desktop search and actions
 
 The menu's root is a compact grouped single column. Root search combines apps,

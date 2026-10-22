@@ -25,18 +25,19 @@ mapfile -t surfaces < <(
   sed -n 's/^all_surfaces=(\(.*\))$/\1/p' "$capture_script" | tr ' ' '\n'
 )
 expected_surfaces=(
-  menu menu-submenu settings settings-scaling settings-schedule menu-search menu-input desktop health lock plymouth
+  menu menu-submenu settings settings-scaling settings-schedule settings-screensavers menu-search menu-input desktop health lock plymouth
   btop file-manager neovim notifications notifications-empty clipboard emojis polkit
   network vpn audio bluetooth agents
   power monitor tray tray-manage clock worldclock weather image-picker apps favorites recent
   dawn osd workspaces updates projects project-overview project-actions project-problem project-switcher project-review project-preferences
 )
 expected_hero_frames=(
-  desktop menu menu-submenu settings settings-scaling settings-schedule menu-search menu-input apps favorites recent
+  desktop menu menu-submenu settings settings-scaling settings-schedule settings-screensavers menu-search menu-input apps favorites recent
   notifications notifications-empty health updates workspaces clipboard emojis
   image-picker network vpn audio bluetooth agents projects project-overview project-actions project-switcher project-review power monitor tray tray-manage clock worldclock weather lock osd
 )
 [[ "${surfaces[*]}" == "${expected_surfaces[*]}" ]]
+[[ "${#surfaces[@]}" == 47 && "${#expected_hero_frames[@]}" == 39 ]]
 
 for surface in "${surfaces[@]}"; do
   test -f "$repo_root/screenshots/$surface.png"

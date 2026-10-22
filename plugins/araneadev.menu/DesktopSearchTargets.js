@@ -130,6 +130,14 @@ function settingRecords(available) {
       { section: "notifications" },
       "Do not disturb and quiet hours",
       ["dnd", "quiet hours", "notification"]
+    ),
+    sourceRecord(
+      "setting",
+      "screensavers",
+      "Screensavers",
+      { section: "screensavers" },
+      "Scenes, shuffle and inactivity deadlines",
+      ["screensaver", "idle", "lock", "timing", "shuffle"]
     )
   ]
 }

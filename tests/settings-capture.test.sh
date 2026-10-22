@@ -95,7 +95,7 @@ for answer in busy invalid 'Function not found.' ''; do
   [[ "$rc" == 3 && ! -e "$out/settings.png" ]]
   if grep -Eq 'grim|captureRestore|dispatch' "$log"; then exit 1; fi
 done
-for surface in settings settings-scaling; do
+for surface in settings settings-scaling settings-screensavers; do
   : >"$log"
   "$capture" --surface "$surface" --output "$out" >/dev/null
   [[ -f "$out/$surface.png" ]]
@@ -152,4 +152,35 @@ grep -Fq captureRestore "$log"
 # A cold expanded artwork catalog can take longer than the first 30 polls.
 CAPTURE_SETTINGS_READY_AFTER=40 "$capture" --surface settings-schedule --output "$out" >/dev/null
 [[ "$(cat "$ARANEA_TEST_SANDBOX/ready-count")" == 40 ]]
+# Screensavers uses production Settings with inert catalog/timing, never a live owner read.
+: >"$log"
+"$capture" --surface settings-screensavers --output "$out" >/dev/null
+[[ "$(cat "$out/settings-screensavers.png")" == frame ]]
+payload="$(sed -n 's/^aranea.settings.capture captureBegin //p' "$log")"
+jq -e --arg root "$repo_root" '
+  .fixture.state.screensaver as $s |
+  .section == "screensavers" and
+  $s.availability == "available" and $s.catalogAvailable == true and
+  $s.selectedId == "silk-journey" and $s.mode == "single" and
+  $s.idle == {screensaverSeconds:900,lockSeconds:1200,stayAwake:false,screensaverOff:false,error:null} and
+  $s.session.running == false and $s.session.ready == false and
+  [$s.choices[].id] == ["silk-journey","silk-chamber","omarchy"] and
+  [$s.choices[].available] == [true,true,true] and
+  [$s.choices[].shuffleEligible] == [true,true,false] and
+  [$s.choices[].thumbnail] == [$root + "/branding/3d/live/preview.png",$root + "/branding/3d/silk-chamber.png",null]
+' <<<"$payload" >/dev/null
+if grep -Eq '^(aranea-screensaver |aranea.settings (configure|preview)|shell reloadConfig|idle )' "$log"; then exit 1; fi
+# A failed Screensavers transaction retains its prior PNG and restores the snapshot.
+for failure in readiness restore; do
+  : >"$log"
+  printf previous >"$out/settings-screensavers.png"
+  rc=0
+  case "$failure" in
+    readiness) CAPTURE_SETTINGS_READY='{"ready":true,"readOnly":false}' "$capture" --surface settings-screensavers --output "$out" >/dev/null 2>&1 || rc=$? ;;
+    restore) CAPTURE_SETTINGS_RESTORE=invalid "$capture" --surface settings-screensavers --output "$out" >/dev/null 2>&1 || rc=$? ;;
+  esac
+  [[ "$rc" == 3 && "$(cat "$out/settings-screensavers.png")" == previous ]]
+  grep -Fq captureRestore "$log"
+  grep -Fq 'window = "address:0xabc"' "$log"
+done
 echo 'Settings capture contract passed'

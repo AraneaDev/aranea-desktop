@@ -1,12 +1,17 @@
 // Persistent process owner; visibility never controls process lifetime.
 import QtQuick
 import Quickshell.Io
+import qs.Commons as Commons
 import "../araneadev.shared" as Aranea
 import "../araneadev.shared/SignalValue.js" as SignalValue
 import "SettingsLogic.js" as Logic
 
 QtObject {
   id: controller
+  // Plugin-local catalog for picker confirmation diagnostics.
+  property Commons.Translations strings: Commons.Translations {
+    directory: Qt.resolvedUrl('i18n')
+  }
   // Backend executable, resolved from the active theme root by default.
   property string adapterPath: Aranea.RuntimePaths.themeRoot + '/scripts/aranea-settings'
   // Notifications wrapper executable; injectable for isolated IPC fixtures.
@@ -306,7 +311,7 @@ QtObject {
     var argv = Logic.command(adapterPath, operation, args, state)
     if (!argv || operation === 'status')
       return false
-    var key = operation === 'set integration' ? 'integration:' + args[0] : operation.split(' ')[1]
+    var key = operation === 'preview screensaver' ? 'screensaver-preview' : operation === 'set integration' ? 'integration:' + args[0] : operation.split(' ')[1]
     pending = true
     pendingKey = key
     readRevision++
@@ -328,11 +333,12 @@ QtObject {
             }
           }
         var outcome = Logic.outcome(operation, args, observed, succeeded, mutation.result)
-        var message = succeeded ? operation === 'set display-scale' && outcome === 'Application not confirmed' ? 'Focused display or effective scale changed during confirmation. Review the current display and Apply again.' : '' : mutation.error ? mutation.error.message : stderr || 'The settings change failed.'
+        var confirmed = operation === 'configure screensaver' ? outcome === 'Saved' : operation === 'configure screensaver-timing' ? outcome === 'Timing saved' : operation === 'preview screensaver' ? outcome === 'Preview accepted' || outcome === 'Stock preview delegated' : true
+        var message = succeeded && !confirmed ? controller.strings.t('screensavers.confirmationFailed') : succeeded ? operation === 'set display-scale' && outcome === 'Application not confirmed' ? 'Focused display or effective scale changed during confirmation. Review the current display and Apply again.' : '' : mutation.error ? mutation.error.message : stderr || 'The settings change failed.'
         setResult(key, outcome, message)
         pending = false
         pendingKey = ''
-        mutationCompleted(operation, args, succeeded && (operation !== 'set display-scale' || outcome.indexOf('Applied') === 0))
+        mutationCompleted(operation, args, succeeded && confirmed && (operation !== 'set display-scale' || outcome.indexOf('Applied') === 0))
       })
     })
     return true
