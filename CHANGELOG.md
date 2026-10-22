@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.38.0...v2.39.0) (2026-10-22)
+
+
+### Features
+
+* add three screensavers and enrich the collection ([#212](https://github.com/AraneaDev/aranea-desktop/issues/212)) ([9e370d0](https://github.com/AraneaDev/aranea-desktop/commit/9e370d0e3f25afce9be074936c7741b0a00cfdf7))
+
 ## [2.38.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.37.0...v2.38.0) (2026-10-22)
 
 
