@@ -23,6 +23,9 @@ SCENES = (
     "kanji-drift",
     "silken-flow",
     "neon-depths",
+    "orbital-loom",
+    "blackglass-foundry",
+    "crystal-bloom",
 )
 
 

@@ -181,8 +181,9 @@ it was saved for later sessions.
 
 ## Screensavers
 
-**Settings → Aranea → Screensavers** offers six live scenes: Silk Journey, Neon Weaver,
-and Spiderfall with the spider; Kanji Drift, Silken Flow, and Neon Depths without it.
+**Settings → Aranea → Screensavers** offers nine live scenes: Silk Journey, Neon Weaver,
+and Spiderfall with the spider; Kanji Drift, Silken Flow, Neon Depths, Orbital Loom,
+Blackglass Foundry, and Crystal Bloom without it.
 All share Aranea's dark palette and mint/violet lighting. Choose
 one scene or shuffle available scenes. **Apply scene** saves that choice;
 **Preview** opens fullscreen without saving. Move the pointer, click, or press

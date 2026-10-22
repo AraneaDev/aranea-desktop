@@ -67,10 +67,12 @@ class PreviewTests(unittest.TestCase):
             "/live/scene.mjs",
             "/live/vendor/three.module.js",
             "/aranea-spider.glb",
+            "/collection/materials.mjs",
         ]:
             self.assertIsNotNone(preview.asset_path(url))
         for url in [
             "/README.md",
+            "/collection/ambient/runtime.mjs",
             "/aranea-spider.blend",
             "/live/../aranea-spider.blend",
             "/live/%2e%2e/aranea-spider.blend",

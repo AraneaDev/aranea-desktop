@@ -1,3 +1,4 @@
+import * as motion from "../../branding/3d/collection/ambient/motion.mjs"
 import test from "node:test"
 import assert from "node:assert/strict"
 import {
@@ -36,4 +37,48 @@ test("render sizing enforces both pixel and device ratio budgets", () => {
   assert.equal(renderScale(1000, 1000, 3), 1.4)
   assert.ok(3840 * 2160 * renderScale(3840, 2160, 2) ** 2 <= 2100000.0001)
   assert.equal(renderScale(800, 600, 1), 1)
+})
+
+test("glyph school assembles into a readable crest and releases continuously", () => {
+  assert.equal(typeof motion.glyphFormation, "function")
+  assert.equal(motion.glyphFormation(0), 0)
+  assert.equal(motion.glyphFormation(28), 1)
+  assert.equal(motion.glyphFormation(36), 0)
+  assert.equal(motion.glyphFormation(76), 1)
+  for (const t of [20, 28, 36, 48])
+    assert.ok(Math.abs(motion.glyphFormation(t + 0.001) - motion.glyphFormation(t)) < 0.001)
+})
+test("silk braid has a bounded quiet interval and a sustained cinematic peak", () => {
+  assert.equal(typeof motion.silkBurst, "function")
+  assert.equal(motion.silkBurst(0), 0)
+  assert.equal(motion.silkBurst(25), 1)
+  assert.equal(motion.silkBurst(32), 0)
+  for (let t = 0; t < 90; t += 0.13) {
+    const pulse = motion.silkBurst(t)
+    assert.ok(pulse >= 0 && pulse <= 1)
+    assert.ok(Math.abs(pulse - motion.silkBurst(t + 0.001)) < 0.001)
+    for (const layer of [0, 3, 6]) {
+      const p = ribbonPoint(0.4, 0.5, t, layer)
+      const q = ribbonPoint(0.4, 0.5, t + 0.001, layer)
+      assert.ok(Math.hypot(...p.map((v, i) => v - q[i])) < 0.05)
+    }
+  }
+})
+test("city express crosses the corridor smoothly and disappears before recycling", () => {
+  assert.equal(typeof motion.transitState, "function")
+  const start = motion.transitState(12),
+    middle = motion.transitState(18),
+    end = motion.transitState(24)
+  assert.equal(start.opacity, 0)
+  assert.equal(middle.opacity, 1)
+  assert.equal(end.opacity, 0)
+  assert.ok(start.x < -35 && end.x > 35)
+  assert.equal(middle.x, 0)
+  assert.deepEqual(motion.transitState(18), motion.transitState(60))
+  for (let t = 12; t < 24; t += 0.1) {
+    const a = motion.transitState(t),
+      b = motion.transitState(t + 0.001)
+    assert.ok(Math.abs(a.x - b.x) < 0.02)
+    assert.ok(Math.abs(a.opacity - b.opacity) < 0.002)
+  }
 })

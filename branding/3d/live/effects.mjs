@@ -1,5 +1,6 @@
 import * as THREE from "three"
-import { EventDirector, EVENT_KINDS, GLYPHS } from "./events.mjs"
+import { EventTimeline, EVENT_KINDS, GLYPHS } from "./events.mjs"
+import { journey } from "./journey.mjs"
 const clamp = (x) => Math.max(0, Math.min(1, x))
 const smooth = (x) => {
   x = clamp(x)
@@ -8,7 +9,7 @@ const smooth = (x) => {
 
 export class SceneEvents {
   constructor(scene, forced = null) {
-    this.director = new EventDirector()
+    this.director = new EventTimeline()
     this.forced = EVENT_KINDS.includes(forced) ? forced : null
     this.scene = scene
     this.current = null
@@ -132,7 +133,8 @@ export class SceneEvents {
     const event = this.forced
       ? { kind: this.forced, start: time - 4, duration: 10, glyph: "糸", seed: 0.2 }
       : this.director.sample(time)
-    if (event !== this.current && (!this.forced || !this.current)) this.begin(event, state)
+    if (event !== this.current && (!this.forced || !this.current))
+      this.begin(event, event && !this.forced ? journey(event.start) : state)
     if (!event) return
     const u = clamp((time - event.start) / event.duration)
     const envelope = smooth(u / 0.22) * smooth((1 - u) / 0.22)

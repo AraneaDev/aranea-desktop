@@ -10,7 +10,7 @@ Click a screensaver image to open its full-resolution capture.
 
 ## Screensavers
 
-Six live scenes share Aranea's dark, mint, violet, and restrained gold palette.
+Nine live scenes share Aranea's dark, mint, violet, and restrained gold palette.
 These are fullscreen captures of the running scenes. Choose one or shuffle the
 collection in **Settings → Aranea → Screensavers**; see
 [selection and timing](configuration.md#choose-screensavers-and-timing).
@@ -42,6 +42,18 @@ collection in **Settings → Aranea → Screensavers**; see
 **Neon Depths**: A continuous journey through an evolving geometric city.
 
 [![Neon Depths screensaver](../screenshots/screensaver-neon-depths.png)](../screenshots/screensaver-neon-depths.png)
+
+**Orbital Loom**: Celestial rings weave luminous silk around an eclipsing core.
+
+[![Orbital Loom screensaver](../screenshots/screensaver-orbital-loom.png)](../screenshots/screensaver-orbital-loom.png)
+
+**Blackglass Foundry**: Obsidian machinery assembles around a surging molten core.
+
+[![Blackglass Foundry screensaver](../screenshots/screensaver-blackglass-foundry.png)](../screenshots/screensaver-blackglass-foundry.png)
+
+**Crystal Bloom**: Mineral petals rise, scatter and reform around a luminous heart.
+
+[![Crystal Bloom screensaver](../screenshots/screensaver-crystal-bloom.png)](../screenshots/screensaver-crystal-bloom.png)
 
 ## Desktop surfaces
 

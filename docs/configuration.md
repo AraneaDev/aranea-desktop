@@ -53,9 +53,12 @@ A full install manages that launcher; enable the **Session** integration in Sett
 if it is inactive. Omarchy's idle service remains responsible for activation and
 locking. Stay awake or screensaver-off can pause automatic activation.
 
-The collection contains six local Chromium/WebGL scenes. **Silk Journey**,
+The collection contains nine local Chromium/WebGL scenes. **Silk Journey**,
 **Neon Weaver**, and **Spiderfall** feature the spider; **Kanji Drift**, **Silken Flow**,
-and **Neon Depths** do not. Each has its own animated environment and preview.
+**Neon Depths**, **Orbital Loom**, **Blackglass Foundry**, and **Crystal Bloom** do not.
+Each has its own animated environment, procedural material detail, and occasional
+transformations. The pointer stays hidden during loading, animation and errors;
+input still dismisses the scene.
 The owner uses one selected scene across active monitors. Shuffle chooses from
 available scenes once per automatic session and avoids the previous scene when possible.
 Missing renderer dependencies disable affected scenes; automatic launch can fall

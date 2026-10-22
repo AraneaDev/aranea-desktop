@@ -69,11 +69,11 @@ class CatalogTests(unittest.TestCase):
     def load(self):
         return self.catalog_api.load_catalog(self.repo)
 
-    def test_shipped_collection_can_select_and_shuffle_six_live_scenes(self):
+    def test_shipped_collection_can_select_and_shuffle_nine_live_scenes(self):
         scenes = self.catalog_api.load_catalog(REPO)
         self.assertEqual(
             [scene.id for scene in scenes],
-            ["silk-journey", "neon-weaver", "spiderfall", "kanji-drift", "silken-flow", "neon-depths"],
+            ["silk-journey", "neon-weaver", "spiderfall", "kanji-drift", "silken-flow", "neon-depths", "orbital-loom", "blackglass-foundry", "crystal-bloom"],
         )
         self.assertTrue(all(scene.available for scene in scenes))
         for scene in scenes:
@@ -89,6 +89,14 @@ class CatalogTests(unittest.TestCase):
             seen.add(selected.id)
             previous = selected.id
         self.assertEqual(seen, {scene.id for scene in scenes})
+
+    def test_all_scenes_serve_shared_materials_and_cursor_bootstrap(self):
+        from tools.screensaver.http_server import asset_path
+
+        for scene in self.catalog_api.load_catalog(REPO):
+            with self.subTest(scene=scene.id):
+                self.assertEqual(asset_path(scene, "/collection/materials.mjs"), REPO / "branding/3d/collection/materials.mjs")
+                self.assertEqual(asset_path(scene, "/live/dismiss.js"), REPO / "branding/3d/live/dismiss.js")
 
     def test_retired_selection_falls_back_without_rewriting_preferences(self):
         path = self.config / "aranea/screensaver.json"
@@ -462,7 +470,7 @@ class CatalogTests(unittest.TestCase):
             state = json.loads(result.stdout)
             self.assertEqual(state["availability"], "unavailable")
             self.assertTrue(state["catalogAvailable"])
-            self.assertEqual(len(state["choices"]), 6)
+            self.assertEqual(len(state["choices"]), 9)
             self.assertTrue(state["error"])
             self.assertEqual(path.read_text(), content)
 

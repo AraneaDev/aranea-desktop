@@ -1,4 +1,6 @@
 import * as THREE from "three"
+import { detailTexture } from "../collection/materials.mjs"
+import { chamberBeat, writeChamberSignals } from "./journey.mjs"
 
 // Build the chamber in scene order; the host animates these runtime handles.
 export function createChamber(scene, random) {
@@ -21,36 +23,16 @@ export function createChamber(scene, random) {
     emissiveIntensity: 2,
     roughness: 0.4
   })
-  // Procedural stone grain: self-contained, no image or wallpaper textures.
-  const textureCanvas = document.createElement("canvas")
-  textureCanvas.width = textureCanvas.height = 256
-  const context = textureCanvas.getContext("2d")
-  context.fillStyle = "#727b7b"
-  context.fillRect(0, 0, 256, 256)
-  for (let i = 0; i < 6500; i++) {
-    const v = Math.floor(70 + random() * 90)
-    context.fillStyle = `rgba(${v},${v},${v},.4)`
-    context.fillRect(random() * 256, random() * 256, 1 + random() * 3, 1 + random() * 3)
-  }
-  for (let i = 0; i < 12; i++) {
-    context.strokeStyle = "rgba(10,20,22,.35)"
-    context.beginPath()
-    let x = random() * 256,
-      y = random() * 256
-    context.moveTo(x, y)
-    for (let j = 0; j < 5; j++) {
-      x += (random() - 0.5) * 55
-      y += random() * 30
-      context.lineTo(x, y)
-    }
-    context.stroke()
-  }
-  const grain = new THREE.CanvasTexture(textureCanvas)
-  grain.wrapS = grain.wrapT = THREE.RepeatWrapping
+  const grain = detailTexture(THREE, "stone", 8181)
   grain.repeat.set(2, 2)
   stone.roughnessMap = grain
   stone.bumpMap = grain
-  stone.bumpScale = 0.06
+  stone.bumpScale = 0.065
+  const metalGrain = detailTexture(THREE, "metal", 28)
+  metalGrain.repeat.set(3, 3)
+  dark.roughnessMap = metalGrain
+  dark.bumpMap = metalGrain
+  dark.bumpScale = 0.035
   function box(w, h, d, x, y, z, material = stone) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material)
     mesh.position.set(x, y, z)
@@ -240,7 +222,77 @@ export function createChamber(scene, random) {
     shaft.position.set(-7, 6, z)
     scene.add(shaft)
   }
+  // Relief seams and suspended silk collectors are batched into two draws.
+  const detailGeometry = new THREE.BoxGeometry(1, 1, 1)
+  const matrix = new THREE.Object3D()
+  const fittings = new THREE.InstancedMesh(detailGeometry, dark, 168)
+  for (let i = 0; i < fittings.count; i++) {
+    const side = i % 2 ? 1 : -1,
+      slab = Math.floor(i / 2) % 14
+    const level = Math.floor(i / 28) % 2 ? -3 : 6
+    const row = Math.floor(i / 56)
+    matrix.position.set(side * (1.5 + row * 0.22), level + 0.015, -12.5 + slab * 2.25)
+    matrix.scale.set(0.055, 0.04, 1.8 - row * 0.2)
+    matrix.updateMatrix()
+    fittings.setMatrixAt(i, matrix.matrix)
+  }
+  scene.add(fittings)
+  const collectors = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.22, 0), violet, 36)
+  collectors.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+  collectors.frustumCulled = false
+  scene.add(collectors)
+  const collectorRings = []
+  for (const side of [-1, 1]) {
+    for (const z of [-12, 0, 12]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(2.9, 0.045, 6, 64), mint)
+      ring.position.set(side * 8, 8, z)
+      scene.add(ring)
+      collectorRings.push(ring)
+    }
+  }
+  const carrierPositions = new Float32Array(224 * 3)
+  const carrierGeometry = new THREE.BufferGeometry()
+  carrierGeometry.setAttribute("position", new THREE.BufferAttribute(carrierPositions, 3))
+  const carrierMaterial = new THREE.PointsMaterial({
+    color: 0xb9ffe1,
+    size: 0.065,
+    transparent: true,
+    opacity: 0.8,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  })
+  const carriers = new THREE.Points(carrierGeometry, carrierMaterial)
+  carriers.frustumCulled = false
+  scene.add(carriers)
+  function updateChamber(time) {
+    const beat = chamberBeat(time)
+    writeChamberSignals(carrierPositions, time)
+    carrierGeometry.attributes.position.needsUpdate = true
+    carrierMaterial.opacity = 0.55 + 0.4 * beat.resonance
+    collectorRings.forEach((ring, i) => {
+      ring.rotation.y = 0.12 * Math.sin(time * 0.13 + i) + beat.resonance * 0.7
+      ring.scale.setScalar(1 - 0.2 * beat.resonance)
+    })
+    for (let i = 0; i < collectors.count; i++) {
+      const ring = collectorRings[Math.floor(i / 6)]
+      const angle = (i / 6) * Math.PI * 2 + time * 0.08
+      const radius = 2.9 - beat.resonance * 0.6
+      matrix.position.set(
+        ring.position.x + radius * Math.cos(angle),
+        8 + radius * Math.sin(angle),
+        ring.position.z + beat.resonance * Math.sin(angle) * 1.2
+      )
+      matrix.rotation.set(angle * 0.5, time * 0.15 + i, 0)
+      matrix.scale.setScalar(1 + beat.resonance * 0.6)
+      matrix.updateMatrix()
+      collectors.setMatrixAt(i, matrix.matrix)
+    }
+    collectors.instanceMatrix.needsUpdate = true
+    mint.emissiveIntensity = 2.3 + beat.resonance * 0.8
+    violet.emissiveIntensity = 2 + beat.resonance * 1.2
+  }
   return {
+    updateChamber,
     silkMaterial,
     silkWeb,
     tetherGeometry,

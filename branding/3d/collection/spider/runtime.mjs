@@ -1,7 +1,8 @@
 import * as THREE from "three"
 import { GLTFLoader } from "../../live/vendor/addons/loaders/GLTFLoader.js"
 import { RoomEnvironment } from "../../live/vendor/addons/environments/RoomEnvironment.js"
-import { weaver, spiderfall } from "./motion.mjs"
+import { weaver, spiderfall, loomState, writeLoomSignals } from "./motion.mjs"
+import { detailTexture } from "../materials.mjs"
 
 const fall = document.body.dataset.scene === "fall"
 const options = new URLSearchParams(location.search)
@@ -38,12 +39,22 @@ try {
   scene.environmentIntensity = 0.55
   room.dispose()
   pmrem.dispose()
+  const metalGrain = detailTexture(THREE, "metal", 71)
+  metalGrain.repeat.set(3, 3)
+  const stoneGrain = detailTexture(THREE, "stone", 92)
+  stoneGrain.repeat.set(2, 2)
   const dark = new THREE.MeshStandardMaterial({
+    roughnessMap: metalGrain,
+    bumpMap: metalGrain,
+    bumpScale: 0.035,
     color: "#11191d",
     roughness: 0.42,
     metalness: 0.75
   })
   const side = new THREE.MeshStandardMaterial({
+    roughnessMap: stoneGrain,
+    bumpMap: stoneGrain,
+    bumpScale: 0.06,
     color: "#121016",
     roughness: 0.55,
     metalness: 0.65
@@ -204,6 +215,80 @@ try {
       0.9
     )
   }
+  // Instanced ribs, fasteners and aperture vanes add relief without one draw per detail.
+  const matrix = new THREE.Object3D()
+  const ribs = new THREE.InstancedMesh(boxGeometry, side, fall ? 240 : 96)
+  for (let i = 0; i < ribs.count; i++) {
+    if (fall) {
+      const level = Math.floor(i / 16),
+        edge = i % 16
+      const angle = (edge / 16) * Math.PI * 2
+      matrix.position.set(4.9 * Math.cos(angle), 12 - level * 4, 4.9 * Math.sin(angle))
+      matrix.scale.set(0.18, 0.65, 0.32)
+      matrix.rotation.set(0, -angle, 0)
+    } else {
+      const angle = (i / 96) * Math.PI * 2
+      matrix.position.set(6.15 * Math.cos(angle), -0.18, 6.15 * Math.sin(angle))
+      matrix.scale.set(2.45, 0.08, 0.035)
+      matrix.rotation.set(0, -angle, 0)
+    }
+    matrix.updateMatrix()
+    ribs.setMatrixAt(i, matrix.matrix)
+  }
+  scene.add(ribs)
+  const rivets = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.065, 0), amber, 144)
+  for (let i = 0; i < rivets.count; i++) {
+    const angle = (i / 48) * Math.PI * 2,
+      ring = Math.floor(i / 48)
+    const radius = fall ? 4.35 : 5.05 + ring * 0.95
+    matrix.position.set(
+      radius * Math.cos(angle),
+      fall ? -4 - ring * 12 : 0.045,
+      radius * Math.sin(angle)
+    )
+    matrix.rotation.set(0, 0, 0)
+    matrix.scale.setScalar(1)
+    matrix.updateMatrix()
+    rivets.setMatrixAt(i, matrix.matrix)
+  }
+  scene.add(rivets)
+  const mechanism = new THREE.Group()
+  mechanism.position.y = fall ? -28 : -0.8
+  const vanes = new THREE.InstancedMesh(boxGeometry, dark, 12)
+  vanes.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+  // Their bounds change as the iris opens; fixed conservative bounds avoid stale culling.
+  vanes.frustumCulled = false
+  mechanism.add(vanes)
+  const haloMaterial = glow(violet, 0.6)
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(4.35, 0.035, 6, 96), haloMaterial)
+  halo.rotation.x = Math.PI / 2
+  mechanism.add(halo)
+  for (const radius of [3.9, 4.7]) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.1, 6, 96), dark)
+    ring.rotation.x = Math.PI / 2
+    mechanism.add(ring)
+  }
+  scene.add(mechanism)
+  const scan = new THREE.Mesh(
+    new THREE.TorusGeometry(fall ? 4.1 : 4.5, 0.025, 5, 96),
+    glow(mint, 0.3)
+  )
+  scan.rotation.x = Math.PI / 2
+  scene.add(scan)
+  const signalArray = new Float32Array(192 * 3)
+  const signalGeometry = new THREE.BufferGeometry()
+  signalGeometry.setAttribute("position", new THREE.BufferAttribute(signalArray, 3))
+  const signalMaterial = new THREE.PointsMaterial({
+    color: gold,
+    size: 0.06,
+    transparent: true,
+    opacity: 0.8,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  })
+  const signals = new THREE.Points(signalGeometry, signalMaterial)
+  signals.frustumCulled = false
+  scene.add(signals)
   let seed = 41417
   const random = () => {
     seed = (seed * 1664525 + 1013904223) >>> 0
@@ -261,6 +346,24 @@ try {
     previous = now
     const t = initial + (still ? 0 : (now - start) / 1000)
     const state = sample(t)
+    const loom = loomState(t, fall)
+    mechanism.rotation.y = loom.rotation
+    for (let i = 0; i < vanes.count; i++) {
+      const angle = (i / vanes.count) * Math.PI * 2
+      matrix.position.set(loom.aperture * Math.cos(angle), 0, loom.aperture * Math.sin(angle))
+      matrix.scale.set(1.8, 0.13, 0.65)
+      matrix.rotation.set(0, -angle + 0.45 + loom.resonance * 0.35, 0)
+      matrix.updateMatrix()
+      vanes.setMatrixAt(i, matrix.matrix)
+    }
+    vanes.instanceMatrix.needsUpdate = true
+    haloMaterial.opacity = 0.35 + 0.6 * loom.resonance
+    scan.position.y = fall ? loom.scanHeight : -0.35 + 1.7 * loom.resonance
+    scan.material.opacity = 0.12 + 0.5 * loom.resonance
+    if (!fall) scan.scale.setScalar(0.25 + 0.75 * (1 - loom.resonance))
+    writeLoomSignals(signalArray, t, fall)
+    signalGeometry.attributes.position.needsUpdate = true
+    signalMaterial.opacity = 0.45 + 0.5 * loom.resonance
     idle.setEffectiveWeight(1 - state.walk)
     walk.setEffectiveWeight(state.walk)
     // Absolute ground distance synchronizes the walk cycle, even in deterministic stills.
@@ -335,6 +438,8 @@ try {
     "pagehide",
     () => {
       renderer.setAnimationLoop(null)
+      metalGrain.dispose()
+      stoneGrain.dispose()
       environment.dispose()
       renderer.dispose()
     },

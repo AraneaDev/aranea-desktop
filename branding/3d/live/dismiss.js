@@ -1,5 +1,9 @@
 // Independent of the 3D module, so Escape works even if WebGL or loading fails.
 ;(() => {
+  // Loading/error overlays and future scene descendants follow the same policy.
+  const cursorPolicy = document.createElement("style")
+  cursorPolicy.textContent = "html, html * { cursor: none !important; }"
+  document.head.append(cursorPolicy)
   const options = new URLSearchParams(window.location.search)
   const screenId = options.get("screen") || "legacy"
   let closed = false,
