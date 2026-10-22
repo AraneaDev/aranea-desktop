@@ -2,14 +2,48 @@
 
 [Back to the README](../README.md) · [Documentation](README.md)
 
-The hero is a tour of the current desktop. Expand a collection below to inspect
-individual surfaces or choose a wallpaper. Agent usage captures show Codex with
-demonstration data; every desktop backdrop uses Silken Vault.
+Browse the desktop, screensavers, and wallpapers below. Agent usage captures
+show Codex with demonstration data; desktop backdrops use **Silken Vault**.
+Click a screensaver image to open its full-resolution capture.
+
+[Screensavers](#screensavers) · [Desktop surfaces](#desktop-surfaces) · [Wallpapers](#wallpapers)
+
+## Screensavers
+
+Six live scenes share Aranea's dark, mint, violet, and restrained gold palette.
+These are fullscreen captures of the running scenes. Choose one or shuffle the
+collection in **Settings → Aranea → Screensavers**; see
+[selection and timing](configuration.md#choose-screensavers-and-timing).
+
+### With the spider
+
+**Silk Journey**: An articulated spider explores a moving silk-lit chamber.
+
+[![Silk Journey screensaver](../screenshots/screensaver-silk-journey.png)](../screenshots/screensaver-silk-journey.png)
+
+**Neon Weaver**: A spider weaves luminous threads across dark cyberpunk architecture.
+
+[![Neon Weaver screensaver](../screenshots/screensaver-neon-weaver.png)](../screenshots/screensaver-neon-weaver.png)
+
+**Spiderfall**: Silk descents through a shifting neon-lit vertical shaft.
+
+[![Spiderfall screensaver](../screenshots/screensaver-spiderfall.png)](../screenshots/screensaver-spiderfall.png)
+
+### Without the spider
+
+**Kanji Drift**: Layered kanji dissolve into drifting particles and reform in the dark.
+
+[![Kanji Drift screensaver](../screenshots/screensaver-kanji-drift.png)](../screenshots/screensaver-kanji-drift.png)
+
+**Silken Flow**: Luminous silk ribbons flow through mint and violet auroras.
+
+[![Silken Flow screensaver](../screenshots/screensaver-silken-flow.png)](../screenshots/screensaver-silken-flow.png)
+
+**Neon Depths**: A continuous journey through an evolving geometric city.
+
+[![Neon Depths screensaver](../screenshots/screensaver-neon-depths.png)](../screenshots/screensaver-neon-depths.png)
 
 ## Desktop surfaces
-
-<details>
-<summary><strong>Desktop panels, settings, pickers, and applications</strong></summary>
 
 ### Desktop and settings
 
@@ -87,12 +121,7 @@ demonstration data; every desktop backdrop uses Silken Vault.
 | ------------------------------------------------ | ------------------------------------ | -------------------------------- |
 | ![File manager](../screenshots/file-manager.png) | ![Neovim](../screenshots/neovim.png) | ![Btop](../screenshots/btop.png) |
 
-</details>
-
 ## Wallpapers
-
-<details>
-<summary><strong>All thirty cyberpunk wallpapers</strong></summary>
 
 Thirty different scenes share obsidian, mint, and violet: alleys, command rooms,
 rail, rooftops, desert, markets, a cybernetic portrait, open road, ocean, orbit, suspended gardens, and polar ice.
@@ -150,5 +179,3 @@ See the [title/ID map](configuration.md#wallpapers) and
 
 See [Visual language](visual-language.md) for the design system behind
 these surfaces.
-
-</details>

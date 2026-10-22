@@ -127,8 +127,8 @@ for standalone previews and asset development.
 ## Gallery
 
 The hero above tours the desktop. Browse the [complete gallery](docs/gallery.md)
-for panels, settings, projects, applications, the lock screen, boot splash, and
-all thirty wallpapers. Desktop captures use **Silken Vault**; agent usage
+for panels, settings, projects, applications, the lock screen, boot splash,
+[all six screensavers](docs/gallery.md#screensavers), and all thirty wallpapers. Desktop captures use **Silken Vault**; agent usage
 captures use demonstration data.
 
 [![Desktop with Silken Vault](screenshots/desktop.png)](docs/gallery.md)
