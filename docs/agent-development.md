@@ -87,6 +87,20 @@ Use `omarchy-shell omarchy.agents select codex` only to intentionally change the
 real provider. See [capture details](development.md#showcase-captures), including
 notification arrival handling and rendered surfaces.
 
+The batch includes all six screensaver scenes as `screensaver-ID.png`, while
+keeping the hero loop at 39 frames. Capture one scene with:
+
+```bash
+scripts/capture-screenshots --surface screensaver-neon-weaver --output screenshots
+```
+
+The native preview helper refuses a locked desktop or an existing screensaver
+session, waits for the requested scene to be ready in its owned fullscreen
+window, and stops only that preview. The owner restores focus and the workspace;
+saved scene selection and idle settings stay unchanged. A failed capture keeps
+the previous PNG. `ARANEA_CAPTURE_SURFACE_COMMAND` still replaces every batch
+child capture, including the six screensaver scenes.
+
 For a separately staged shell, run both shell and capture commands through:
 
 ```text

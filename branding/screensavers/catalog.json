@@ -12,19 +12,81 @@
       "publicPaths": ["branding/3d/live", "branding/3d/aranea-spider.glb"]
     },
     {
-      "id": "silk-chamber",
-      "label": "Silk Chamber",
-      "description": "A lightweight rendered loop of the spider in its silk chamber.",
-      "renderer": "video",
-      "thumbnail": "branding/3d/silk-chamber.png",
-      "asset": "branding/3d/silk-chamber.mp4"
+      "id": "neon-weaver",
+      "label": "Neon Weaver",
+      "description": "A spider weaves luminous threads across dark cyberpunk architecture.",
+      "renderer": "web",
+      "thumbnail": "branding/3d/collection/spider/neon-weaver.png",
+      "root": "branding/3d",
+      "entry": "branding/3d/collection/spider/neon-weaver.html",
+      "publicPaths": [
+        "branding/3d/collection/spider",
+        "branding/3d/live/vendor",
+        "branding/3d/live/dismiss.js",
+        "branding/3d/live/kanji.woff2",
+        "branding/3d/aranea-spider.glb"
+      ]
     },
     {
-      "id": "omarchy",
-      "label": "Omarchy",
-      "description": "The packaged terminal screensaver.",
-      "renderer": "stock",
-      "thumbnail": null
+      "id": "spiderfall",
+      "label": "Spiderfall",
+      "description": "Silk descents through a shifting neon-lit vertical shaft.",
+      "renderer": "web",
+      "thumbnail": "branding/3d/collection/spider/spiderfall.png",
+      "root": "branding/3d",
+      "entry": "branding/3d/collection/spider/spiderfall.html",
+      "publicPaths": [
+        "branding/3d/collection/spider",
+        "branding/3d/live/vendor",
+        "branding/3d/live/dismiss.js",
+        "branding/3d/live/kanji.woff2",
+        "branding/3d/aranea-spider.glb"
+      ]
+    },
+    {
+      "id": "kanji-drift",
+      "label": "Kanji Drift",
+      "description": "Layered kanji dissolve into drifting particles and reform in the dark.",
+      "renderer": "web",
+      "thumbnail": "branding/3d/collection/ambient/kanji-drift.png",
+      "root": "branding/3d",
+      "entry": "branding/3d/collection/ambient/kanji-drift.html",
+      "publicPaths": [
+        "branding/3d/collection/ambient",
+        "branding/3d/live/vendor",
+        "branding/3d/live/dismiss.js",
+        "branding/3d/live/kanji.woff2"
+      ]
+    },
+    {
+      "id": "silken-flow",
+      "label": "Silken Flow",
+      "description": "Luminous silk ribbons flow through mint and violet auroras.",
+      "renderer": "web",
+      "thumbnail": "branding/3d/collection/ambient/silken-flow.png",
+      "root": "branding/3d",
+      "entry": "branding/3d/collection/ambient/silken-flow.html",
+      "publicPaths": [
+        "branding/3d/collection/ambient",
+        "branding/3d/live/vendor",
+        "branding/3d/live/dismiss.js",
+        "branding/3d/live/kanji.woff2"
+      ]
+    },
+    {
+      "id": "neon-depths",
+      "label": "Neon Depths",
+      "description": "A continuous journey through an evolving geometric city.",
+      "renderer": "web",
+      "thumbnail": "branding/3d/collection/ambient/neon-depths.png",
+      "root": "branding/3d",
+      "entry": "branding/3d/collection/ambient/neon-depths.html",
+      "publicPaths": [
+        "branding/3d/collection/ambient",
+        "branding/3d/live/vendor",
+        "branding/3d/live/dismiss.js",
+        "branding/3d/live/kanji.woff2"
+      ]
     }
   ]
 }

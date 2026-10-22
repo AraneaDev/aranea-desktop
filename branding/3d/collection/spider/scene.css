@@ -1,0 +1,26 @@
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #08090b;
+  cursor: none;
+}
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+#status {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 16px system-ui;
+  color: #b8c8c1;
+  pointer-events: none;
+}
+body[data-ready="true"] #status {
+  display: none;
+}

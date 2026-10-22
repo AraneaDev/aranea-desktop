@@ -288,7 +288,9 @@ IDLEACTION
   grep -E 'QMLTEST FAIL' <<<"$log" | sed 's/^.*QMLTEST FAIL/  QMLTEST FAIL/' && status=1
   if ! grep -q 'QMLTEST DONE' <<<"$log"; then
     echo "qmltest: $name FAILED (no QMLTEST DONE within ${timeout_s}s)"
-    grep -E 'ERROR|TypeError|ReferenceError' <<<"$log" | grep -v 'quickshell.ipc' | sed 's/^/  /' | head -20
+    # A lost asynchronous continuation may only log a warning (for example a
+    # fixture JSON.parse SyntaxError). Keep the bounded final context visible.
+    tail -40 <<<"$log" | sed 's/^/  /'
     return 1
   fi
   # A runtime error fails the test even when every check passed: it means

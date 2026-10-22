@@ -4,9 +4,9 @@
 
 **A cyberpunk command center for Omarchy.**
 
-Obsidian instruments, mint light, violet depth, animated controls, and
-thirty distinct cyberpunk wallpapers. Signal Shrine brings the Aranea spider
-to the desktop; the same identity carries through the command center, lock, and boot.
+A coordinated desktop with a command center, grouped controls, project tools,
+thirty wallpapers, and six live screensavers. Obsidian, mint, violet, and the
+Aranea spider carry through the desktop, lock screen, and boot splash.
 
 [![Release](https://img.shields.io/github/v/release/AraneaDev/aranea-desktop?label=release)](https://github.com/AraneaDev/aranea-desktop/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/AraneaDev/aranea-desktop/ci.yml?label=CI)](https://github.com/AraneaDev/aranea-desktop/actions/workflows/ci.yml)
@@ -20,24 +20,7 @@ to the desktop; the same identity carries through the command center, lock, and 
 
 ![Aranea desktop showcase](screenshots/hero-showcase.gif)
 
-Static fallback: [desktop capture](screenshots/desktop.png) · [full showcase GIF](screenshots/hero-showcase.gif)
-
-[Install](#install) · [Daily controls](#daily-controls) · [Projects and agents](#projects-and-agents) · [Gallery](#gallery) · [Documentation](#documentation)
-
-## Spider screensaver
-
-The original Aranea spider is now a rigged 3D model with a live cyberpunk
-screensaver: suspended bridges, silk descents, and occasional kanji projections
-and particle effects. In **Settings → Aranea → Screensavers**, choose **Silk Journey**,
-the lightweight **Silk Chamber** video, or classic **Omarchy**. Apply a single scene
-or shuffle the Aranea scenes; Preview leaves your saved selection unchanged.
-Move the pointer, click, or press a key to return.
-
-Automatic activation uses the managed session integration and Omarchy's idle
-service. Scene selection and idle/lock timing have separate Apply controls.
-See the [configuration guide](docs/configuration.md#choose-screensavers-and-timing)
-and [model and screensaver guide](branding/3d/README.md) for setup, requirements,
-and standalone preview commands.
+[Install](#install) · [Explore](#explore-the-desktop) · [Screensavers](#screensavers) · [Gallery](docs/gallery.md) · [Documentation](#documentation)
 
 ## Install
 
@@ -70,270 +53,103 @@ To update, run the installer again with your selected profile. See
 [Getting started](docs/getting-started.md) for activation, local development
 sources, the optional boot splash, and removal.
 
-## Daily controls
+## Explore the desktop
 
-Open the command center from the spider on the bar. **Files**, **Terminal**, and
-**Projects** are the three top tiles. The list below groups applications,
-actions, software management, settings, help, and system commands in one column.
-Type to search; use a prefix such as `app:`, `window:`, or `project:` to narrow
-results.
+Click the **spider on the bar** to open the command center. Launch an app, open a
+terminal or folder, or search with prefixes such as `app:`, `window:`, and
+`project:`. Keyboard hints appear inside the menu and panels.
 
-The right side of the bar groups related controls:
+| Surface               | What you can do                                                                                                                    |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **Clock**             | Open Calendar, World Clock, and Weather in one dropdown. Search for cities, view daylight on the globe, and choose your home city. |
+| **Network**           | Manage Wi-Fi, wired connections, VPN profiles, and Bluetooth devices.                                                              |
+| **Audio**             | Adjust outputs, microphones, and individual application streams.                                                                   |
+| **System**            | Control power and displays, inspect resource usage, and open health diagnostics.                                                   |
+| **Notifications**     | Read notification history and toggle Do Not Disturb.                                                                               |
+| **Updates**           | Check repository and AUR packages, then install through Omarchy's native tools.                                                    |
+| **Passwordless sudo** | Choose a duration and authenticate to enable it; click again to disable. White means enabled.                                      |
 
-| Control           | Inside                                                           | Page shortcuts                               |
-| ----------------- | ---------------------------------------------------------------- | -------------------------------------------- |
-| **Network**       | Wi-Fi and wired connections, VPN profiles, Bluetooth devices     | `N` Network · `V` VPN · `B` Bluetooth        |
-| **Audio**         | Output and microphone levels, devices, and application streams   | Keyboard controls follow the focused channel |
-| **System**        | Power, display controls, and resource details with health issues | `P` Power · `D` Display · `S` Health         |
-| **Notifications** | Notification history and Do Not Disturb                          | Controls shown in the panel                  |
-| **Agents**        | Provider usage and reported local tasks                          | Usage and Tasks views                        |
+See [Features](docs/features.md) for the full control map and keyboard shortcuts.
 
-A microphone badge appears during capture. Health adds a shortcut when an issue
-needs attention; the app tray opens through its disclosure. Inside the command
-center and panels, use the displayed keyboard hints to navigate and activate
-controls.
+### Personalize it
 
-For a tour of every surface, see [Features](docs/features.md). For step-by-step
-use, start with [Workflows](docs/workflows.md).
+Open **Command center → Settings → Aranea** to choose a wallpaper, fonts, motion,
+display scale, application integrations, notification preferences, or a daily
+wallpaper schedule. **Silken Vault** is the default wallpaper; **Inter** and
+**JetBrains Mono** are the default interface and technical fonts.
 
-### Make it yours
+The collection includes thirty cyberpunk wallpapers, from city streets and
+command rooms to ocean, orbit, and spider artwork. Browse them in the
+[wallpaper gallery](docs/gallery.md#wallpapers) and use the
+[configuration guide](docs/configuration.md) for preferences and schedules.
 
-Open **Command center → Settings → Aranea**:
+### Projects and agents
 
-| Page              | Change                                               |
-| ----------------- | ---------------------------------------------------- |
-| **Appearance**    | Wallpaper, interface and technical fonts, and motion |
-| **Display**       | The focused monitor's scale, including custom values |
-| **Schedule**      | A daily list of wallpaper images and times           |
-| **Integrations**  | Optional application styling                         |
-| **Notifications** | Do Not Disturb and current notification preferences  |
+Open **Command center → Projects → Add project** to register a folder, discover
+repositories and worktrees, and choose your tools. Return with **Open** or
+**Resume**, or search with `project:`. Task checkouts provide separate working
+copies. Project actions are commands and services you explicitly start, with
+status, local logs, and Stop/Restart controls.
 
-Choose a wallpaper or font, then **Apply**. For a wallpaper schedule, **Add
-entry**, choose its image and a unique 24-hour time, then **Save schedule**. Add or remove
-entries as needed; the most recent entry stays active across midnight. Existing
-schedules retain their choices.
+**Agents → Usage** shows provider usage; **Tasks** shows opt-in local Claude Code
+and Codex activity. The [workflow guide](docs/workflows.md) covers projects,
+actions, and agent adapters. The [agent interface](docs/agent-interface.md)
+documents the public `aranea` CLI and structured output.
 
-The default fonts are **Inter** for the interface and **JetBrains Mono** for
-technical text. Motion can be turned off. The wallpaper collection contains
-thirty distinct scenes in obsidian, mint, and violet, with **Silken Vault** as
-the default. Signal Shrine and Aranea Core feature the spider, joined by Lunar
-Weaver, Abyssal Sanctum, Ghost Weaver, Skyline Sentinel, and Frostbound Nexus.
-Ghost in the Wire is the cybernetic portrait, and Neural Deck is the command room.
+## Screensavers
 
-See [Configuration](docs/configuration.md) for saved preferences, display
-behavior, and the wallpaper title/ID map.
+Six live scenes share Aranea's dark, mint, violet, and restrained gold palette.
+Three feature the rigged spider; three explore the same visual world without it.
 
-### Health and updates
+| Scene            | Visuals                                                    | Spider |
+| ---------------- | ---------------------------------------------------------- | ------ |
+| **Silk Journey** | An articulated spider explores a moving, silk-lit chamber. | Yes    |
+| **Neon Weaver**  | Luminous threads across dark cyberpunk architecture.       | Yes    |
+| **Spiderfall**   | Silk descents through a shifting neon-lit vertical shaft.  | Yes    |
+| **Kanji Drift**  | Layered kanji dissolve into drifting particles and reform. | No     |
+| **Silken Flow**  | Luminous ribbons flow through mint and violet auroras.     | No     |
+| **Neon Depths**  | A continuous journey through an evolving geometric city.   | No     |
 
-System's Health page opens with CPU, memory, and disk details expanded. Select an
-issue to open its diagnostics and recovery options. A stopped container can be
-acknowledged for that particular stop; later failures still appear.
+Open **Settings → Aranea → Screensavers** to apply one scene or shuffle the
+collection. **Preview** leaves your saved selection unchanged. Set the idle time
+before the screensaver and before locking separately; scene selection and timing
+have separate Apply controls. Move the pointer, click, or press a key to return.
 
-The update center checks repository and AUR packages, including the installed Omarchy package, and hands installation to the native update tools. See
-[Troubleshooting](docs/troubleshooting.md) when a check or recovery action needs
-attention.
+The live scenes use local assets and a Chromium/WebGL renderer. Automatic
+activation uses the managed session integration and Omarchy's idle service.
+Stock Omarchy remains an automatic fallback; **Silk Chamber** is a standalone
+experiment outside the picker.
 
-The passwordless sudo control stays visible: white while enabled and dimmed
-while disabled. Click to turn it off, or choose a duration and authenticate
-to turn it on. See [Passwordless sudo](docs/features.md#passwordless-sudo).
-
-### Clock
-
-Click the time to open one dropdown below the clock, with **Calendar**, **World Clock**,
-and **Weather** tabs. The world clock includes live daylight, a sun-lit Earth,
-and offline city search. Start with Amsterdam, London, UTC, New York, and Los Angeles;
-add, reorder, or choose a home city from the dropdown. Existing custom Elsewhen city
-lists are preserved. See [World clock](docs/features.md#world-clock) for the keys.
-
-## Projects and agents
-
-Open **Command center → Projects → Add project** to register a development
-folder. Review discovered repositories and worktrees, choose your tools and
-workspace preference, then use **Open** or **Resume** to return to a checkout.
-Search with `project:` from the command center. The Projects help pages explain
-the workflow offline.
-
-Project **Actions** are saved commands or services that you start explicitly.
-Their runs retain status and bounded local-journal output, with Stop/Restart and
-an optional local preview. Registering or opening a project does not run its
-repository scripts. Follow the [project workflow guide](docs/workflows.md) to
-set up a project, tools, and actions. Task checkouts give each task its own
-working copy, and Projects explains any problem in plain words with **Details**
-and **Copy**.
-
-**Agents → Usage** shows provider usage. **Tasks** shows opt-in local Claude Code
-and Codex activity. Install an adapter only when you want local task reporting;
-the [agent activity workflow](docs/workflows.md#connect-claude-code-or-codex) explains the
-commands and controls. Live work and unanswered input remain distinct from
-completed history that can be cleared.
+See [screensaver setup and timing](docs/configuration.md#choose-screensavers-and-timing)
+for requirements and behavior, or the [model and scene guide](branding/3d/README.md)
+for standalone previews and asset development.
 
 ## Gallery
 
-The hero is a tour of the current desktop. Expand a collection below to inspect
-individual surfaces or choose a wallpaper. Agent usage captures show Codex with
-demonstration data; every desktop backdrop uses Silken Vault.
+The hero above tours the desktop. Browse the [complete gallery](docs/gallery.md)
+for panels, settings, projects, applications, the lock screen, boot splash,
+[all six screensavers](docs/gallery.md#screensavers), and all thirty wallpapers. Desktop captures use **Silken Vault**; agent usage
+captures use demonstration data.
 
-<details>
-<summary><strong>Desktop panels, settings, pickers, and applications</strong></summary>
-
-### Desktop and settings
-
-| Desktop                             | Appearance                                                                | Display scaling                                               |
-| ----------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| ![Desktop](screenshots/desktop.png) | ![Appearance settings on the desktop wallpaper](screenshots/settings.png) | ![Display scaling settings](screenshots/settings-scaling.png) |
-
-![Daily wallpaper schedule](screenshots/settings-schedule.png)
-
-![Screensaver picker and idle timing](screenshots/settings-screensavers.png)
-
-### Command center
-
-| Menu                                  | System submenu                                  | Search                                      |
-| ------------------------------------- | ----------------------------------------------- | ------------------------------------------- |
-| ![Command menu](screenshots/menu.png) | ![System submenu](screenshots/menu-submenu.png) | ![Menu search](screenshots/menu-search.png) |
-
-| Input                                     | Apps                          | Favorites and Recent                                                         |
-| ----------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
-| ![Menu input](screenshots/menu-input.png) | ![Apps](screenshots/apps.png) | ![Favorites](screenshots/favorites.png)<br>![Recent](screenshots/recent.png) |
-
-### Health, notifications, and session
-
-| Health                                   | Notifications                                   | Empty center                                                      |
-| ---------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
-| ![System health](screenshots/health.png) | ![Notifications](screenshots/notifications.png) | ![Empty notification center](screenshots/notifications-empty.png) |
-
-| Updates                                   | Workspaces                                        | System: Power                            |
-| ----------------------------------------- | ------------------------------------------------- | ---------------------------------------- |
-| ![Update center](screenshots/updates.png) | ![Workspace overview](screenshots/workspaces.png) | ![Power controls](screenshots/power.png) |
-
-| Authentication                                   | Lock screen                          | Boot splash                                       |
-| ------------------------------------------------ | ------------------------------------ | ------------------------------------------------- |
-| ![Authentication prompt](screenshots/polkit.png) | ![Lock screen](screenshots/lock.png) | ![Plymouth boot splash](screenshots/plymouth.png) |
-
-### Bar controls
-
-| Network: Network                             | Network: VPN                         | Network: Bluetooth                               |
-| -------------------------------------------- | ------------------------------------ | ------------------------------------------------ |
-| ![Network controls](screenshots/network.png) | ![VPN controls](screenshots/vpn.png) | ![Bluetooth controls](screenshots/bluetooth.png) |
-
-| Audio                                    | Agents: Codex                           | System: Display                              |
-| ---------------------------------------- | --------------------------------------- | -------------------------------------------- |
-| ![Audio controls](screenshots/audio.png) | ![Agent status](screenshots/agents.png) | ![Display controls](screenshots/monitor.png) |
-
-| Tray menu                          | Tray management                                 | Filament OSD                         |
-| ---------------------------------- | ----------------------------------------------- | ------------------------------------ |
-| ![Tray menu](screenshots/tray.png) | ![Tray management](screenshots/tray-manage.png) | ![Filament OSD](screenshots/osd.png) |
-
-| Calendar                           | World clock                                | Weather                             |
-| ---------------------------------- | ------------------------------------------ | ----------------------------------- |
-| ![Calendar](screenshots/clock.png) | ![World clock](screenshots/worldclock.png) | ![Weather](screenshots/weather.png) |
-
-### Projects
-
-| Projects                              | Overview and Git                                                                  | Actions                                             |
-| ------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------- |
-| ![Projects](screenshots/projects.png) | ![Project overview with task checkouts and Git](screenshots/project-overview.png) | ![Project actions](screenshots/project-actions.png) |
-
-| Plain problem with Details                                     | Quick switcher                                      |
-| -------------------------------------------------------------- | --------------------------------------------------- |
-| ![Plain problem with Details](screenshots/project-problem.png) | ![Quick switcher](screenshots/project-switcher.png) |
-
-| Ready for review                                    | Preferences: a terminal and an agent, no editor             |
-| --------------------------------------------------- | ----------------------------------------------------------- |
-| ![Ready for review](screenshots/project-review.png) | ![Project preferences](screenshots/project-preferences.png) |
-
-### Pickers and applications
-
-| Clipboard                                      | Emoji                                   | Wallpaper picker                                  |
-| ---------------------------------------------- | --------------------------------------- | ------------------------------------------------- |
-| ![Clipboard picker](screenshots/clipboard.png) | ![Emoji picker](screenshots/emojis.png) | ![Wallpaper picker](screenshots/image-picker.png) |
-
-| File manager                                  | Neovim                            | Btop                          |
-| --------------------------------------------- | --------------------------------- | ----------------------------- |
-| ![File manager](screenshots/file-manager.png) | ![Neovim](screenshots/neovim.png) | ![Btop](screenshots/btop.png) |
-
-</details>
-
-<details>
-<summary><strong>All thirty cyberpunk wallpapers</strong></summary>
-
-Thirty different scenes share obsidian, mint, and violet: alleys, command rooms,
-rail, rooftops, desert, markets, a cybernetic portrait, open road, ocean, orbit, suspended gardens, and polar ice.
-Human titles appear in the picker; stable IDs preserve selections and schedules.
-See the [title/ID map](docs/configuration.md#wallpapers) and
-[artwork sources and prompts](backgrounds/ARTWORK.md).
-
-| Signal Shrine                                            | Aranea Core                                          | Neural Deck                                      |
-| -------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------ |
-| ![Signal Shrine](backgrounds/variants/signal-shrine.png) | ![Aranea Core](backgrounds/variants/aranea-core.png) | ![Neural Deck](backgrounds/variants/cockpit.png) |
-
-| Rain City                                    | Silent Vault                                      | First Departure                                   |
-| -------------------------------------------- | ------------------------------------------------- | ------------------------------------------------- |
-| ![Rain City](backgrounds/background-day.png) | ![Silent Vault](backgrounds/background-night.png) | ![First Departure](backgrounds/variants/dawn.png) |
-
-| Dead Frequency                                   | Black Signal                                     | Undercity                                    |
-| ------------------------------------------------ | ------------------------------------------------ | -------------------------------------------- |
-| ![Dead Frequency](backgrounds/variants/dusk.png) | ![Black Signal](backgrounds/variants/sparse.png) | ![Undercity](backgrounds/variants/dense.png) |
-
-| Ghost in the Wire                                         | Violet Pursuit                                             | Deep Current                                           |
-| --------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------ |
-| ![Ghost in the Wire](backgrounds/variants/monochrome.png) | ![Violet Pursuit](backgrounds/variants/violet-pursuit.png) | ![Deep Current](backgrounds/variants/deep-current.png) |
-
-| Orbital Relay                                        | Canopy Circuit                                             | Polar Freight                                            |
-| ---------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------- |
-| ![Orbital Relay](backgrounds/variants/ultrawide.png) | ![Canopy Circuit](backgrounds/variants/canopy-circuit.png) | ![Polar Freight](backgrounds/variants/polar-freight.png) |
-
-| Lunar Weaver                                           | Abyssal Sanctum                                              | Ghost Weaver                                           |
-| ------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------ |
-| ![Lunar Weaver](backgrounds/variants/lunar-weaver.png) | ![Abyssal Sanctum](backgrounds/variants/abyssal-sanctum.png) | ![Ghost Weaver](backgrounds/variants/ghost-weaver.png) |
-
-| Skyline Sentinel                                               | Frostbound Nexus                                               |
-| -------------------------------------------------------------- | -------------------------------------------------------------- |
-| ![Skyline Sentinel](backgrounds/variants/skyline-sentinel.png) | ![Frostbound Nexus](backgrounds/variants/frostbound-nexus.png) |
-
-| Prism Weaver                                           | Forge of Silk                                            |
-| ------------------------------------------------------ | -------------------------------------------------------- |
-| ![Prism Weaver](backgrounds/variants/prism-weaver.png) | ![Forge of Silk](backgrounds/variants/forge-of-silk.png) |
-
-| Basalt Covenant                                              | Silken Vault (default)                                 |
-| ------------------------------------------------------------ | ------------------------------------------------------ |
-| ![Basalt Covenant](backgrounds/variants/basalt-covenant.png) | ![Silken Vault](backgrounds/variants/silken-vault.png) |
-
-| Orbital Sigil                                            | Echo Basin                                         |
-| -------------------------------------------------------- | -------------------------------------------------- |
-| ![Orbital Sigil](backgrounds/variants/orbital-sigil.png) | ![Echo Basin](backgrounds/variants/echo-basin.png) |
-
-| Glass Tide                                         | Vector Garden                                            |
-| -------------------------------------------------- | -------------------------------------------------------- |
-| ![Glass Tide](backgrounds/variants/glass-tide.png) | ![Vector Garden](backgrounds/variants/vector-garden.png) |
-
-| Midnight Switchyard                                                  | Quiet Singularity                                                |
-| -------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| ![Midnight Switchyard](backgrounds/variants/midnight-switchyard.png) | ![Quiet Singularity](backgrounds/variants/quiet-singularity.png) |
-
-See [Visual language](docs/visual-language.md) for the design system behind
-these surfaces.
-
-</details>
+[![Desktop with Silken Vault](screenshots/desktop.png)](docs/gallery.md)
 
 ## Documentation
 
-Start with the [documentation hub](docs/README.md), or go directly to your task:
+Start at the [documentation hub](docs/README.md), or go directly to your task:
 
-| Task                                       | Guide                                                                     |
-| ------------------------------------------ | ------------------------------------------------------------------------- |
-| Install, update, activate, or remove       | [Getting started](docs/getting-started.md)                                |
-| Use the desktop and project workflows      | [Features](docs/features.md) · [Workflows](docs/workflows.md)             |
-| Set preferences and integrations           | [Configuration](docs/configuration.md)                                    |
-| Diagnose or recover                        | [Troubleshooting](docs/troubleshooting.md)                                |
-| Automate projects, agents, or installation | [Agent interface](docs/agent-interface.md)                                |
-| Browse fonts and icons                     | [Bundled fonts](fonts/README.md) · [Icon gallery](docs/icons.md)          |
-| Work on the code                           | [Development](docs/development.md) · [Architecture](docs/architecture.md) |
+| Task                                            | Guide                                                                                                       |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Install, update, activate, or remove            | [Getting started](docs/getting-started.md)                                                                  |
+| Learn controls and everyday workflows           | [Features](docs/features.md) · [Workflows](docs/workflows.md)                                               |
+| Change settings, screensavers, and integrations | [Configuration](docs/configuration.md)                                                                      |
+| Diagnose or repair an installation              | [Troubleshooting](docs/troubleshooting.md)                                                                  |
+| Automate projects and local agent activity      | [Agent interface](docs/agent-interface.md)                                                                  |
+| Browse the visual system and assets             | [Visual language](docs/visual-language.md) · [Fonts](fonts/README.md) · [Icons](docs/icons.md)              |
+| Develop, test, capture, or release              | [Development](docs/development.md) · [Architecture](docs/architecture.md) · [Contributing](CONTRIBUTING.md) |
 
-Helpers can be run from this checkout's `scripts/` directory or from the installed
-`~/.config/omarchy/themes/aranea/scripts/` directory. The public `aranea` command
-manages projects, actions, and local agent activity. See the automation guide for
-JSON schemas and command examples.
+Helpers run from the checkout's `scripts/` directory or from the installed
+`~/.config/omarchy/themes/aranea/scripts/` directory. The installed `aranea`
+command manages projects, actions, and opt-in local agent reporting.
 
 ### Get help
 

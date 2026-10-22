@@ -40,7 +40,7 @@ def snapshot(repo_root: Path, config_home: Path | None = None) -> dict:
         catalog = load_catalog(repo_root)
         state["catalogAvailable"] = True
         state["choices"] = [scene.projection() for scene in catalog]
-        prefs = read_preferences(config_home)
+        prefs = read_preferences(config_home, catalog=catalog)
         state["selectedId"] = prefs["selectedId"]
         state["mode"] = prefs["mode"]
         validate_selection(catalog, prefs)

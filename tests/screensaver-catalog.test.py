@@ -34,8 +34,9 @@ class CatalogTests(unittest.TestCase):
         self.repo = self.base / "repo"
         self.catalog_file = self.repo / "branding/screensavers/catalog.json"
         self.catalog_file.parent.mkdir(parents=True)
+        # Renderer/storage unit tests use a stable fixture independent of the collection.
         self.source = json.loads(
-            (REPO / "branding/screensavers/catalog.json").read_text()
+            (REPO / "tests/fixtures/screensaver-catalog.json").read_text()
         )
         self.catalog_file.write_text(json.dumps(self.source))
         for name in (
@@ -67,6 +68,43 @@ class CatalogTests(unittest.TestCase):
 
     def load(self):
         return self.catalog_api.load_catalog(self.repo)
+
+    def test_shipped_collection_can_select_and_shuffle_six_live_scenes(self):
+        scenes = self.catalog_api.load_catalog(REPO)
+        self.assertEqual(
+            [scene.id for scene in scenes],
+            ["silk-journey", "neon-weaver", "spiderfall", "kanji-drift", "silken-flow", "neon-depths"],
+        )
+        self.assertTrue(all(scene.available for scene in scenes))
+        for scene in scenes:
+            self.catalog_api.validate_selection(scenes, {"selectedId": scene.id, "mode": "single"})
+            self.assertEqual(scene.renderer, "web")
+            self.assertTrue(scene.shuffle_eligible)
+        seen = set()
+        rng = random.Random(29)
+        previous = None
+        for _ in range(100):
+            selected = self.catalog_api.choose_scene(scenes, {"selectedId": "silk-journey", "mode": "shuffle"}, previous, rng)
+            self.assertNotEqual(selected.id, previous)
+            seen.add(selected.id)
+            previous = selected.id
+        self.assertEqual(seen, {scene.id for scene in scenes})
+
+    def test_retired_selection_falls_back_without_rewriting_preferences(self):
+        path = self.config / "aranea/screensaver.json"
+        path.parent.mkdir(parents=True)
+        catalog = [self.load()[0]]
+        for retired in ("silk-chamber", "omarchy"):
+            for mode in ("single", "shuffle"):
+                original = json.dumps({"version": 1, "selectedId": retired, "mode": mode}).encode()
+                path.write_bytes(original)
+                prefs = self.preferences.read_preferences(self.config, catalog=catalog)
+                self.assertEqual(prefs, {"version": 1, "selectedId": "silk-journey", "mode": mode})
+                self.assertEqual(path.read_bytes(), original)
+        path.write_text('{"version":1,"selectedId":"unknown-scene","mode":"single"}')
+        prefs = self.preferences.read_preferences(self.config, catalog=catalog)
+        with self.assertRaises(ValueError):
+            self.catalog_api.validate_selection(catalog, prefs)
 
     def test_default_read_and_status_create_nothing(self):
         self.assertEqual(
@@ -270,8 +308,8 @@ class CatalogTests(unittest.TestCase):
         # Separate processes contend on the stable adjacent lock, including first creation.
         commands = [
             ("silk-journey", "single"),
-            ("silk-chamber", "shuffle"),
-            ("omarchy", "single"),
+            ("neon-weaver", "shuffle"),
+            ("kanji-drift", "single"),
         ] * 8
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             results = list(
@@ -424,7 +462,7 @@ class CatalogTests(unittest.TestCase):
             state = json.loads(result.stdout)
             self.assertEqual(state["availability"], "unavailable")
             self.assertTrue(state["catalogAvailable"])
-            self.assertEqual(len(state["choices"]), 3)
+            self.assertEqual(len(state["choices"]), 6)
             self.assertTrue(state["error"])
             self.assertEqual(path.read_text(), content)
 

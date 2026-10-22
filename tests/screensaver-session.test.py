@@ -283,6 +283,18 @@ class SessionTests(unittest.TestCase):
                 },
             ],
         )
+        # Lifecycle tests retain all supported renderers independently of the shipped collection.
+        fixture_repo = self.root / "renderer-fixture"
+        fixture_catalog = fixture_repo / "branding/screensavers/catalog.json"
+        fixture_catalog.parent.mkdir(parents=True)
+        fixture_catalog.write_text((REPO / "tests/fixtures/screensaver-catalog.json").read_text())
+        for name in ("live/index.html", "live/preview.png", "aranea-spider.glb", "silk-chamber.mp4", "silk-chamber.png"):
+            asset = fixture_repo / "branding/3d" / name
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(b"renderer fixture")
+        from tools.screensaver.catalog import load_catalog
+
+        self.enterContext(patch.object(self.api, "load_catalog", lambda _: load_catalog(fixture_repo)))
         self.guard = Path(os.environ["ARANEA_TEST_SANDBOX"]) / "guard.log"
         self.guard_before = self.guard.read_bytes() if self.guard.exists() else b""
         self.processes = []
@@ -698,6 +710,23 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(json.loads(config.read_text())["selectedId"], "silk-chamber")
         self.event("dismiss")
         self.assert_closed(process)
+
+    def test_unavailable_collection_delegates_without_stock_picker_entry(self):
+        scenes = [scene for scene in self.api.load_catalog(REPO) if scene.renderer == "web"]
+        from dataclasses import replace
+
+        scenes = [replace(scene, available=False, reason="Chromium missing") for scene in scenes]
+        stock = self.root / "stock"
+        stock.write_text('#!/bin/sh\ntouch "$FIXTURE_ROOT/stock-called"\n')
+        stock.chmod(0o755)
+        with (
+            patch.object(self.api, "STOCK_LAUNCHER", str(stock)),
+            patch.object(self.api, "load_catalog", return_value=scenes),
+        ):
+            process = self.start()
+            process.join(3)
+            self.assertFalse(process.is_alive())
+            self.assertTrue((self.root / "stock-called").exists())
 
     def test_preflight_availability_only_delegates_to_fixed_stock_launcher(self):
         stock = self.root / "stock"

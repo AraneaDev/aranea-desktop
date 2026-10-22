@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Contract for scripts/capture-screenshots and the screenshots it produces:
-# every declared surface has a PNG referenced from the README, the hero
+# every declared surface has a PNG referenced from the linked gallery, the hero
 # showcase GIF has the right frame count and each frame matches its still,
 # the capture never disables the notifications plugin or types real text,
 # the real inbox/clipboard/picker state is always restored (trap ordering
@@ -14,6 +14,13 @@ capture_script="$repo_root/scripts/capture-screenshots"
 notification_library="$repo_root/scripts/lib/capture-notifications.sh"
 capture_sources=("$capture_script" "$notification_library")
 readme="$repo_root/README.md"
+gallery="$repo_root/docs/gallery.md"
+
+# The concise README links to the complete gallery; every surface remains
+# discoverable there after the documentation reorganization.
+grep -Fq '(docs/gallery.md)' "$readme"
+grep -Fq '(gallery.md)' "$repo_root/docs/README.md"
+test -f "$gallery"
 
 # Inspect the canonical helpers used by the entry script; trap ownership and
 # capture orchestration stay in the entry script.
@@ -30,6 +37,7 @@ expected_surfaces=(
   network vpn audio bluetooth agents
   power monitor tray tray-manage clock worldclock weather image-picker apps favorites recent
   dawn osd workspaces updates projects project-overview project-actions project-problem project-switcher project-review project-preferences
+  screensaver-silk-journey screensaver-neon-weaver screensaver-spiderfall screensaver-kanji-drift screensaver-silken-flow screensaver-neon-depths
 )
 expected_hero_frames=(
   desktop menu menu-submenu settings settings-scaling settings-schedule settings-screensavers menu-search menu-input apps favorites recent
@@ -37,7 +45,7 @@ expected_hero_frames=(
   image-picker network vpn audio bluetooth agents projects project-overview project-actions project-switcher project-review power monitor tray tray-manage clock worldclock weather lock osd
 )
 [[ "${surfaces[*]}" == "${expected_surfaces[*]}" ]]
-[[ "${#surfaces[@]}" == 47 && "${#expected_hero_frames[@]}" == 39 ]]
+[[ "${#surfaces[@]}" == 53 && "${#expected_hero_frames[@]}" == 39 ]]
 
 for surface in "${surfaces[@]}"; do
   test -f "$repo_root/screenshots/$surface.png"
@@ -48,15 +56,15 @@ for surface in "${surfaces[@]}"; do
     exit 1
   fi
   if [[ "$surface" == dawn ]]; then
-    grep -Eq 'screenshots/dawn\.png|backgrounds/variants/dawn\.png' "$readme"
+    grep -Eq 'screenshots/dawn\.png|backgrounds/variants/dawn\.png' "$gallery"
   else
-    grep -Fq "screenshots/$surface.png" "$readme"
+    grep -Fq "../screenshots/$surface.png" "$gallery"
   fi
 done
 
 [[ "$(identify -format '%wx%h' "$repo_root/screenshots/settings.png")" == "$(identify -format '%wx%h' "$repo_root/screenshots/desktop.png")" ]]
 test -f "$repo_root/screenshots/settings-scaling.png"
-grep -Fq 'screenshots/settings-scaling.png' "$readme"
+grep -Fq '../screenshots/settings-scaling.png' "$gallery"
 [[ "$(identify -format '%wx%h' "$repo_root/screenshots/settings-scaling.png")" == "$(identify -format '%wx%h' "$repo_root/screenshots/desktop.png")" ]]
 
 test -f "$repo_root/screenshots/dawn.png"

@@ -53,7 +53,9 @@ def _read_object(path: Path) -> dict | None:
     return value
 
 
-def read_preferences(config_home: Path | None = None) -> dict:
+def read_preferences(
+    config_home: Path | None = None, *, catalog: list[Scene] | None = None
+) -> dict:
     """Return version-1 preferences or defaults, creating no files or directories."""
     path = config_directory(config_home) / "aranea/screensaver.json"
     value = _read_object(path)
@@ -73,6 +75,14 @@ def read_preferences(config_home: Path | None = None) -> dict:
         raise PreferenceError(f"Invalid selectedId in {path}: {error}") from error
     if value["mode"] not in ("single", "shuffle"):
         raise PreferenceError(f"Invalid mode in {path}; use single or shuffle")
+    # Retired experiments remain untouched on disk until an explicit scene Apply.
+    if (
+        catalog is not None
+        and value["selectedId"] in ("silk-chamber", "omarchy")
+        and not any(scene.id == value["selectedId"] for scene in catalog)
+        and any(scene.id == "silk-journey" for scene in catalog)
+    ):
+        value = {**value, "selectedId": "silk-journey"}
     return value
 
 

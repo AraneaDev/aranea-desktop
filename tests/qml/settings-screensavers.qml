@@ -34,17 +34,38 @@ ShellRoot {
             shuffleEligible: true
           },
           {
-            id: 'silk-chamber',
-            label: 'Silk Chamber',
+            id: 'neon-weaver',
+            label: 'Neon Weaver',
             available: true,
             thumbnail: null,
             shuffleEligible: true
           },
           {
-            id: 'omarchy',
-            label: 'Omarchy',
+            id: 'spiderfall',
+            label: 'Spiderfall',
+            available: true,
+            thumbnail: null,
+            shuffleEligible: true
+          },
+          {
+            id: 'kanji-drift',
+            label: 'Kanji Drift',
+            available: true,
+            thumbnail: null,
+            shuffleEligible: true
+          },
+          {
+            id: 'silken-flow',
+            label: 'Silken Flow',
+            available: true,
+            thumbnail: null,
+            shuffleEligible: true
+          },
+          {
+            id: 'neon-depths',
+            label: 'Neon Depths',
             available: false,
-            reason: 'Stock launcher missing',
+            reason: 'Browser unavailable',
             thumbnail: null,
             shuffleEligible: false
           }
@@ -145,7 +166,18 @@ ShellRoot {
     t.equal(commands.length, 0, 'render and navigation have no process effects')
     t.check(t.findChild(page, 'screensaverCurrent').text.indexOf('<b>Silk Journey</b>') >= 0, 'current summary preserves catalog label as text')
     t.equal(t.findChild(page, 'screensaverCurrent').textFormat, Text.PlainText, 'owner label never interprets markup')
-    var tile = t.findChild(page, 'screensaverChoice:silk-chamber')
+    var previousCard = null
+    var ids = ['silk-journey', 'neon-weaver', 'spiderfall', 'kanji-drift', 'silken-flow', 'neon-depths']
+    ids.forEach(function (id, index) {
+      var card = t.findChild(page, 'screensaverChoice:' + id)
+      t.check(!!card && card.width > 0 && card.height > 0, 'collection card has usable geometry: ' + id)
+      if (card && previousCard && index % 3 !== 0)
+        t.check(card.x >= previousCard.x + previousCard.width, 'collection columns do not overlap: ' + id)
+      if (index === 3)
+        t.check(card.y > previousCard.y, 'six scenes continue on second row')
+      previousCard = card
+    })
+    var tile = t.findChild(page, 'screensaverChoice:neon-weaver')
     var countBeforeClick = commands.length
     surface.stampLayout()
     input.mouseClick(tile, tile.width / 2, tile.height / 2)
@@ -153,12 +185,12 @@ ShellRoot {
     t.equal(commands.length, countBeforeClick, 'guarded pointer has no owner effects')
     tile.forceActiveFocus()
     input.keyClick(Qt.Key_Space)
-    t.equal(page.selectedId, 'silk-chamber', 'keyboard selects production card')
+    t.equal(page.selectedId, 'neon-weaver', 'keyboard selects production card')
     t.equal(owner.screensaver.selectedId, 'silk-journey', 'tile never persists')
     entry.opened = true
     t.findChild(page, 'screensaverPreview').activate()
     t.equal(entry.opened, false, 'accepted Preview hides Settings overlay')
-    t.equal(page.selectedId, 'silk-chamber', 'Preview retains draft')
+    t.equal(page.selectedId, 'neon-weaver', 'Preview retains draft')
     t.equal(owner.screensaver.selectedId, 'silk-journey', 'Preview never saves selection')
     t.equal(entry.controller.resultFor('screensaver-preview'), 'Preview accepted', 'preview result persists on controller')
     t.findChild(page, 'screensaverShuffle').activate()
@@ -185,9 +217,9 @@ ShellRoot {
     entry.controller.refresh()
     t.findChild(page, 'screensaverDiscard').activate()
     t.equal(page.modeDraft, 'shuffle', 'scene Discard reads authoritative mode')
-    var missing = t.findChild(page, 'screensaverChoice:omarchy')
+    var missing = t.findChild(page, 'screensaverChoice:neon-depths')
     missing.activate()
-    t.equal(page.selectedId, 'silk-chamber', 'unavailable card cannot select')
+    t.equal(page.selectedId, 'neon-weaver', 'unavailable card cannot select')
     var field = t.findChild(page, 'screensaverMinutes:lockSeconds')
     field.forceActiveFocus()
     input.keyClick(Qt.Key_A, Qt.ControlModifier)
@@ -240,7 +272,7 @@ ShellRoot {
     t.equal(entry.captureRestore(saved), 'ok', 'capture restores transaction')
     t.equal(page.timingDraft.lockSeconds, 1800, 'capture restores timing draft')
     t.check(page.sceneDirty && page.timingDirty, 'capture restores independent dirty state')
-    t.equal(page.selectedId, 'silk-chamber', 'capture restores remembered single selection')
+    t.equal(page.selectedId, 'neon-weaver', 'capture restores remembered single selection')
     t.equal(page.modeDraft, 'single', 'capture restores gallery highlight mode')
     surface.width = 432
     surface.height = 260
