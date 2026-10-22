@@ -11,6 +11,7 @@ references cover development and automation.
 | Find a control or understand a panel                 | [Features](features.md)               |
 | Set up a project, actions, or agent activity         | [Workflows](workflows.md)             |
 | Change wallpapers, schedules, fonts, or integrations | [Configuration](configuration.md)     |
+| Browse desktop captures and all thirty wallpapers    | [Gallery](gallery.md)                 |
 | Resolve an issue or repair an installation           | [Troubleshooting](troubleshooting.md) |
 
 For your first visit, install Aranea, open the command center from the spider,
