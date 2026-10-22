@@ -269,11 +269,11 @@ jq '.tasks[0] as $task | .tasks += [range(100) as $i | $task + {taskId:("fixture
 mv "$TMPDIR/large-state" "$ARANEA_STATE_ROOT/agent-activity.json"
 [[ $(stat -c %s "$ARANEA_STATE_ROOT/agent-activity.json") -gt 131072 ]] || large_ingress_fail "retained state must exceed 131072 bytes"
 large_started=$(date +%s.%N)
-if ! jq -cn --arg cwd "$checkout" '{session_id:"fixture",hook_event_name:"UserPromptSubmit",prompt_id:"large-next",prompt:("Large first line\nPRIVATE LARGE PROMPT"+("x"*300000)),cwd:$cwd}' | "$hook" claude >"$TMPDIR/out" 2>"$TMPDIR/err"; then
-  large_ingress_fail "prompt pipeline failed"
-fi
+large_pipeline_status=0
+jq -cn --arg cwd "$checkout" '{session_id:"fixture",hook_event_name:"UserPromptSubmit",prompt_id:"large-next",prompt:("Large first line\nPRIVATE LARGE PROMPT"+("x"*300000)),cwd:$cwd}' | "$hook" claude >"$TMPDIR/out" 2>"$TMPDIR/err" || large_pipeline_status=$?
 large_ended=$(date +%s.%N)
 large_duration=$(awk -v started="$large_started" -v ended="$large_ended" 'BEGIN {printf "%.6f", ended-started}')
+[[ "$large_pipeline_status" == 0 ]] || large_ingress_fail "prompt pipeline failed"
 large_snapshot=$(snap) || large_ingress_fail "final snapshot failed"
 [[ ! -s "$TMPDIR/out" && ! -s "$TMPDIR/err" ]] || large_ingress_fail "hook must leave stdout and stderr empty"
 printf '%s\n' "$large_snapshot" | jq -e 'any(.state.tasks[];.description == "Large first line" and .reportedState == "working") and (.state.tasks|length == 102)' >/dev/null || large_ingress_fail "expected working task and exactly 102 tasks"
