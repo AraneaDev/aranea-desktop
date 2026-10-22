@@ -675,6 +675,126 @@ Item {
     root.finishDisplayRebuild()
   }
 
+  // Builds ranked root search rows with their scoped action/project feedback.
+  function buildDesktopSearchRows(): var {
+    var rows = []
+    let ranked = DesktopSearch.rankResults(desktopSources.records, root.filterText)
+    for (let r = 0; r < ranked.length; r++) {
+      let record = ranked[r]
+      let entry = record.type === "command" ? root.item(record.target.itemId) : null
+      let appEntry = record.type === "app" ? root.appRows.find(function (app) {
+        return app.appId === record.target.appId
+      }) : null
+      let base = entry || appEntry
+      let desktopRow = base ? MenuModel.displayRow(root.items, root.itemOrder, guards.checkedResults, base, record.detail, r) : {
+        kind: record.type,
+        target: "",
+        action: "",
+        icon: "",
+        iconFont: "",
+        appIcon: "",
+        appId: "",
+        childCount: 0,
+        section: "",
+        score: r,
+        path: ""
+      }
+      desktopRow.itemId = record.key
+      desktopRow.desktopKey = record.key
+      desktopRow.targetKey = record.key
+      desktopRow.resultType = record.type
+      if (!desktopRow.icon)
+        desktopRow.icon = ResultPresentation.fallbackIcon(record.type)
+      if (!base)
+        desktopRow.label = record.label
+      desktopRow.detail = record.detail
+      let feedback = record.type === "action" ? desktopActionsObject.feedback[record.key] : (record.type === "project" || record.type === "project-agent") ? desktopSources.feedbackForProject(record.target.projectId, record.target.checkoutId) : null
+      if ((record.type === "project" || record.type === "project-agent") && feedback && feedback.checkoutId !== record.target.checkoutId)
+        feedback = null
+      if ((record.type === "project" || record.type === "project-agent") && feedback && feedback.status !== "pending" && feedback.status !== "failed")
+        desktopRow.detail += " · " + feedback.message
+      desktopRow.actionStatus = feedback ? feedback.status : ""
+      desktopRow.actionMessage = feedback ? feedback.message : ""
+      rows.push(desktopRow)
+    }
+    return rows
+  }
+
+  // Builds deduplicated scoped hits and reports whether drilldown needs a divider.
+  function buildScopedSearchRows(active: string, query: string): var {
+    let currentRows = []
+    let drilldownRows = []
+
+    for (let i = 0; i < root.itemOrder.length; i++) {
+      let entry = root.item(root.itemOrder[i])
+      if (!entry || entry.id === "root")
+        continue
+      if (!MenuModel.isDescendantOf(root.items, entry.id, active))
+        continue
+      if (!MenuModel.matchesQuery(entry, query, MenuModel.isVisible(root.items, root.itemOrder, guards.whenResults, entry)))
+        continue
+      let detail = MenuModel.parentPathFor(root.items, entry.id)
+      let row = MenuModel.displayRow(root.items, root.itemOrder, guards.checkedResults, entry, detail, MenuModel.searchScore(root.items, entry, query))
+      if (entry.parent === active)
+        currentRows.push(row)
+      else
+        drilldownRows.push(row)
+    }
+
+    let searchSort = function (a, b) {
+      if (a.score !== b.score)
+        return a.score - b.score
+      return a.path.localeCompare(b.path)
+    }
+
+    currentRows.sort(searchSort)
+    drilldownRows.sort(searchSort)
+    // Favorites and Recent hold copies of app rows: show each app once.
+    var rows = MenuModel.dedupeAppRows(currentRows.concat(drilldownRows))
+    let drilldownIds = ({})
+    for (let d = 0; d < drilldownRows.length; d++)
+      drilldownIds[drilldownRows[d].itemId] = true
+    let currentCount = 0
+    for (let c = 0; c < rows.length; c++) {
+      if (!drilldownIds[rows[c].itemId])
+        currentCount += 1
+    }
+    var searchDivider = currentCount > 0 && currentCount < rows.length
+    if (searchDivider) {
+      for (let e = 0; e < rows.length; e++) {
+        if (drilldownIds[rows[e].itemId])
+          rows[e].section = "drilldown"
+      }
+    }
+    return {
+      rows: rows,
+      searchDivider: searchDivider
+    }
+  }
+
+  // Builds visible menu children, preserving root exclusions and Apps ordering.
+  function buildMenuChildRows(active: string): var {
+    var rows = []
+    for (let j = 0; j < root.itemOrder.length; j++) {
+      let child = root.item(root.itemOrder[j])
+      if (!child || child.parent !== active)
+        continue
+      // Projects is already a root tile; retain its command for search.
+      if (active === "root" && child.id === "aranea.projects")
+        continue
+      if (!MenuModel.isVisible(root.items, root.itemOrder, guards.whenResults, child))
+        continue
+      rows.push(MenuModel.displayRow(root.items, root.itemOrder, guards.checkedResults, child, child.description, child.order))
+    }
+
+    // DesktopEntries can reorder its values when an application starts.
+    // Keep the Apps menu alphabetical independently of provider refreshes,
+    // with Favorites and Recent on top.
+    if (active === "apps")
+      rows = MenuModel.sortAppsMenu(rows)
+    return rows
+  }
+
   // Refills displayModel with the active menu's visible children, or the ranked search hits.
   function rebuildDisplay(): void {
     if (root.dmenuActive) {
@@ -693,108 +813,13 @@ Item {
     root.searchDivider = false
 
     if (query && active === "root") {
-      let ranked = DesktopSearch.rankResults(desktopSources.records, root.filterText)
-      for (let r = 0; r < ranked.length; r++) {
-        let record = ranked[r]
-        let entry = record.type === "command" ? root.item(record.target.itemId) : null
-        let appEntry = record.type === "app" ? root.appRows.find(function (app) {
-          return app.appId === record.target.appId
-        }) : null
-        let base = entry || appEntry
-        let desktopRow = base ? MenuModel.displayRow(root.items, root.itemOrder, guards.checkedResults, base, record.detail, r) : {
-          kind: record.type,
-          target: "",
-          action: "",
-          icon: "",
-          iconFont: "",
-          appIcon: "",
-          appId: "",
-          childCount: 0,
-          section: "",
-          score: r,
-          path: ""
-        }
-        desktopRow.itemId = record.key
-        desktopRow.desktopKey = record.key
-        desktopRow.targetKey = record.key
-        desktopRow.resultType = record.type
-        if (!desktopRow.icon)
-          desktopRow.icon = ResultPresentation.fallbackIcon(record.type)
-        if (!base)
-          desktopRow.label = record.label
-        desktopRow.detail = record.detail
-        let feedback = record.type === "action" ? desktopActionsObject.feedback[record.key] : (record.type === "project" || record.type === "project-agent") ? desktopSources.feedbackForProject(record.target.projectId, record.target.checkoutId) : null
-        if ((record.type === "project" || record.type === "project-agent") && feedback && feedback.checkoutId !== record.target.checkoutId)
-          feedback = null
-        if ((record.type === "project" || record.type === "project-agent") && feedback && feedback.status !== "pending" && feedback.status !== "failed")
-          desktopRow.detail += " · " + feedback.message
-        desktopRow.actionStatus = feedback ? feedback.status : ""
-        desktopRow.actionMessage = feedback ? feedback.message : ""
-        rows.push(desktopRow)
-      }
+      rows = root.buildDesktopSearchRows()
     } else if (query) {
-      let currentRows = []
-      let drilldownRows = []
-
-      for (let i = 0; i < root.itemOrder.length; i++) {
-        let entry = root.item(root.itemOrder[i])
-        if (!entry || entry.id === "root")
-          continue
-        if (!MenuModel.isDescendantOf(root.items, entry.id, active))
-          continue
-        if (!MenuModel.matchesQuery(entry, query, MenuModel.isVisible(root.items, root.itemOrder, guards.whenResults, entry)))
-          continue
-        let detail = MenuModel.parentPathFor(root.items, entry.id)
-        let row = MenuModel.displayRow(root.items, root.itemOrder, guards.checkedResults, entry, detail, MenuModel.searchScore(root.items, entry, query))
-        if (entry.parent === active)
-          currentRows.push(row)
-        else
-          drilldownRows.push(row)
-      }
-
-      let searchSort = function (a, b) {
-        if (a.score !== b.score)
-          return a.score - b.score
-        return a.path.localeCompare(b.path)
-      }
-
-      currentRows.sort(searchSort)
-      drilldownRows.sort(searchSort)
-      // Favorites and Recent hold copies of app rows: show each app once.
-      rows = MenuModel.dedupeAppRows(currentRows.concat(drilldownRows))
-      let drilldownIds = ({})
-      for (let d = 0; d < drilldownRows.length; d++)
-        drilldownIds[drilldownRows[d].itemId] = true
-      let currentCount = 0
-      for (let c = 0; c < rows.length; c++) {
-        if (!drilldownIds[rows[c].itemId])
-          currentCount += 1
-      }
-      root.searchDivider = currentCount > 0 && currentCount < rows.length
-      if (root.searchDivider) {
-        for (let e = 0; e < rows.length; e++) {
-          if (drilldownIds[rows[e].itemId])
-            rows[e].section = "drilldown"
-        }
-      }
+      let scoped = root.buildScopedSearchRows(active, query)
+      rows = scoped.rows
+      root.searchDivider = scoped.searchDivider
     } else {
-      for (let j = 0; j < root.itemOrder.length; j++) {
-        let child = root.item(root.itemOrder[j])
-        if (!child || child.parent !== active)
-          continue
-        // Projects is already a root tile; retain its command for search.
-        if (active === "root" && child.id === "aranea.projects")
-          continue
-        if (!MenuModel.isVisible(root.items, root.itemOrder, guards.whenResults, child))
-          continue
-        rows.push(MenuModel.displayRow(root.items, root.itemOrder, guards.checkedResults, child, child.description, child.order))
-      }
-
-      // DesktopEntries can reorder its values when an application starts.
-      // Keep the Apps menu alphabetical independently of provider refreshes,
-      // with Favorites and Recent on top.
-      if (active === "apps")
-        rows = MenuModel.sortAppsMenu(rows)
+      rows = root.buildMenuChildRows(active)
     }
 
     root.syncingDesktopRows = true
