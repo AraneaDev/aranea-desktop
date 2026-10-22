@@ -41,7 +41,9 @@ function canonicalPng(png) {
   return Buffer.concat(chunks)
 }
 
-function pngsMatch(first, second) {
+/** Tolerate rasterizer byte differences only for unchanged source inputs. */
+function rasterMatchesForCheck(first, second, inputsMatch) {
+  if (!inputsMatch) return false
   try {
     const firstSize = first.subarray(16, 24)
     const secondSize = second.subarray(16, 24)
@@ -513,12 +515,20 @@ function outputs(tokens) {
 
 function checkOrWrite(write) {
   const expected = outputs(loadTokens())
+  const manifestRelative = "branding/raster-manifest.txt"
+  const manifestPath = path.join(root, manifestRelative)
+  const rasterInputsMatch =
+    fs.existsSync(manifestPath) &&
+    fs.readFileSync(manifestPath, "utf8") === expected.get(manifestRelative)
   let stale = false
   for (const [relative, content] of expected) {
     const target = path.join(root, relative)
     const current = fs.existsSync(target) ? fs.readFileSync(target) : Buffer.alloc(0)
     const matches = Buffer.isBuffer(content)
-      ? current.equals(content) || (relative.endsWith(".png") && pngsMatch(current, content))
+      ? current.equals(content) ||
+        (!write &&
+          relative.endsWith(".png") &&
+          rasterMatchesForCheck(current, content, rasterInputsMatch))
       : current.toString("utf8") === content
     if (!matches) {
       stale = true
