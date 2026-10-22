@@ -164,10 +164,10 @@ jq -e --arg root "$repo_root" '
   $s.selectedId == "silk-journey" and $s.mode == "single" and
   $s.idle == {screensaverSeconds:900,lockSeconds:1200,stayAwake:false,screensaverOff:false,error:null} and
   $s.session.running == false and $s.session.ready == false and
-  [$s.choices[].id] == ["silk-journey","neon-weaver","spiderfall","kanji-drift","silken-flow","neon-depths"] and
-  [$s.choices[].available] == [true,true,true,true,true,true] and
-  [$s.choices[].shuffleEligible] == [true,true,true,true,true,true] and
-  [$s.choices[].thumbnail] == [$root + "/branding/3d/live/preview.png",$root + "/branding/3d/collection/spider/neon-weaver.png",$root + "/branding/3d/collection/spider/spiderfall.png",$root + "/branding/3d/collection/ambient/kanji-drift.png",$root + "/branding/3d/collection/ambient/silken-flow.png",$root + "/branding/3d/collection/ambient/neon-depths.png"]
+  [$s.choices[].id] == ["silk-journey","neon-weaver","spiderfall","kanji-drift","silken-flow","neon-depths","orbital-loom","blackglass-foundry","crystal-bloom"] and
+  [$s.choices[].available] == [true,true,true,true,true,true,true,true,true] and
+  [$s.choices[].shuffleEligible] == [true,true,true,true,true,true,true,true,true] and
+  [$s.choices[].thumbnail] == [$root + "/branding/3d/live/preview.png",$root + "/branding/3d/collection/spider/neon-weaver.png",$root + "/branding/3d/collection/spider/spiderfall.png",$root + "/branding/3d/collection/ambient/kanji-drift.png",$root + "/branding/3d/collection/ambient/silken-flow.png",$root + "/branding/3d/collection/ambient/neon-depths.png",$root + "/branding/3d/collection/ambient/orbital-loom.png",$root + "/branding/3d/collection/ambient/blackglass-foundry.png",$root + "/branding/3d/collection/ambient/crystal-bloom.png"]
 ' <<<"$payload" >/dev/null
 if grep -Eq '^(aranea-screensaver |aranea.settings (configure|preview)|shell reloadConfig|idle )' "$log"; then exit 1; fi
 # A failed Screensavers transaction retains its prior PNG and restores the snapshot.

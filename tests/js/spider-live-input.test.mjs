@@ -4,6 +4,14 @@ import fs from "node:fs"
 import vm from "node:vm"
 const code = () =>
   fs.readFileSync(new URL("../../branding/3d/live/dismiss.js", import.meta.url), "utf8")
+function documentFixture(dataset = {}) {
+  return {
+    body: { dataset },
+    head: { append() {} },
+    createElement: () => ({ textContent: "" }),
+    getElementById: () => ({ textContent: "" })
+  }
+}
 test("dismissal is independent of scene/WebGL loading and only happens once", async () => {
   const events = {},
     requests = []
@@ -15,7 +23,7 @@ test("dismissal is independent of scene/WebGL loading and only happens once", as
   }
   const context = {
     window,
-    document: { body: { dataset: {} }, getElementById: () => ({ textContent: "" }) },
+    document: documentFixture(),
     URLSearchParams,
     performance: { now: () => 0 },
     fetch: async (...args) => requests.push(args),
@@ -44,7 +52,7 @@ function harness(search = "?session=owned-token&screen=DP-1") {
       addEventListener: (type, fn) => (events[type] = fn),
       close: () => {}
     },
-    document: { body: { dataset }, getElementById: () => ({ textContent: "" }) },
+    document: documentFixture(dataset),
     URLSearchParams,
     performance: { now: () => 0 },
     fetch: async (...args) => requests.push(args),
