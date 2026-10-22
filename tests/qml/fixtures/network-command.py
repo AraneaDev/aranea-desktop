@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import tempfile
 import time
 
 root = Path(os.environ["ARANEA_TEST_SANDBOX"]) / "network-fixture"
@@ -13,7 +14,7 @@ name = Path(sys.argv[0]).name
 args = sys.argv[1:]
 
 
-def update(fn):
+def update(fn, *, read_only=False):
     with (root / "lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         path = root / "state.json"
@@ -21,7 +22,19 @@ def update(fn):
             "response": "", "delay": 0, "started": 0, "finished": 0,
         }
         result = fn(state)
-        path.write_text(json.dumps(state))
+        if read_only:
+            return result
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", dir=root, prefix=".state-", delete=False,
+            ) as stream:
+                temporary = Path(stream.name)
+                json.dump(state, stream)
+            temporary.replace(path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
         return result
 
 
@@ -29,7 +42,10 @@ if name == "network-fixture":
     def configure(state):
         state.update(json.loads(args[1]))
         return state
-    print(json.dumps(update(configure if args[0] == "configure" else lambda state: state)))
+    if args[0] == "configure":
+        print(json.dumps(update(configure)))
+    else:
+        print(json.dumps(update(lambda state: state, read_only=True)))
 elif name == "omarchy-network-status" and args == ["--verbose"]:
     def accept(state):
         state["started"] += 1
