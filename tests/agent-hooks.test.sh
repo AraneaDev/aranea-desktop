@@ -250,6 +250,7 @@ echo 'PASS safe executable bootstrap, missing dependency and bounded lock conten
 # Real native ingress streams both large retained state and a large prompt, without argv limits.
 large_snapshot='null'
 large_duration=null
+# Report the failed assertion with sanitized ingress metadata and exit.
 large_ingress_fail() {
   printf 'FAIL large native ingress: %s\n' "$1" >&2
   # Project only counts and a numeric revision; never print snapshot or hook output.
