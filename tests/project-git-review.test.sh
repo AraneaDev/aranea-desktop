@@ -78,6 +78,25 @@ review_reports_changes() {
   jq -e '.data.uncommitted == {dirty:false,untracked:true} and .data.truncated == false' "$result" >/dev/null
   jq -e '(.data.head|test("^[0-9a-f]{40}$")) and (.data.mergeBase|test("^[0-9a-f]{40}$")) and .data.head == .data.commits[0].sha' "$result" >/dev/null
 }
+# Catch rejecting registered SHA-256 repositories or returning abbreviated review IDs.
+review_sha256_reports_changes() {
+  rm -rf "$ARANEA_STATE_ROOT" "$ARANEA_TEST_SANDBOX/w"
+  repo="$ARANEA_TEST_SANDBOX/w/app"
+  git init -q --object-format=sha256 -b main "$repo"
+  commit_file "$repo" a.txt 'old\n' init
+  jq -cn --arg path "$repo" '{action:"register",args:{paths:[$path]}}' | "$store" mutate >"$result"
+  project_id=$(jq -r '.state.projects[0].id' "$result")
+  checkout_id=$(jq -r '.state.projects[0].checkouts[0].id' "$result")
+  make_task feat/sha256
+  local base head
+  base=$(git -C "$task_path" rev-parse HEAD)
+  commit_file "$task_path" a.txt 'new\n' change
+  head=$(git -C "$task_path" rev-parse HEAD)
+  task_run review
+  jq -e --arg b "$base" --arg h "$head" '.ok and .data.mergeBase == $b and .data.head == $h
+    and (.data.head|length) == 64 and .data.commits == [{sha:$h,subject:"change"}]
+    and .data.ahead == 1 and .data.behind == 0 and .data.files == [{path:"a.txt",added:1,removed:1}]' "$result" >/dev/null
+}
 # Catch a review being produced for the primary checkout.
 review_refuses_primary() {
   setup
@@ -313,7 +332,7 @@ review_reads_one_snapshot() {
   fi
   grep -E ' rev-list --count .*'"$head" "$log" >/dev/null && grep -E "$base_sha" "$log" >/dev/null
 }
-cases=(review_reads_one_snapshot lock_seconds_are_validated review_ignores_repository_lock review_reports_changes review_refuses_primary review_no_default_branch review_caps review_hostile_names_inert rebased_branch_reviews_cleanly review_never_lazy_fetches push_sets_upstream push_rejected push_detached push_auth_required push_never_forces push_hook_decline_is_not_rejected tag_named_like_branch)
+cases=(review_sha256_reports_changes review_reads_one_snapshot lock_seconds_are_validated review_ignores_repository_lock review_reports_changes review_refuses_primary review_no_default_branch review_caps review_hostile_names_inert rebased_branch_reviews_cleanly review_never_lazy_fetches push_sets_upstream push_rejected push_detached push_auth_required push_never_forces push_hook_decline_is_not_rejected tag_named_like_branch)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e

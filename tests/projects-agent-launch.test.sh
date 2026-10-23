@@ -210,26 +210,29 @@ merge_base=0123456789abcdef0123456789abcdef01234567
 diff_request() {
   jq -cn --arg cwd "${1:-$checkout}" --arg mb "${2:-$merge_base}" --arg t "${3:-kitty}" '{kind:"diff",cwd:$cwd,mergeBase:$mb,terminalId:$t}'
 }
-for terminal in kitty alacritty foot ghostty; do
-  rm -f "$ARANEA_TEST_SANDBOX/argv" "$ARANEA_TEST_SANDBOX/cwd"
-  result=$(diff_request "$checkout" "$merge_base" "$terminal" | PATH="$launch_path" "$launcher") || {
-    echo "Expected diff acceptance for $terminal, got: $result"
-    exit 1
-  }
-  jq -e '.ok and .status=="accepted"' <<<"$result" >/dev/null
-  sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || true"
-  for ((i = 0; i < 50; i++)); do
-    [[ ! -f "$ARANEA_TEST_SANDBOX/cwd" ]] || break
-    sleep .02
+for merge_base in 0123456789abcdef0123456789abcdef01234567 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef; do
+  for terminal in kitty alacritty foot ghostty; do
+    rm -f "$ARANEA_TEST_SANDBOX/argv" "$ARANEA_TEST_SANDBOX/cwd"
+    result=$(diff_request "$checkout" "$merge_base" "$terminal" | PATH="$launch_path" "$launcher") || {
+      echo "Expected diff acceptance for $terminal, got: $result"
+      exit 1
+    }
+    jq -e '.ok and .status=="accepted"' <<<"$result" >/dev/null
+    sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || true"
+    for ((i = 0; i < 50; i++)); do
+      [[ ! -f "$ARANEA_TEST_SANDBOX/cwd" ]] || break
+      sleep .02
+    done
+    tail_actual=$(jq -Rsc 'split("\n")[:-1][-13:]' "$ARANEA_TEST_SANDBOX/argv")
+    tail_expected=$(jq -cn --arg g "$tool_bin/git" --arg cwd "$checkout" --arg r "$merge_base...HEAD" '[$g,"-c","core.pager=less","-c","pager.diff=less","-c","core.fsmonitor=false","-C",$cwd,"diff","--no-ext-diff","--no-textconv",$r]')
+    [[ "$tail_actual" == "$tail_expected" ]] || {
+      echo "Expected diff tail $tail_expected for $terminal, got: $tail_actual"
+      exit 1
+    }
+    accepted=$((accepted + 1))
   done
-  tail_actual=$(jq -Rsc 'split("\n")[:-1][-13:]' "$ARANEA_TEST_SANDBOX/argv")
-  tail_expected=$(jq -cn --arg g "$tool_bin/git" --arg cwd "$checkout" --arg r "$merge_base...HEAD" '[$g,"-c","core.pager=less","-c","pager.diff=less","-c","core.fsmonitor=false","-C",$cwd,"diff","--no-ext-diff","--no-textconv",$r]')
-  [[ "$tail_actual" == "$tail_expected" ]] || {
-    echo "Expected diff tail $tail_expected for $terminal, got: $tail_actual"
-    exit 1
-  }
-  accepted=$((accepted + 1))
 done
+merge_base=0123456789abcdef0123456789abcdef01234567
 # Refuse a raw launcher request with the given code and no terminal started.
 refuse_raw() {
   local request=$1 code=$2 rc=0 out
@@ -241,6 +244,9 @@ refuse_raw() {
   }
   refused=$((refused + 1))
 }
+for bad in "$(printf 'a%.0s' {1..39})" "$(printf 'a%.0s' {1..41})" "$(printf 'a%.0s' {1..63})" "$(printf 'a%.0s' {1..65})" "$(printf 'A%.0s' {1..64})" "$(printf 'a%.0s' {1..64})"$'\n'; do
+  refuse_raw "$(diff_request "$checkout" "$bad")" INVALID_LAUNCH
+done
 refuse_raw "$(diff_request "$checkout" 'HEAD;id')" INVALID_LAUNCH
 refuse_raw "$(diff_request "$checkout" "${merge_base^^}")" INVALID_LAUNCH
 refuse_raw "$(diff_request "$checkout" "${merge_base}0")" INVALID_LAUNCH
@@ -393,5 +399,5 @@ sleep 2
   exit 1
 }
 accepted=$((accepted + 1))
-echo "PASS Open diff: four terminals accepted, malformed mergeBase, unregistered path, unknown terminal and extra fields refused"
+echo "PASS Open diff: four terminals accept SHA-1 and SHA-256 IDs, malformed mergeBase, unregistered path, unknown terminal and extra fields refused"
 echo "PASS $accepted accepted launches, $refused refusals: all terminal/provider shapes, basename-sensitive shims, editor/resume shapes and canonical safe PATH"

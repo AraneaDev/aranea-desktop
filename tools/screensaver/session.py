@@ -413,6 +413,129 @@ class Supervisor:
                 self.recovery_deadlines.pop(name)
         return True
 
+    def _launch_renderer(self, name, index, directory):
+        """Launch and retain the renderer for one observed monitor."""
+        self.hypr.dispatch("focusmonitor", name)
+        if self.scene.renderer == "web":
+            child = launch_web(
+                self.server.url(name),
+                directory / f"profile-{index}",
+                APP_ID,
+                kiosk=True,
+            )
+        else:
+            child = launch_video(
+                self.scene.asset,
+                directory / f"video-{index}.sock",
+                APP_ID,
+                REPO / "branding/3d/preview.lua",
+            )
+        self.children[name] = child
+        return child
+
+    def _pump_events(self, observed):
+        """Drain events and return their observation time and monitor status.
+
+        Setup waits ignore observation's false result until after close/renderer
+        handling; the steady-state loop exits on it before either check. This
+        helper deliberately leaves those termination policies with its callers.
+        """
+        events = self.hypr.events()
+        active = True
+        if events or time.monotonic() - observed >= 0.5:
+            observed = time.monotonic()
+            active = self.observe()
+        return events, observed, active
+
+    def _wait_for_mapping(self, name, child, deadline, observed):
+        """Return client, observation time and whether setup may continue."""
+        client = None
+        while not self.stop.is_set() and time.monotonic() < deadline:
+            events, observed, _ = self._pump_events(observed)
+            if self.closed_window(events) or not self.renderer_events():
+                return None, observed, False
+            if name not in self.expected:
+                break
+            if child.process.poll() is not None:
+                raise ValueError("Renderer exited before mapping")
+            client = self.mapped_client(child)
+            if client:
+                break
+            time.sleep(0.025)
+        return client, observed, True
+
+    def _place_surface(self, name, monitor, client):
+        """Validate and place the exact owned address on its saved workspace."""
+        workspace = (
+            monitor["specialWorkspace"].get("name")
+            or "special:screensaver-" + name
+        )
+        if (
+            not isinstance(workspace, str)
+            or not workspace.startswith("special:")
+            or not 8 < len(workspace) <= 168
+            or any(
+                ord(char) < 32 or ord(char) == 127 or char == ","
+                for char in workspace
+            )
+        ):
+            raise ValueError("Invalid special workspace identity")
+        self.hypr.dispatch(
+            "movetoworkspacesilent",
+            workspace + ",address:" + client["address"],
+        )
+        if not monitor["specialWorkspace"].get("name"):
+            self.hypr.dispatch(
+                "togglespecialworkspace", workspace.removeprefix("special:")
+            )
+            self.shown.add(name)
+        self.workspaces[name] = workspace
+        # Kiosk flags and window rules are advisory. Set, never toggle,
+        # fullscreen on this exact owned address after showing its workspace.
+        self.hypr.dispatch("fullscreen", "address:" + client["address"])
+
+    def _wait_for_placement(self, name, observed):
+        """Return observation time and whether setup may continue after placement."""
+        while not self.stop.is_set():
+            events, observed, _ = self._pump_events(observed)
+            if self.closed_window(events) or not self.renderer_events():
+                return observed, False
+            if name not in self.expected or self.surface_placed(name):
+                break
+            if time.monotonic() >= self.ready_deadline:
+                raise ValueError("Renderer fullscreen monitor/workspace placement deadline exceeded")
+            time.sleep(0.025)
+        return observed, True
+
+    def _update_readiness(self, directory):
+        """Probe readiness and publish only after placement and pointer settling."""
+        if not self.server:
+            probe_deadline = time.monotonic() + 0.15
+            for index, monitor in enumerate(self.monitors):
+                if time.monotonic() >= probe_deadline:
+                    break
+                name = monitor["name"]
+                if (
+                    name in self.expected
+                    and name not in self.ready
+                    and video_ready(
+                        directory / f"video-{index}.sock", timeout=0.05
+                    )
+                ):
+                    self.ready.add(name)
+        if not self.state["ready"]:
+            if all(self.surface_ready(name) for name in self.expected):
+                self.refresh_pointer()
+                if not self.state["preview"]:
+                    write_last_scene(None, self.scene.id)
+                self.state["ready"] = True
+            elif any(
+                not self.surface_ready(name)
+                and time.monotonic() >= self.recovery_deadlines.get(name, self.ready_deadline)
+                for name in self.expected
+            ):
+                raise ValueError("Renderer ready deadline exceeded")
+
     def run(self, accepted=None):
         previous = {}
         try:
@@ -448,43 +571,17 @@ class Supervisor:
                         and time.monotonic() >= self.started + FIRST_MAP_TIMEOUT
                     ):
                         raise ValueError("Renderer mapping deadline exceeded")
-                    self.hypr.dispatch("focusmonitor", name)
-                    if self.scene.renderer == "web":
-                        child = launch_web(
-                            self.server.url(name),
-                            directory / f"profile-{index}",
-                            APP_ID,
-                            kiosk=True,
-                        )
-                    else:
-                        child = launch_video(
-                            self.scene.asset,
-                            directory / f"video-{index}.sock",
-                            APP_ID,
-                            REPO / "branding/3d/preview.lua",
-                        )
-                    self.children[name] = child
+                    child = self._launch_renderer(name, index, directory)
                     deadline = (
                         self.ready_deadline
                         if mapped_any
                         else self.started + FIRST_MAP_TIMEOUT
                     )
-                    client = None
-                    while not self.stop.is_set() and time.monotonic() < deadline:
-                        events = self.hypr.events()
-                        if events or time.monotonic() - observed >= 0.5:
-                            observed = time.monotonic()
-                            self.observe()
-                        if self.closed_window(events) or not self.renderer_events():
-                            return
-                        if name not in self.expected:
-                            break
-                        if child.process.poll() is not None:
-                            raise ValueError("Renderer exited before mapping")
-                        client = self.mapped_client(child)
-                        if client:
-                            break
-                        time.sleep(0.025)
+                    client, observed, continuing = self._wait_for_mapping(
+                        name, child, deadline, observed
+                    )
+                    if not continuing:
+                        return
                     if self.stop.is_set():
                         return
                     if name not in self.expected:
@@ -494,86 +591,24 @@ class Supervisor:
                     mapped_any = True
                     self.hypr.deadline = None
                     self.addresses[name] = client["address"]
-                    workspace = (
-                        monitor["specialWorkspace"].get("name")
-                        or "special:screensaver-" + name
-                    )
-                    if (
-                        not isinstance(workspace, str)
-                        or not workspace.startswith("special:")
-                        or not 8 < len(workspace) <= 168
-                        or any(
-                            ord(char) < 32 or ord(char) == 127 or char == ","
-                            for char in workspace
-                        )
-                    ):
-                        raise ValueError("Invalid special workspace identity")
-                    self.hypr.dispatch(
-                        "movetoworkspacesilent",
-                        workspace + ",address:" + client["address"],
-                    )
-                    if not monitor["specialWorkspace"].get("name"):
-                        self.hypr.dispatch(
-                            "togglespecialworkspace", workspace.removeprefix("special:")
-                        )
-                        self.shown.add(name)
-                    self.workspaces[name] = workspace
-                    # Kiosk flags and window rules are advisory. Set, never toggle,
-                    # fullscreen on this exact owned address after showing its workspace.
-                    self.hypr.dispatch("fullscreen", "address:" + client["address"])
-                    while not self.stop.is_set():
-                        events = self.hypr.events()
-                        if events or time.monotonic() - observed >= 0.5:
-                            observed = time.monotonic()
-                            self.observe()
-                        if self.closed_window(events) or not self.renderer_events():
-                            return
-                        if name not in self.expected or self.surface_placed(name):
-                            break
-                        if time.monotonic() >= self.ready_deadline:
-                            raise ValueError("Renderer fullscreen monitor/workspace placement deadline exceeded")
-                        time.sleep(0.025)
+                    self._place_surface(name, monitor, client)
+                    observed, continuing = self._wait_for_placement(name, observed)
+                    if not continuing:
+                        return
                     if self.stop.is_set():
                         return
                     if name not in self.expected:
                         continue
                     self.refresh_pointer()
                 while not self.stop.is_set() and self.expected:
-                    events = self.hypr.events()
-                    if events or time.monotonic() - observed >= 0.5:
-                        observed = time.monotonic()
-                        if not self.observe():
-                            break
+                    events, observed, active = self._pump_events(observed)
+                    if not active:
+                        break
                     if self.closed_window(events):
                         return
                     if not self.renderer_events():
                         return
-                    if not self.server:
-                        probe_deadline = time.monotonic() + 0.15
-                        for index, monitor in enumerate(self.monitors):
-                            if time.monotonic() >= probe_deadline:
-                                break
-                            name = monitor["name"]
-                            if (
-                                name in self.expected
-                                and name not in self.ready
-                                and video_ready(
-                                    directory / f"video-{index}.sock", timeout=0.05
-                                )
-                            ):
-                                self.ready.add(name)
-                    if not self.state["ready"]:
-                        if all(self.surface_ready(name) for name in self.expected):
-                            self.refresh_pointer()
-                            if not self.state["preview"]:
-                                write_last_scene(None, self.scene.id)
-                            self.state["ready"] = True
-                        elif any(
-                            not self.surface_ready(name)
-                            and time.monotonic() >= self.recovery_deadlines.get(name, self.ready_deadline)
-                            for name in self.expected
-                        ):
-                            raise ValueError("Renderer ready deadline exceeded")
+                    self._update_readiness(directory)
                     time.sleep(0.025)
         except (OSError, ValueError, TypeError) as error:
             self.state["error"] = str(error)

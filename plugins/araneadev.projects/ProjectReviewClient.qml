@@ -299,7 +299,7 @@ Item {
   }
   // Open the saved terminal on `git diff <mergeBase>...HEAD` of a registered checkout.
   function openDiff(path, mergeBase, terminalId): bool {
-    if (captureActive || diffPending || !path || !/^[0-9a-f]{40}$/.test(mergeBase || '') || !terminalId)
+    if (captureActive || diffPending || !path || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(mergeBase || '') || !terminalId)
       return false
     diffPending = true
     diffError = null

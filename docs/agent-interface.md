@@ -741,7 +741,9 @@ Result fields, carried as the final CLI event's `data`:
   The remote is chosen as for `git fetch`.
 - `review`: read-only, and it never fetches.
   `{projectId,checkoutId,branch,base,mergeBase,head,ahead,behind,commits,files,uncommitted,truncated}`.
-  Only task checkouts can be reviewed. The base is chosen as for `task new`
+  Object IDs are full lowercase SHA-1 (40 hex digits) or SHA-256 (64 hex digits),
+  matching the repository’s storage format. Review marks and Open diff preserve
+  these full IDs. Only task checkouts can be reviewed. The base is chosen as for `task new`
   (`refs/remotes/<remote>/HEAD`, then `<remote>/main`, `<remote>/master`, then
   local `main`, `master`). `commits` is `[{sha,subject}]`, newest first, at most 50. `files` is `[{path,added,removed}]` from the numstat of the merge base against `HEAD`, at most 200; binary files report `added` and `removed`
   as `null`. `uncommitted` is `{dirty,untracked}`. `truncated` is true when

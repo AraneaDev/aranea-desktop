@@ -121,6 +121,12 @@ capture/showcase state cannot overwrite it.
 
 ## Screensaver settings ownership
 
+The Python `Supervisor.run` remains the sole session lifecycle owner. Private
+phase helpers launch renderers, wait for mapping/placement, and publish readiness.
+Event observation is shared, while setup and steady-state callers retain their
+different monitor-removal exit order and close-before-recovery checks. Cleanup,
+resource scopes, signal restoration, and all deadlines remain with the supervisor.
+
 `ScreensaversPage.qml` keeps independent scene/mode and exact-second timing drafts
 inside the persistent `SettingsSurface`. Selection and navigation have no command
 side effects. `SettingsLogic.command` allowlists catalog identities, modes and
@@ -183,9 +189,10 @@ renderer. Placement, pointer gates, cursor state, and lifecycle stay in hosts.
 
 The public CLI keeps syntax validation, discovery, Open submission, and details
 readback in private helpers within `scripts/lib/projects-cli.sh`.
-`projects_cli_main` owns command state shared through Bash dynamic scope and
-sequences dependencies, registry reads, and dispatch. The persistent owner
-retains launch and observation authority.
+`projects_cli_main` and `projects_cli_profiles_main` own command state shared
+through Bash dynamic scope and sequence dependencies, registry reads, and dispatch.
+Profile syntax and exact Start/Return payload construction stay in private helpers
+in the same library. The persistent owner retains launch and observation authority.
 
 Discovery and ordinary Open do not execute repository scripts. Registered IDs
 and canonical paths are shared across CLI, search, details, and workspace views.

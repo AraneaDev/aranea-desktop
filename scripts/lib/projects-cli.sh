@@ -609,10 +609,9 @@ projects_cli_environment_submit() {
   projects_cli_observe
 }
 
-# Parse additive profile commands without changing any legacy Open syntax or payload.
-projects_cli_profiles_main() {
-  local command=$1 seed_before='[]' option value profile_id='' environment_id='' definition='' revision='' action='' args='{}'
-  local -A supplied=()
+# Parse additive profile syntax before registry reads, events, or desktop calls.
+# Writes the command/options owned by projects_cli_profiles_main through dynamic scope.
+projects_cli_profiles_parse() {
   shift
   if [[ "$command" == profiles || "$command" == environments ]]; then
     [[ $# -gt 0 ]] || projects_cli_usage
@@ -680,6 +679,37 @@ projects_cli_profiles_main() {
     start) [[ -n "$profile_id" ]] || projects_cli_usage ;;
     environments.list) [[ -n "$cli_project_id" ]] || projects_cli_usage ;;
   esac
+}
+
+# Build the exact saved profile revision and a fresh activation target.
+# Writes main-owned revision/payload/method and shared CLI launch identities.
+projects_cli_profile_start() {
+  revision=$(jq -r --arg id "$profile_id" '.profiles[]|select(.id==$id)|.revision' <<<"$cli_project")
+  [[ -n "$revision" ]] || projects_cli_fail PROFILE_NOT_FOUND 'The saved profile is unavailable.' 'List profiles and choose an existing profile.'
+  cli_checkout_id=$(jq -r .lastCheckoutId <<<"$cli_project")
+  cli_activation_id=$(projects_registry_id a)
+  projects_cli_uuid a "$cli_activation_id" || projects_cli_fail DEPENDENCY_MISSING 'A fresh activation UUID is unavailable.' 'Restore access to the kernel UUID source.' 4
+  payload=$(jq -cn --arg project "$cli_project_id" --arg checkout "$cli_checkout_id" --arg profile "$profile_id" --arg activation "$cli_activation_id" --argjson revision "$revision" '{projectId:$project,checkoutId:$checkout,profileId:$profile,profileRevision:$revision,activationId:$activation}')
+  cli_environment_target=$payload
+  method=startEnvironment
+}
+
+# Resolve the retained environment checkout/workspace without substituting selection.
+# Reads main-owned environment_id/args and writes its payload/method and CLI identities.
+projects_cli_environment_return() {
+  cli_environment_id=$environment_id
+  cli_checkout_id=$(jq -r --arg id "$environment_id" '.environments[]|select(.id==$id)|.checkoutId' <<<"$cli_project")
+  cli_environment_workspace=$(jq -r --arg id "$environment_id" '.environments[]|select(.id==$id)|.workspaceId' <<<"$cli_project")
+  payload=$(jq -c --arg id "$environment_id" '.+{environmentId:$id}' <<<"$args")
+  method=returnEnvironment
+}
+
+# Own profile command state, validate syntax, then sequence registry and owner dispatch.
+projects_cli_profiles_main() {
+  # These locals intentionally flow through parse and dispatch by Bash dynamic scope.
+  local command=$1 seed_before='[]' option value profile_id='' environment_id='' definition='' revision='' action='' args='{}' payload method
+  local -A supplied=()
+  projects_cli_profiles_parse "$@"
   projects_cli_event started '' '' 'Starting project command.' '' '{}'
   [[ "$command" != activation ]] || projects_cli_activation
   projects_cli_require flock realpath
@@ -710,22 +740,10 @@ projects_cli_profiles_main() {
       args=$(jq -c --arg id "$environment_id" '.+{environmentId:$id}' <<<"$args")
       ;;
     start | environments.return)
-      local payload method
       if [[ "$command" == start ]]; then
-        revision=$(jq -r --arg id "$profile_id" '.profiles[]|select(.id==$id)|.revision' <<<"$cli_project")
-        [[ -n "$revision" ]] || projects_cli_fail PROFILE_NOT_FOUND 'The saved profile is unavailable.' 'List profiles and choose an existing profile.'
-        cli_checkout_id=$(jq -r .lastCheckoutId <<<"$cli_project")
-        cli_activation_id=$(projects_registry_id a)
-        projects_cli_uuid a "$cli_activation_id" || projects_cli_fail DEPENDENCY_MISSING 'A fresh activation UUID is unavailable.' 'Restore access to the kernel UUID source.' 4
-        payload=$(jq -cn --arg project "$cli_project_id" --arg checkout "$cli_checkout_id" --arg profile "$profile_id" --arg activation "$cli_activation_id" --argjson revision "$revision" '{projectId:$project,checkoutId:$checkout,profileId:$profile,profileRevision:$revision,activationId:$activation}')
-        cli_environment_target=$payload
-        method=startEnvironment
+        projects_cli_profile_start
       else
-        cli_environment_id=$environment_id
-        cli_checkout_id=$(jq -r --arg id "$environment_id" '.environments[]|select(.id==$id)|.checkoutId' <<<"$cli_project")
-        cli_environment_workspace=$(jq -r --arg id "$environment_id" '.environments[]|select(.id==$id)|.workspaceId' <<<"$cli_project")
-        payload=$(jq -c --arg id "$environment_id" '.+{environmentId:$id}' <<<"$args")
-        method=returnEnvironment
+        projects_cli_environment_return
       fi
       projects_cli_require omarchy-shell timeout
       projects_cli_snapshot
