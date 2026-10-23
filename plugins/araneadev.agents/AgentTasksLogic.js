@@ -278,7 +278,8 @@ function rows(snapshot, registry, now) {
 }
 
 /** A listed preview row with the full text of its details read, when that
- * read is of the same task and the same last report; otherwise the row as is.
+ * read matches the exact task, producer epoch and report version; otherwise
+ * the row as is. Receipt time alone cannot identify same-second reports.
  * State, connection and identity always come from the list.
  * @param {TaskData} task - listed task (may be a preview)
  * @param {?TaskData} detail - full task from the details read
@@ -289,6 +290,12 @@ function withDetails(task, detail) {
     !task ||
     !detail ||
     detail.taskId !== task.taskId ||
+    detail.provider !== task.provider ||
+    detail.providerSessionId !== task.providerSessionId ||
+    detail.producerEpoch !== task.producerEpoch ||
+    typeof task.reportVersion !== "string" ||
+    !task.reportVersion ||
+    detail.reportVersion !== task.reportVersion ||
     detail.lastReceivedAt !== task.lastReceivedAt
   )
     return task

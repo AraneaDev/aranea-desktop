@@ -524,7 +524,8 @@ test("details use the full task text only while it matches the listed report", (
     preview: true,
     result: "short…",
     diagnostics: [],
-    lastReceivedAt: 5
+    lastReceivedAt: 5,
+    reportVersion: "report-2"
   })
   const detail = {
     ...listed,
@@ -554,4 +555,38 @@ test("details use the full task text only while it matches the listed report", (
     "other task ignored"
   )
   assert.equal(logic.withDetails(listed, null), listed)
+})
+
+test("same-second details reject stale, future and unversioned report content", () => {
+  const listed = task("t", "working", { preview: true, lastReceivedAt: 5, reportVersion: "second" })
+  for (const reportVersion of ["first", "third", undefined, ""]) {
+    const detail = { ...listed, reportVersion, result: "wrong report" }
+    assert.equal(logic.withDetails(listed, detail), listed)
+  }
+  const unversioned = { ...listed, reportVersion: undefined }
+  assert.equal(logic.withDetails(unversioned, { ...unversioned, result: "unproven" }), unversioned)
+  assert.equal(
+    logic.withDetails(listed, { ...listed, result: "current report" }).result,
+    "current report"
+  )
+})
+
+test("matching report tokens never merge details from another producer identity", () => {
+  const listed = task("t", "working", {
+    preview: true,
+    lastReceivedAt: 5,
+    reportVersion: "legacy:2",
+    providerSessionId: "session",
+    producerEpoch: "epoch"
+  })
+  for (const change of [
+    { provider: "codex" },
+    { providerSessionId: "other" },
+    { producerEpoch: "other" }
+  ]) {
+    assert.equal(
+      logic.withDetails(listed, { ...listed, ...change, result: "Wrong producer" }),
+      listed
+    )
+  }
 })

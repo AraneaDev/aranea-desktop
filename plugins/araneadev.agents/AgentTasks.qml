@@ -72,7 +72,7 @@ Item {
     return task.taskId === selectedId
   })[0] || null : null
   // A preview selection asks its host for the full task again after each report.
-  readonly property string detailKey: selectedTask && selectedTask.preview === true ? selectedId + '\n' + selectedTask.lastReceivedAt : ''
+  readonly property string detailKey: selectedTask && selectedTask.preview === true ? JSON.stringify([selectedId, selectedTask.provider, selectedTask.providerSessionId, selectedTask.producerEpoch, selectedTask.reportVersion]) : ''
   // Selection is resolved by identity after every sort/refresh; details show
   // the full text once the host has read it for this report.
   readonly property var selectedRow: {

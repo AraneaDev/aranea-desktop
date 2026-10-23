@@ -67,8 +67,9 @@ def session: fields(["provider","providerSessionId","producerEpoch","highWaterSe
   and (.connection|connection) and (.provenance|provenance) and (.nativeMetadata|metadata(true));
 def association: fields(["status","projectId","checkoutId","cwd"];[]) and (.status|IN("registered","unassigned")) and (.cwd|path)
   and (if .status == "registered" then (.projectId|id) and (.checkoutId|id) else .projectId == null and .checkoutId == null end);
-def task: fields(["taskId","provider","providerSessionId","producerEpoch","reportedState","description","result","question","blockers","diagnostics","verification","association","lastReceivedAt","source"];[])
+def task: fields(["taskId","provider","providerSessionId","producerEpoch","reportedState","description","result","question","blockers","diagnostics","verification","association","lastReceivedAt","source"];["reportVersion"])
   and (.taskId|id) and (.provider|provider) and (.providerSessionId|id) and (.producerEpoch|id) and (.reportedState|lifecycle)
+  and ((has("reportVersion")|not) or (.reportVersion|text(64) and startswith("report:") and (.[7:]|fromjson|uint)))
   and all([.description,.result,.question][];text(4096)) and (.blockers|blockers)
   and (.diagnostics|type == "array" and length <= 20 and all(.[];fields(["summary","receivedAt"];[]) and (.summary|text(4096)) and (.receivedAt|uint)))
   and (.verification|verification) and (.association|association) and (.lastReceivedAt|uint) and (.source|IN("report","native"));
@@ -103,7 +104,7 @@ def associate($a): [$projects.projects[] as $p | $p.checkouts[] | select(.path =
     else $found[0] // {status:"unassigned",projectId:null,checkoutId:null,cwd:$a.cwd} end;
 def make_task($a;$t;$source): {taskId:$t.taskId,provider:$a.provider,providerSessionId:$a.providerSessionId,producerEpoch:$a.producerEpoch,
   reportedState:$t.reportedState,description:($t.description//""),result:($t.result//""),question:($t.question//""),blockers:($t.blockers//[]),diagnostics:[],
-  verification:($t.verification//{status:"unknown",summary:"",commands:[]}),association:associate($t),lastReceivedAt:$context.receivedAt,source:$source};
+  verification:($t.verification//{status:"unknown",summary:"",commands:[]}),association:associate($t),lastReceivedAt:$context.receivedAt,source:$source,reportVersion:("report:"+($a.sequence//0|tostring))};
 def retain:
   (.sessions|session_index) as $sessions
   | [.tasks[]|select(live($sessions))] as $live
@@ -129,7 +130,9 @@ def register($a;$source):
       | .sessions = ([.sessions[]|select(same_session($a)|not)] + [{provider:$a.provider,providerSessionId:$a.providerSessionId,producerEpoch:$a.producerEpoch,
           highWaterSequence:0,receipts:[],registrationHash:$hash,retiredEpochs:(($old.retiredEpochs//[]) + (if $old == null then [] else [$old.producerEpoch] end)),
           connection:clock(true),provenance:($a.provenance//null),nativeMetadata:{currentTaskId:null,turns:[]}}]) | .revision += 1 end;
-def update_task($e): .lastReceivedAt = $context.receivedAt
+# The accepted sequence identifies reports within the exact producer epoch,
+# including reports in one wall-clock second. Replays bypass this update.
+def update_task($e): .lastReceivedAt = $context.receivedAt | .reportVersion = ("report:"+($e.sequence|tostring))
   | if $e.kind == "snapshot" then make_task($e;($e.payload+{taskId:$e.taskId});.source)
     elif $e.kind == "needs-input" then .blockers = ([.blockers[]|select(.blockerId != $e.payload.blockerId)] + [$e.payload]) | if (.blockers|length) > 32 then error("CAPACITY_EXCEEDED") else . end | .reportedState = "needs-input" | .question = $e.payload.question
     elif $e.kind == "blocker-resolved" then any(.blockers[];.blockerId == $e.payload.blockerId) as $resolved
@@ -189,7 +192,10 @@ def dismiss_result($before;$after;$r):
     | {result:{removed:[$r.args.taskIds[]|select($old[.] != null and $new[.] == null)],missing:[$r.args.taskIds[]|select($old[.] == null)],refused:[$r.args.taskIds[]|select($old[.] != null and $new[.] != null)]}}
   else {} end;
 def project_state:
-  (.sessions|session_index) as $sessions | .tasks |= map(. as $task | $sessions[session_key] as $entry | $entry.session as $s
+  .revision as $revision | (.sessions|session_index) as $sessions | .tasks |= map(. as $task | $sessions[session_key] as $entry | $entry.session as $s
+    # Old schema-1 rows have no persisted report version. The state revision bounds
+    # their identity until their first new report assigns a persisted sequence.
+    | .reportVersion //= ("legacy:"+($revision|tostring))
     | .freshness = (if $entry.inactive[$task.taskId] != null then "connection-lost" elif fresh($s) then if $s.provenance == null or ($s.provenance|has("commandHash")|not) then "unconfirmed" else "connected" end else "connection-lost" end)
     | if .association.status == "registered" and (any($projects.projects[];.id == $task.association.projectId and any(.checkouts[];.id == $task.association.checkoutId and .path == $task.association.cwd))|not) then .association.status = "unavailable" else . end)
   | .capabilities = {heartbeatSeconds:15,connectionLostSeconds:60,maxLiveTasks:200,maxInactiveTasks:500,inactiveRetentionDays:14,duplicateReceiptWindow:512,maxRetiredEpochs:512,epochHistoryLifetime:"retained-session"};

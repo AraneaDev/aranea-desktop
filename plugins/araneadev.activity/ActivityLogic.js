@@ -129,6 +129,8 @@ function project(state, now, registry) {
       var displayState = !historical && lost ? "connection-lost" : task.reportedState
       if (!historical && (superseded || silentWork(task, clock.wall))) displayState = "ended"
       return Object.assign({}, task, {
+        // Match the store's compatibility identity for old schema-1 rows.
+        reportVersion: task.reportVersion || "legacy:" + state.revision,
         // Presentation eligibility follows private exact-epoch evidence, not the
         // latest producer label. Runtime still independently proves every action.
         nativeSessionEligible: !!(

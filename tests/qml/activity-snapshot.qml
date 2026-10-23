@@ -157,6 +157,7 @@ ShellRoot {
           checkoutId: null,
           cwd: '/home/user/work/checkout-' + i
         },
+        reportVersion: 'report:9007199254740991',
         lastReceivedAt: 900,
         source: 'native'
       })
@@ -237,6 +238,7 @@ ShellRoot {
           checkoutId: 'checkout-' + uuid,
           cwd: '/home/user/work/some-project/checkout-' + i
         },
+        reportVersion: 'report:9007199254740991',
         lastReceivedAt: 900,
         source: 'native'
       })

@@ -39,7 +39,17 @@ fills preview rows back to the usual shape. A refresh asked for while pages are
 loading runs once after them instead of starting over. A failed page keeps the
 last snapshot. `readTask(taskId)` fills `taskDetails`; `AgentTasks` asks its
 host for it (`detailsNeeded`) when a preview row is opened, and again after
-each new report.
+each new report. Full task and preview projections carry the same opaque
+`reportVersion`; details are merged only when task identity, version and receipt
+time match. The version is the accepted monotonically increasing sequence within
+the exact producer epoch (`report:0` for registration), so distinct reports received
+in one second still refresh details and late responses cannot restore older
+content. Exact duplicate replay preserves it. Existing schema-1 state
+without versions remains readable: the store and owner project a stable legacy
+version from the state revision until the next accepted report supplies a persisted
+sequence. Matching also checks the exact provider, session and epoch, so legacy
+versions cannot cross producer identities. Missing versions never permit a
+timestamp-only detail merge.
 
 `ActivityClient` exposes `snapshot`, `available`, structured `error`, `pending`,
 `operationId`, `currentOperation`, `request(payload)`, `refresh()`,
