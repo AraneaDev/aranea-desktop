@@ -92,7 +92,9 @@ class Compositor:
                 child = json.loads(file.read_text())
                 if child["address"] == address:
                     child["workspace"] = {"name": workspace}
-                    file.write_text(json.dumps(child))
+                    temporary = file.with_name("." + file.name + ".pending")
+                    temporary.write_text(json.dumps(child))
+                    temporary.replace(file)
         if name == "focusmonitor":
             self.focus = value
             (self.root / "focus").write_text(value)
@@ -157,7 +159,17 @@ if "--remote-debugging-pipe" in sys.argv and behavior != "no-control":
 
 if behavior == "slow-map" or (behavior == "second-slow" and screen == "HDMI-A-1"): time.sleep(3)
 child = {"pid":os.getpid(),"address":hex(os.getpid()),"class":"org.omarchy.screensaver","mapped":behavior != "no-map","monitor":1 if screen == "DP-1" else 2,"workspace":{"name":"special:screensaver-" + screen},"screen":screen,"url":url}
-(root / ("child-"+screen)).write_text(json.dumps(child))
+client_path = root / ("child-"+screen)
+pending_client = client_path.with_name("."+client_path.name+".pending")
+with pending_client.open("w") as record:
+    if behavior == "pause-client":
+        (root / ("client-pending-"+screen)).touch()
+        deadline = time.monotonic()+2
+        while not (root / ("client-allow-"+screen)).exists():
+            assert time.monotonic()<deadline
+            time.sleep(.01)
+    record.write(json.dumps(child))
+pending_client.replace(client_path)
 if behavior == "stubborn-removed" and screen == "HDMI-A-1":
     signal.signal(signal.SIGTERM, lambda *_: (root / "removed-term").write_text(str(time.monotonic())))
 if behavior == "orphan":
@@ -183,7 +195,10 @@ root = pathlib.Path(os.environ["FIXTURE_ROOT"])
 screen = (root / "focus").read_text()
 ipc = next(x.removeprefix("--input-ipc-server=") for x in sys.argv if x.startswith("--input-ipc-server="))
 child = {"pid":os.getpid(),"address":hex(os.getpid()),"class":"org.omarchy.screensaver","mapped":True,"monitor":1 if screen == "DP-1" else 2,"workspace":{"name":"special:screensaver-" + screen},"screen":screen}
-(root / ("child-"+screen)).write_text(json.dumps(child))
+client_path = root / ("child-"+screen)
+pending_client = client_path.with_name("."+client_path.name+".pending")
+pending_client.write_text(json.dumps(child))
+pending_client.replace(client_path)
 signal.signal(signal.SIGUSR1, lambda *_: sys.exit(0))
 server = socket.socket(socket.AF_UNIX)
 server.bind(ipc)
@@ -495,7 +510,49 @@ class SessionTests(unittest.TestCase):
             data=json.dumps({"screenId": screen}).encode(),
             headers={"X-Aranea-Session": query["session"][0]},
         )
-        urllib.request.urlopen(req, timeout=2).close()
+        try:
+            urllib.request.urlopen(req, timeout=2).close()
+        except OSError as error:
+            state = self.api.session_status()
+            saved = self.root / "error"
+            reason = saved.read_text()[:512] if saved.exists() else state.get("error")
+            raise AssertionError(f"Scene event {kind} failed; supervisor={reason!r}, running={state.get('running')}, ready={state.get('ready')}") from error
+
+    def test_client_record_is_not_visible_until_publish_completes(self):
+        self.write("monitors", [json.loads((self.root / "monitors").read_text())[0]])
+        self.write("behavior", "pause-client")
+        process = self.start()
+        wait_for(lambda: (self.root / "client-pending-DP-1").exists())
+        self.assertFalse((self.root / "child-DP-1").exists(), "Unfinished client record became visible")
+        (self.root / "client-allow-DP-1").touch()
+        self.ready()
+        self.event("dismiss")
+        self.assert_closed(process)
+
+    def test_client_update_keeps_previous_json_visible_until_commit(self):
+        path = self.root / "child-DP-1"
+        old = {"address": "0xbeef", "workspace": {"name": "special:old"}}
+        path.write_text(json.dumps(old))
+        entered, release = threading.Event(), threading.Event()
+        original = Path.write_text
+        def delayed(file, value, *args, **kwargs):
+            if "child-" not in file.name:
+                return original(file, value, *args, **kwargs)
+            with file.open("w") as stream:
+                entered.set()
+                if not release.wait(2):
+                    raise ValueError("Fixture writer was not released")
+                return stream.write(value)
+        with patch.object(Path, "write_text", delayed):
+            writer = threading.Thread(target=Compositor(self.root).dispatch, args=("movetoworkspacesilent", "special:new,address:0xbeef"))
+            writer.start()
+            try:
+                self.assertTrue(entered.wait(1))
+                self.assertEqual(json.loads(path.read_text()), old)
+            finally:
+                release.set(); writer.join(2)
+        self.assertFalse(writer.is_alive())
+        self.assertEqual(json.loads(path.read_text())["workspace"]["name"], "special:new")
 
     def test_shared_session_readiness_dismissal_and_restoration(self):
         process = self.start()
