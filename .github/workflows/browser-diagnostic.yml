@@ -1,0 +1,26 @@
+name: Browser launch diagnostic
+on:
+  push:
+    branches: [diagnose/screensaver-browser-timeout]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [/usr/bin/chromium, /opt/google/chrome/chrome]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Compare identical isolated cursor assertions and retain timeout output
+        shell: bash
+        env:
+          BROWSER_DIAGNOSTIC_BINARY: ${{ matrix.browser }}
+        run: |
+          repo_root="$PWD"
+          source tests/lib/sandbox.sh
+          python3 "$repo_root/tools/diagnose-browser-launch.py" "$BROWSER_DIAGNOSTIC_BINARY"
