@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.4](https://github.com/AraneaDev/aranea-desktop/compare/v2.39.3...v2.39.4) (2026-10-23)
+
+
+### Fixes
+
+* refresh task details and support SHA-256 project reviews ([#224](https://github.com/AraneaDev/aranea-desktop/issues/224)) ([db061fd](https://github.com/AraneaDev/aranea-desktop/commit/db061fdca42708f949c8d4067527e0d76b2bb43f))
+* **workspaces:** stop naming workspaces from stale launch history ([#222](https://github.com/AraneaDev/aranea-desktop/issues/222)) ([36921d3](https://github.com/AraneaDev/aranea-desktop/commit/36921d3d7d2e7e3ff845472ad867cf9801b28541))
+
 ## [2.39.3](https://github.com/AraneaDev/aranea-desktop/compare/v2.39.2...v2.39.3) (2026-10-23)
 
 
