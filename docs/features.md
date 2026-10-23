@@ -187,7 +187,7 @@ Blackglass Foundry, and Crystal Bloom without it.
 All share Aranea's dark palette and mint/violet lighting. Choose
 one scene or shuffle available scenes. **Apply scene** saves that choice;
 **Preview** opens fullscreen without saving. Move the pointer, click, or press
-a key to return after the launch grace period.
+a key after the launch grace period to return to the picker with your drafts intact.
 
 A ready browser tab that crashes is reloaded once on its existing monitor. The
 scene must render again within its readiness deadline. A repeated crash or failed

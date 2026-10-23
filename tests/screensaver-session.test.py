@@ -5,6 +5,7 @@ import json
 import multiprocessing
 import os
 import signal
+import shutil
 import socket
 import subprocess
 import sys
@@ -79,6 +80,13 @@ class Compositor:
                 os.kill(child["pid"], 0)
             except ProcessLookupError:
                 continue
+            pending = self.root / ("fullscreen-pending-" + child["screen"])
+            if pending.exists() and time.monotonic() >= float(pending.read_text()):
+                child["fullscreen"] = 2
+                temporary = file.with_name("." + file.name + ".pending")
+                temporary.write_text(json.dumps(child))
+                temporary.replace(file)
+                pending.unlink()
             if child.get("mapped", True):
                 result.append(child)
         return result
@@ -95,6 +103,23 @@ class Compositor:
                     temporary = file.with_name("." + file.name + ".pending")
                     temporary.write_text(json.dumps(child))
                     temporary.replace(file)
+        if name == "fullscreen":
+            address = value.removeprefix("address:")
+            for file in self.root.glob("child-*"):
+                child = json.loads(file.read_text())
+                if child["address"] != address:
+                    continue
+                behavior = self.root / "fullscreen-behavior"
+                behavior = json.loads(behavior.read_text()) if behavior.exists() else "set"
+                if behavior == "reject":
+                    continue
+                if behavior == "delay":
+                    (self.root / ("fullscreen-pending-" + child["screen"])).write_text(str(time.monotonic() + 0.35))
+                    continue
+                child["fullscreen"] = 2
+                temporary = file.with_name("." + file.name + ".pending")
+                temporary.write_text(json.dumps(child))
+                temporary.replace(file)
         if name == "focusmonitor":
             self.focus = value
             (self.root / "focus").write_text(value)
@@ -158,7 +183,7 @@ if "--remote-debugging-pipe" in sys.argv and behavior != "no-control":
     threading.Thread(target=browser_protocol, daemon=True).start()
 
 if behavior == "slow-map" or (behavior == "second-slow" and screen == "HDMI-A-1"): time.sleep(3)
-child = {"pid":os.getpid(),"address":hex(os.getpid()),"class":"org.omarchy.screensaver","mapped":behavior != "no-map","monitor":1 if screen == "DP-1" else 2,"workspace":{"name":"special:screensaver-" + screen},"screen":screen,"url":url}
+child = {"pid":os.getpid(),"address":hex(os.getpid()),"class":"org.omarchy.screensaver","mapped":behavior != "no-map","fullscreen":0,"monitor":1 if screen == "DP-1" else 2,"workspace":{"name":"special:screensaver-" + screen},"screen":screen,"url":url}
 client_path = root / ("child-"+screen)
 pending_client = client_path.with_name("."+client_path.name+".pending")
 with pending_client.open("w") as record:
@@ -194,7 +219,7 @@ import json, os, pathlib, signal, socket, sys, time
 root = pathlib.Path(os.environ["FIXTURE_ROOT"])
 screen = (root / "focus").read_text()
 ipc = next(x.removeprefix("--input-ipc-server=") for x in sys.argv if x.startswith("--input-ipc-server="))
-child = {"pid":os.getpid(),"address":hex(os.getpid()),"class":"org.omarchy.screensaver","mapped":True,"monitor":1 if screen == "DP-1" else 2,"workspace":{"name":"special:screensaver-" + screen},"screen":screen}
+child = {"pid":os.getpid(),"address":hex(os.getpid()),"class":"org.omarchy.screensaver","mapped":True,"fullscreen":0,"monitor":1 if screen == "DP-1" else 2,"workspace":{"name":"special:screensaver-" + screen},"screen":screen}
 client_path = root / ("child-"+screen)
 pending_client = client_path.with_name("."+client_path.name+".pending")
 pending_client.write_text(json.dumps(child))
@@ -242,6 +267,13 @@ function hl.dsp.window.move(value)
   fields(value, {workspace="string",follow="boolean",window="string"})
   assert(value.follow == false)
   return {"movetoworkspacesilent", value.workspace .. "," .. value.window}
+end
+function hl.dsp.window.fullscreen(value)
+  fields(value, {mode="string",action="string",window="string"})
+  assert(value.mode == "fullscreen")
+  assert(value.action == "set")
+  assert(value.window:match("^address:0x%x+$"))
+  return {"fullscreen", value.window}
 end
 function hl.dsp.workspace.toggle_special(value)
   assert(type(value) == "string")
@@ -791,6 +823,50 @@ class SessionTests(unittest.TestCase):
         status = Path(f"/proc/{pid}/stat")
         self.assertTrue(not status.exists() or status.read_text().split()[2] == "Z")
 
+    def session_cli_fixture(self):
+        """Run the shipped entry points from a catalog that cannot be loaded."""
+        fixture = self.root / "renderer-fixture"
+        package = fixture / "tools/screensaver"
+        shutil.copytree(REPO / "tools/screensaver", package, ignore=shutil.ignore_patterns("__pycache__"))
+        launcher = fixture / "scripts/aranea-screensaver"
+        launcher.parent.mkdir()
+        shutil.copy2(REPO / "scripts/aranea-screensaver", launcher)
+        (fixture / "branding/screensavers/catalog.json").write_text("invalid catalog")
+        config = self.root / "config/aranea/screensaver.json"
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text('{"version":1,"selectedId":"removed-scene","mode":"single"}')
+        return package / "cli.py", launcher
+
+    def test_session_cli_reads_live_preview_without_catalog_or_preferences(self):
+        process = self.start(preview=True)
+        self.ready()
+        expected = self.api.session_status()
+        cli, launcher = self.session_cli_fixture()
+        watched = [self.root / "config", self.root / "run"]
+        def contents():
+            return {str(path): path.read_bytes() for root in watched for path in root.rglob("*") if path.is_file()}
+        before = contents()
+        for command in ([sys.executable, str(cli)], ["bash", str(launcher)]):
+            with self.subTest(command=command):
+                result = subprocess.run(command + ["session", "--json"], capture_output=True, text=True, timeout=5, check=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout), {"session": expected})
+                self.assertEqual(result.stderr, "")
+                self.assertEqual(contents(), before)
+        self.api.stop_session()
+        self.assert_closed(process)
+
+    def test_session_cli_without_runtime_returns_empty_without_creating_paths(self):
+        cli, launcher = self.session_cli_fixture()
+        runtime = self.root / "absent-runtime"
+        for command in ([sys.executable, str(cli)], ["bash", str(launcher)]):
+            with self.subTest(command=command), patch.dict(os.environ, {"XDG_RUNTIME_DIR": str(runtime)}):
+                result = subprocess.run(command + ["session", "--json"], capture_output=True, text=True, timeout=5, check=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout), {"session": {"running": False, "ready": False, "sceneId": None, "preview": False}})
+                self.assertEqual(result.stderr, "")
+                self.assertFalse(runtime.exists())
+
     def test_owner_cli_routes_and_invalid_preview(self):
         self.native_boundary()
         result = subprocess.run(
@@ -867,6 +943,11 @@ class SessionTests(unittest.TestCase):
         self.native_boundary()
         adapter = Hyprland()
         cases = [
+            (
+                "fullscreen",
+                "address:0xbeef",
+                'hl.dsp.window.fullscreen({ mode = "fullscreen", action = "set", window = "address:0xbeef" })',
+            ),
             ("focusmonitor", "eDP-1", 'hl.dsp.focus({ monitor = "eDP-1" })'),
             (
                 "focuswindow",
@@ -932,6 +1013,8 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         for operation, value in [
             ("exec", "anything"),
+            ("fullscreen", 'address:0x1"});evil()'),
+            ("fullscreen", "activewindow"),
             ("focuswindow", 'address:0x1"});evil()'),
             ("movetoworkspacesilent", "special:x"),
             ("focusmonitor", None),
@@ -1248,6 +1331,39 @@ class SessionTests(unittest.TestCase):
         self.assertLess(time.monotonic() - before, 1.5)
         self.assertFalse((self.root / "state").exists())
 
+    def test_windowed_preview_is_fullscreen_before_ready(self):
+        process = self.start(preview=True)
+        self.ready()
+        clients = [json.loads(path.read_text()) for path in self.root.glob("child-*")]
+        self.assertEqual(len(clients), 2)
+        self.assertEqual([client["fullscreen"] for client in clients], [2, 2])
+        # The terminal and any other foreign surface must never be a target.
+        calls = [json.loads(line) for line in (self.root / "dispatches").read_text().splitlines()]
+        fullscreen = [value for name, value in calls if name == "fullscreen"]
+        self.assertCountEqual(fullscreen, ["address:" + client["address"] for client in clients])
+        self.api.stop_session()
+        self.assert_closed(process)
+
+    def test_fullscreen_settlement_waits_before_preview_readiness(self):
+        self.write("fullscreen-behavior", "delay")
+        process = self.start(preview=True)
+        wait_for(lambda: list(self.root.glob("fullscreen-pending-*")) or self.api.session_status().get("ready"))
+        self.assertFalse(self.api.session_status()["ready"])
+        self.ready()
+        self.assertFalse(list(self.root.glob("fullscreen-pending-*")))
+        self.assertTrue(all(json.loads(path.read_text())["fullscreen"] == 2 for path in self.root.glob("child-*")))
+        self.api.stop_session()
+        self.assert_closed(process)
+
+    def test_rejected_fullscreen_never_reports_preview_ready(self):
+        self.write("fullscreen-behavior", "reject")
+        process = self.start(preview=True, timeout=0.8)
+        wait_for(lambda: (self.root / "error").exists() or self.api.session_status().get("ready"))
+        self.assertFalse(self.api.session_status()["ready"])
+        self.assert_closed(process)
+        self.assertIn("fullscreen", (self.root / "error").read_text().lower())
+        self.assertFalse((self.root / "state").exists())
+
     def test_placement_readback_must_match_saved_special_workspace(self):
         original = Compositor.dispatch
 
@@ -1256,7 +1372,7 @@ class SessionTests(unittest.TestCase):
                 original(compositor, name, value)
 
         with patch.object(Compositor, "dispatch", ignore_move):
-            process = self.start()
+            process = self.start(timeout=0.8)
             process.join(3)
             self.assertFalse(process.is_alive())
             self.assertIn("workspace", (self.root / "error").read_text().lower())

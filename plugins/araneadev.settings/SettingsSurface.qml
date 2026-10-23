@@ -198,9 +198,6 @@ Item {
       }
       if (succeeded && (operation === 'configure screensaver' || operation === 'configure screensaver-timing'))
         screensaversPage.acceptSaved(operation, args)
-      // Overlay keyboard focus must yield to the accepted fullscreen preview.
-      if (operation === 'preview screensaver' && succeeded)
-        panel.root.close()
       if (operation === 'configure schedule' && succeeded)
         schedulePage.acceptSaved(args)
     }

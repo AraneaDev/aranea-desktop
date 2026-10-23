@@ -106,6 +106,10 @@ QtObject {
   signal stateRead
   // Report completion after independent owner readback, for local draft acknowledgment.
   signal mutationCompleted(string operation, var args, bool succeeded)
+  // Yield the picker before launching its fullscreen preview.
+  signal previewRequested
+  // Identify the accepted owned session independently of visibility.
+  signal previewAccepted(string sessionId)
   // Factory for process instances parented to the keep-loaded controller.
   component CommandProcess: Process {
     id: process
@@ -316,6 +320,8 @@ QtObject {
     pendingKey = key
     readRevision++
     setResult(key, '', '')
+    if (operation === 'preview screensaver')
+      previewRequested()
     runCommand(argv, function (code, stdout, stderr) {
       var mutation = Logic.parseResponse(stdout, code)
       // STATE_UNAVAILABLE may describe an unrelated section after helper success.
@@ -338,6 +344,8 @@ QtObject {
         setResult(key, outcome, message)
         pending = false
         pendingKey = ''
+        if (operation === 'preview screensaver' && succeeded && confirmed)
+          previewAccepted(mutation.result.screensaverPreview.sessionId || '')
         mutationCompleted(operation, args, succeeded && confirmed && (operation !== 'set display-scale' || outcome.indexOf('Applied') === 0))
       })
     })
