@@ -189,9 +189,10 @@ renderer. Placement, pointer gates, cursor state, and lifecycle stay in hosts.
 
 The public CLI keeps syntax validation, discovery, Open submission, and details
 readback in private helpers within `scripts/lib/projects-cli.sh`.
-`projects_cli_main` owns command state shared through Bash dynamic scope and
-sequences dependencies, registry reads, and dispatch. The persistent owner
-retains launch and observation authority.
+`projects_cli_main` and `projects_cli_profiles_main` own command state shared
+through Bash dynamic scope and sequence dependencies, registry reads, and dispatch.
+Profile syntax and exact Start/Return payload construction stay in private helpers
+in the same library. The persistent owner retains launch and observation authority.
 
 Discovery and ordinary Open do not execute repository scripts. Registered IDs
 and canonical paths are shared across CLI, search, details, and workspace views.
