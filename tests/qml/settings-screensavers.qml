@@ -97,6 +97,20 @@ ShellRoot {
     windowEnabled: false
     runner: function (argv, done) {
       host.commands = host.commands.concat([argv])
+      if (argv[0].endsWith('/aranea-screensaver')) {
+        done(0, JSON.stringify({
+          session: {
+            version: 1,
+            sessionId: 'fake',
+            running: false
+          }
+        }), '')
+        return
+      }
+      if (argv[1] === 'lock') {
+        done(0, 'false', '')
+        return
+      }
       var state = JSON.parse(JSON.stringify(host.owner))
       var result = {}
       var ok = true
@@ -193,6 +207,11 @@ ShellRoot {
     t.equal(page.selectedId, 'neon-weaver', 'Preview retains draft')
     t.equal(owner.screensaver.selectedId, 'silk-journey', 'Preview never saves selection')
     t.equal(entry.controller.resultFor('screensaver-preview'), 'Preview accepted', 'preview result persists on controller')
+    if (typeof entry.pollPreview === 'function')
+      entry.pollPreview()
+    t.check(entry.opened, 'dismissed preview restores the picker')
+    t.equal(page.selectedId, 'neon-weaver', 'restored picker retains scene draft')
+    t.check(page.sceneDirty, 'restored picker retains unsaved scene edit')
     t.findChild(page, 'screensaverShuffle').activate()
     t.equal(page.modeDraft, 'shuffle', 'shuffle edits mode locally')
     t.equal(tile.selected, false, 'shuffle clears tile highlight')
@@ -230,6 +249,10 @@ ShellRoot {
     var before = commands.length
     t.findChild(page, 'screensaverPreview').activate()
     t.equal(owner.screensaver.idle.lockSeconds, 1200, 'Preview never saves timing')
+    if (typeof entry.pollPreview === 'function')
+      entry.pollPreview()
+    t.check(entry.opened, 'second dismissal restores the picker')
+    t.equal(page.timingDraft.lockSeconds, 1260, 'restored picker retains timing draft')
     t.findChild(page, 'screensaverTimingApply').activate()
     t.equal(owner.screensaver.idle.screensaverSeconds, 150, 'timing Apply preserves unedited exact seconds')
     t.equal(owner.screensaver.idle.lockSeconds, 1260, 'timing Apply saves edited minutes')

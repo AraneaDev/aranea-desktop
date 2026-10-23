@@ -31,10 +31,12 @@ Open **Settings → Screensavers**, or search for **screensaver**, **shuffle** o
 **lock** in the command center. Select a card to draft a single scene, or enable
 **Shuffle Aranea scenes**; shuffle excludes Omarchy. **Apply scene** saves the
 selection, while **Discard** restores the current owner choice. Unavailable scenes
-cannot be selected. **Preview** never saves either draft and hides Settings when
-the launch is accepted. Move the pointer, click, or press a key to dismiss the
-preview. Launch acceptance is not a rendered-frame confirmation; reopen Settings
-to read any startup error.
+cannot be selected. **Preview** never saves either draft. Settings temporarily
+hides while the preview fills the display. Move the pointer, click, or press a
+key to dismiss it; the same picker returns with its drafts intact. Startup errors
+also return to the picker. Automatic return is cancelled if the desktop locks,
+you manually close or reopen Settings, or another screensaver session replaces
+the preview. Launch acceptance is not a rendered-frame confirmation.
 
 Both timing deadlines count from last activity. Set whole minutes from 1 to 1440
 or explicitly choose **Disabled**. When both are enabled, lock must be later than
@@ -75,6 +77,10 @@ without launching a renderer:
 scripts/aranea-screensaver status --json
 scripts/aranea-screensaver list --json
 ```
+
+Read only the owned session with `scripts/aranea-screensaver session --json`.
+This returns `{"session": ...}` without reading preferences, the catalog, idle
+timing, or launcher integration, so it remains available when configuration is invalid.
 
 The session status also retains `lastCrash` after a browser-tab failure, including
 the numeric error code and recovery action. See [screensaver crash troubleshooting](troubleshooting.md#a-screensaver-shows-aw-snap).

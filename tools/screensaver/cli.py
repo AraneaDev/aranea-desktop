@@ -54,6 +54,11 @@ def main(argv: list[str] | None = None) -> int:
     """Print one JSON result on owner routes; send diagnostics to stderr on errors."""
     args = list(sys.argv[1:] if argv is None else argv)
     repo = Path(__file__).resolve().parents[2]
+    if args == ["session", "--json"]:
+        # Preview watchers must remain usable when saved selection, catalog or
+        # integration configuration is unavailable. This read never starts them.
+        print(json.dumps({"session": session_status()}, separators=(",", ":")))
+        return 0
     if len(args) == 3 and args[0] == "_preview":
         descriptor = int(args[2])
         acknowledged = False
@@ -93,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
             state = snapshot(repo)
         else:
             raise ValueError(
-                "Usage: aranea-screensaver list|status --json | configure ID single|shuffle --json | configure-idle SECONDS SECONDS --json | start [force] | preview-scene ID --json | stop --json"
+                "Usage: aranea-screensaver list|status|session --json | configure ID single|shuffle --json | configure-idle SECONDS SECONDS --json | start [force] | preview-scene ID --json | stop --json"
             )
     except (OSError, ValueError, TypeError) as error:
         state = snapshot(repo)

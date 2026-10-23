@@ -153,6 +153,7 @@ class Supervisor:
     def __init__(self, scene, preview, root, hyprland, started):
         self.started = started
         self.addresses = {}
+        self.workspaces = {}
         self.scene = scene
         self.root = root
         self.hypr = hyprland
@@ -243,13 +244,15 @@ class Supervisor:
                     )
         return bool(self.expected)
 
-    def mapped_client(self, owned):
+    def mapped_client(self, owned, address=None):
         for client in self.hypr.clients():
             if client.get("class") != APP_ID or not client.get("mapped"):
                 continue
             pid = client.get("pid")
-            address = client.get("address", "")
-            if type(pid) is not int or not re.fullmatch(r"0x[0-9a-fA-F]+", address):
+            client_address = client.get("address", "")
+            if address is not None and client_address != address:
+                continue
+            if type(pid) is not int or not re.fullmatch(r"0x[0-9a-fA-F]+", client_address):
                 continue
             try:
                 if os.getpgid(pid) == owned.pgid:
@@ -328,12 +331,22 @@ class Supervisor:
             for event in events
         )
 
+    def surface_placed(self, name):
+        """Observe the exact owned mapped surface after asynchronous placement."""
+        client = self.mapped_client(self.children[name], self.addresses[name])
+        return bool(
+            client
+            and client.get("monitor") == self.expected[name]["id"]
+            and client.get("workspace", {}).get("name") == self.workspaces[name]
+            and client.get("fullscreen") == 2
+        )
+
     def surface_ready(self, name):
         """Require both page readiness and its private crash observation channel."""
         child = self.children[name]
         return name in self.ready and (
             child.browser_control is None or child.browser_control.connected
-        )
+        ) and name in self.addresses and self.surface_placed(name)
 
     def recover_browser(self, name, control, crash):
         """Reload a ready owned tab once; never loop on repeated/startup crashes."""
@@ -499,20 +512,31 @@ class Supervisor:
                         "movetoworkspacesilent",
                         workspace + ",address:" + client["address"],
                     )
-                    placed = self.mapped_client(child)
-                    if (
-                        not placed
-                        or placed.get("monitor") != monitor["id"]
-                        or placed.get("workspace", {}).get("name") != workspace
-                    ):
-                        raise ValueError(
-                            "Renderer mapped on unexpected monitor/workspace"
-                        )
                     if not monitor["specialWorkspace"].get("name"):
                         self.hypr.dispatch(
                             "togglespecialworkspace", workspace.removeprefix("special:")
                         )
                         self.shown.add(name)
+                    self.workspaces[name] = workspace
+                    # Kiosk flags and window rules are advisory. Set, never toggle,
+                    # fullscreen on this exact owned address after showing its workspace.
+                    self.hypr.dispatch("fullscreen", "address:" + client["address"])
+                    while not self.stop.is_set():
+                        events = self.hypr.events()
+                        if events or time.monotonic() - observed >= 0.5:
+                            observed = time.monotonic()
+                            self.observe()
+                        if self.closed_window(events) or not self.renderer_events():
+                            return
+                        if name not in self.expected or self.surface_placed(name):
+                            break
+                        if time.monotonic() >= self.ready_deadline:
+                            raise ValueError("Renderer fullscreen monitor/workspace placement deadline exceeded")
+                        time.sleep(0.025)
+                    if self.stop.is_set():
+                        return
+                    if name not in self.expected:
+                        continue
                     self.refresh_pointer()
                 while not self.stop.is_set() and self.expected:
                     events = self.hypr.events()

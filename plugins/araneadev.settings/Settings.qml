@@ -2,6 +2,7 @@
 import QtQuick
 import Quickshell.Io
 import "SettingsLogic.js" as Logic
+import "../araneadev.shared" as Aranea
 
 Item {
   id: root
@@ -26,6 +27,109 @@ Item {
   SettingsController {
     id: controllerObject
   }
+  // Session-only read boundary; never changes the saved selection or idle timers.
+  property string previewSessionPath: Aranea.RuntimePaths.themeRoot + '/scripts/aranea-screensaver'
+  // Return only from a preview launched by this open picker.
+  property bool previewReturn: false
+  // Exact accepted session identity; no PID or global process matching.
+  property string previewSessionId: ''
+  // Serialize observation and discard callbacks after manual open/close.
+  property bool previewPolling: false
+  // Invalidate asynchronous reads after a different presentation request.
+  property int previewGeneration: 0
+  // Cancel observation without stopping or changing any screensaver session.
+  function cancelPreviewReturn() {
+    previewGeneration++
+    previewReturn = false
+    previewSessionId = ''
+    previewPolling = false
+  }
+  // Return only after a current unlocked observation, including refused launches.
+  function returnFromPreview() {
+    if (!previewReturn || previewPolling)
+      return
+    var generation = previewGeneration
+    previewPolling = true
+    controllerObject.runCommand([controllerObject.notificationsPath, 'lock', 'isLocked'], function (code, state, stderr) {
+      if (generation !== previewGeneration)
+        return
+      previewPolling = false
+      if (code !== 0 || ['true', 'false'].indexOf(state.trim()) < 0)
+        return
+      var restore = state.trim() === 'false'
+      cancelPreviewReturn()
+      if (restore) {
+        opened = true
+        if (view)
+          view.focusKeys()
+      }
+    })
+  }
+  // Observe only the accepted session; unreadable observations never steal focus.
+  function pollPreview() {
+    if (!previewReturn || previewPolling || controllerObject.pending)
+      return
+    if (!previewSessionId) {
+      returnFromPreview()
+      return
+    }
+    var generation = previewGeneration
+    previewPolling = true
+    controllerObject.runCommand([previewSessionPath, 'session', '--json'], function (code, stdout, stderr) {
+      if (generation !== previewGeneration)
+        return
+      var session = null
+      try {
+        let value = JSON.parse(stdout)
+        session = value && value.session
+      } catch (e) {}
+      if (code !== 0 || !session || typeof session.running !== 'boolean') {
+        previewPolling = false
+        return
+      }
+      if (session.sessionId !== previewSessionId) {
+        cancelPreviewReturn()
+        return
+      }
+      if (session.running) {
+        previewPolling = false
+        return
+      }
+      if (session.sessionId === previewSessionId)
+        controllerObject.state = Object.assign({}, controllerObject.state, {
+          screensaver: Object.assign({}, controllerObject.state.screensaver || {}, {
+            session: session
+          })
+        })
+      previewPolling = false
+      returnFromPreview()
+    })
+  }
+  Timer {
+    interval: 750
+    repeat: true
+    running: root.previewReturn
+    onTriggered: root.pollPreview()
+  }
+  Connections {
+    target: controllerObject
+    function onPreviewRequested() {
+      root.cancelPreviewReturn()
+      root.previewReturn = root.opened
+      root.opened = false
+    }
+    function onPreviewAccepted(sessionId) {
+      // A delegated stock preview has no owned identity to observe.
+      if (sessionId)
+        root.previewSessionId = sessionId
+      else
+        root.cancelPreviewReturn()
+    }
+    function onMutationCompleted(operation, args, succeeded) {
+      if (operation === 'preview screensaver' && !succeeded)
+        root.returnFromPreview()
+    }
+  }
   // Internal transaction state; JSON snapshots cannot overwrite arbitrary owner data.
   property var captureSaved: null
   // Serialize current presentation and prior showcase observations without reading owners.
@@ -47,7 +151,7 @@ Item {
   }
   // Atomically accept an inert fixture before changing visibility or presentation.
   function captureBegin(payloadJson) {
-    if (controllerObject.pending || captureSaved || (view && typeof view.captureBusy === 'function' && view.captureBusy()))
+    if (previewReturn || controllerObject.pending || captureSaved || (view && typeof view.captureBusy === 'function' && view.captureBusy()))
       return 'busy'
     var payload
     try {
@@ -139,6 +243,7 @@ Item {
     try {
       payload = JSON.parse(payloadJson || '{}')
     } catch (e) {}
+    cancelPreviewReturn()
     section = Logic.normalizeSection(payload && payload.section)
     opened = true
     controllerObject.reopened()
@@ -147,6 +252,7 @@ Item {
   }
   // Hide the window without cancelling owned processes.
   function close() {
+    cancelPreviewReturn()
     opened = false
     controllerObject.endShowcase()
   }

@@ -95,6 +95,7 @@ class Hyprland:
         if name not in (
             "focusmonitor",
             "focuswindow",
+            "fullscreen",
             "movetoworkspacesilent",
             "togglespecialworkspace",
         ):
@@ -102,10 +103,16 @@ class Hyprland:
         literal = lua_string(value)
         if name == "focusmonitor":
             expression = "hl.dsp.focus({ monitor = " + literal + " })"
-        elif name == "focuswindow":
+        elif name in ("focuswindow", "fullscreen"):
             if not re.fullmatch(r"address:0x[0-9a-fA-F]+", value):
                 raise ValueError("Invalid owned window address")
-            expression = "hl.dsp.focus({ window = " + literal + " })"
+            if name == "fullscreen":
+                expression = (
+                    'hl.dsp.window.fullscreen({ mode = "fullscreen", action = "set", window = '
+                    + literal + " })"
+                )
+            else:
+                expression = "hl.dsp.focus({ window = " + literal + " })"
         elif name == "movetoworkspacesilent":
             parts = value.rsplit(",address:", 1)
             if (
