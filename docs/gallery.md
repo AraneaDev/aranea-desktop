@@ -2,72 +2,26 @@
 
 [Back to the README](../README.md) · [Documentation](README.md)
 
-Browse the desktop, screensavers, and wallpapers below. Agent usage captures
-show Codex with demonstration data; desktop backdrops use **Silken Vault**.
-Click a screensaver image to open its full-resolution capture.
+Explore Aranea's desktop, command center, project tools, and everyday controls.
+Wallpapers and idle scenes round out the appearance options.
 
-[Screensavers](#screensavers) · [Desktop surfaces](#desktop-surfaces) · [Wallpapers](#wallpapers)
+[Desktop](#desktop-surfaces) · [Command center](#command-center) · [Projects](#projects) · [Controls](#bar-controls) · [Wallpapers](#wallpapers) · [Screensavers](#screensavers)
 
-## Screensavers
-
-Nine live scenes share Aranea's dark, mint, violet, and restrained gold palette.
-These are fullscreen captures of the running scenes. Choose one or shuffle the
-collection in **Settings → Aranea → Screensavers**; see
-[selection and timing](configuration.md#choose-screensavers-and-timing).
-
-### With the spider
-
-**Silk Journey**: An articulated spider explores a moving silk-lit chamber.
-
-[![Silk Journey screensaver](../screenshots/screensaver-silk-journey.png)](../screenshots/screensaver-silk-journey.png)
-
-**Neon Weaver**: A spider weaves luminous threads across dark cyberpunk architecture.
-
-[![Neon Weaver screensaver](../screenshots/screensaver-neon-weaver.png)](../screenshots/screensaver-neon-weaver.png)
-
-**Spiderfall**: Silk descents through a shifting neon-lit vertical shaft.
-
-[![Spiderfall screensaver](../screenshots/screensaver-spiderfall.png)](../screenshots/screensaver-spiderfall.png)
-
-### Without the spider
-
-**Kanji Drift**: Layered kanji dissolve into drifting particles and reform in the dark.
-
-[![Kanji Drift screensaver](../screenshots/screensaver-kanji-drift.png)](../screenshots/screensaver-kanji-drift.png)
-
-**Silken Flow**: Luminous silk ribbons flow through mint and violet auroras.
-
-[![Silken Flow screensaver](../screenshots/screensaver-silken-flow.png)](../screenshots/screensaver-silken-flow.png)
-
-**Neon Depths**: A continuous journey through an evolving geometric city.
-
-[![Neon Depths screensaver](../screenshots/screensaver-neon-depths.png)](../screenshots/screensaver-neon-depths.png)
-
-**Orbital Loom**: Celestial rings weave luminous silk around an eclipsing core.
-
-[![Orbital Loom screensaver](../screenshots/screensaver-orbital-loom.png)](../screenshots/screensaver-orbital-loom.png)
-
-**Blackglass Foundry**: Obsidian machinery assembles around a surging molten core.
-
-[![Blackglass Foundry screensaver](../screenshots/screensaver-blackglass-foundry.png)](../screenshots/screensaver-blackglass-foundry.png)
-
-**Crystal Bloom**: Mineral petals rise, scatter and reform around a luminous heart.
-
-[![Crystal Bloom screensaver](../screenshots/screensaver-crystal-bloom.png)](../screenshots/screensaver-crystal-bloom.png)
+Desktop captures use **Silken Vault**. Agent usage captures show Codex with
+demonstration data.
 
 ## Desktop surfaces
 
-### Desktop and settings
+### Desktop
 
-| Desktop                                | Appearance                                                                   | Display scaling                                                  |
-| -------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| ![Desktop](../screenshots/desktop.png) | ![Appearance settings on the desktop wallpaper](../screenshots/settings.png) | ![Display scaling settings](../screenshots/settings-scaling.png) |
+The bar, command center, notifications, and project tools share one desktop.
 
-![Daily wallpaper schedule](../screenshots/settings-schedule.png)
-
-![Screensaver picker and idle timing](../screenshots/settings-screensavers.png)
+![Aranea desktop](../screenshots/desktop.png)
 
 ### Command center
+
+Launch apps, search for a project or desktop destination, and reach Settings
+from the command center.
 
 | Menu                                     | System submenu                                     | Search                                         |
 | ---------------------------------------- | -------------------------------------------------- | ---------------------------------------------- |
@@ -77,21 +31,29 @@ collection in **Settings → Aranea → Screensavers**; see
 | -------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------- |
 | ![Menu input](../screenshots/menu-input.png) | ![Apps](../screenshots/apps.png) | ![Favorites](../screenshots/favorites.png)<br>![Recent](../screenshots/recent.png) |
 
-### Health, notifications, and session
+### Projects
 
-| Health                                      | Notifications                                      | Empty center                                                         |
-| ------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------- |
-| ![System health](../screenshots/health.png) | ![Notifications](../screenshots/notifications.png) | ![Empty notification center](../screenshots/notifications-empty.png) |
+Move between projects, inspect task checkouts and Git changes, and start saved
+actions. The overview, quick switcher, and review views show different parts
+of that workflow.
 
-| Updates                                      | Workspaces                                           | System: Power                               |
-| -------------------------------------------- | ---------------------------------------------------- | ------------------------------------------- |
-| ![Update center](../screenshots/updates.png) | ![Workspace overview](../screenshots/workspaces.png) | ![Power controls](../screenshots/power.png) |
+| Projects                                 | Overview and Git                                                                     | Actions                                                |
+| ---------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| ![Projects](../screenshots/projects.png) | ![Project overview with task checkouts and Git](../screenshots/project-overview.png) | ![Project actions](../screenshots/project-actions.png) |
 
-| Authentication                                      | Lock screen                             | Boot splash                                          |
-| --------------------------------------------------- | --------------------------------------- | ---------------------------------------------------- |
-| ![Authentication prompt](../screenshots/polkit.png) | ![Lock screen](../screenshots/lock.png) | ![Plymouth boot splash](../screenshots/plymouth.png) |
+| Problem details                                        | Quick switcher                                         |
+| ------------------------------------------------------ | ------------------------------------------------------ |
+| ![Problem details](../screenshots/project-problem.png) | ![Quick switcher](../screenshots/project-switcher.png) |
+
+| Ready for review                                       | Tool preferences                                                    |
+| ------------------------------------------------------ | ------------------------------------------------------------------- |
+| ![Ready for review](../screenshots/project-review.png) | ![Project tool preferences](../screenshots/project-preferences.png) |
 
 ### Bar controls
+
+Network, Audio, and System group related controls into shared panels. The clock
+brings Calendar, World Clock, and Weather together; Agents and the tray have
+their own views.
 
 | Network: Network                                | Network: VPN                            | Network: Bluetooth                                  |
 | ----------------------------------------------- | --------------------------------------- | --------------------------------------------------- |
@@ -109,21 +71,27 @@ collection in **Settings → Aranea → Screensavers**; see
 | ------------------------------------- | --------------------------------------------- | -------------------------------------- |
 | ![Calendar](../screenshots/clock.png) | ![World clock](../screenshots/worldclock.png) | ![Weather](../screenshots/weather.png) |
 
-### Projects
+### Notifications, health, and session
 
-| Projects                                 | Overview and Git                                                                     | Actions                                                |
-| ---------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| ![Projects](../screenshots/projects.png) | ![Project overview with task checkouts and Git](../screenshots/project-overview.png) | ![Project actions](../screenshots/project-actions.png) |
+Review notifications, inspect system health and updates, switch workspaces, and
+manage power. Authentication, lock, and boot screens carry the same visual style.
 
-| Plain problem with Details                                        | Quick switcher                                         |
-| ----------------------------------------------------------------- | ------------------------------------------------------ |
-| ![Plain problem with Details](../screenshots/project-problem.png) | ![Quick switcher](../screenshots/project-switcher.png) |
+| Health                                      | Notifications                                      | Empty center                                                         |
+| ------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------- |
+| ![System health](../screenshots/health.png) | ![Notifications](../screenshots/notifications.png) | ![Empty notification center](../screenshots/notifications-empty.png) |
 
-| Ready for review                                       | Preferences: a terminal and an agent, no editor                |
-| ------------------------------------------------------ | -------------------------------------------------------------- |
-| ![Ready for review](../screenshots/project-review.png) | ![Project preferences](../screenshots/project-preferences.png) |
+| Updates                                      | Workspaces                                           | System: Power                               |
+| -------------------------------------------- | ---------------------------------------------------- | ------------------------------------------- |
+| ![Update center](../screenshots/updates.png) | ![Workspace overview](../screenshots/workspaces.png) | ![Power controls](../screenshots/power.png) |
+
+| Authentication                                      | Lock screen                             | Boot splash                                          |
+| --------------------------------------------------- | --------------------------------------- | ---------------------------------------------------- |
+| ![Authentication prompt](../screenshots/polkit.png) | ![Lock screen](../screenshots/lock.png) | ![Plymouth boot splash](../screenshots/plymouth.png) |
 
 ### Pickers and applications
+
+Clipboard, emoji, and wallpaper pickers sit alongside matching application
+styling for the file manager, Neovim, and Btop.
 
 | Clipboard                                         | Emoji                                      | Wallpaper picker                                     |
 | ------------------------------------------------- | ------------------------------------------ | ---------------------------------------------------- |
@@ -133,12 +101,25 @@ collection in **Settings → Aranea → Screensavers**; see
 | ------------------------------------------------ | ------------------------------------ | -------------------------------- |
 | ![File manager](../screenshots/file-manager.png) | ![Neovim](../screenshots/neovim.png) | ![Btop](../screenshots/btop.png) |
 
+### Appearance and settings
+
+Adjust appearance and display scaling, or choose how the wallpaper changes
+through the day. See [Configuration](configuration.md) for the controls behind
+these views.
+
+| Appearance                                          | Display scaling                                                  |
+| --------------------------------------------------- | ---------------------------------------------------------------- |
+| ![Appearance settings](../screenshots/settings.png) | ![Display scaling settings](../screenshots/settings-scaling.png) |
+
+![Daily wallpaper schedule](../screenshots/settings-schedule.png)
+
 ## Wallpapers
 
-Thirty different scenes share obsidian, mint, and violet: alleys, command rooms,
-rail, rooftops, desert, markets, a cybernetic portrait, open road, ocean, orbit, suspended gardens, and polar ice.
-Human titles appear in the picker; stable IDs preserve selections and schedules.
-See the [title/ID map](configuration.md#wallpapers) and
+Thirty wallpapers range from city streets and command rooms to ocean, orbit,
+gardens, and polar ice. **Silken Vault** is the default. Choose a single backdrop
+or build a daily schedule in Settings.
+
+See [wallpaper settings and titles](configuration.md#wallpapers) and
 [artwork sources and prompts](../backgrounds/ARTWORK.md).
 
 | Signal Shrine                                               | Aranea Core                                             | Neural Deck                                         |
@@ -188,6 +169,27 @@ See the [title/ID map](configuration.md#wallpapers) and
 | Midnight Switchyard                                                     | Quiet Singularity                                                   |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | ![Midnight Switchyard](../backgrounds/variants/midnight-switchyard.png) | ![Quiet Singularity](../backgrounds/variants/quiet-singularity.png) |
+
+## Screensavers
+
+Nine animated scenes extend the desktop's palette into idle time. Choose one
+or shuffle the collection in **Settings → Aranea → Screensavers**; see
+[selection and timing](configuration.md#choose-screensavers-and-timing).
+Click a scene to view its full-resolution capture.
+
+| Silk Journey                                                                                                                                                     | Neon Weaver                                                                                                                                                            | Spiderfall                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [![Silk Journey screensaver](../screenshots/screensaver-silk-journey.png)](../screenshots/screensaver-silk-journey.png)<br>A spider explores a silk-lit chamber. | [![Neon Weaver screensaver](../screenshots/screensaver-neon-weaver.png)](../screenshots/screensaver-neon-weaver.png)<br>Luminous threads cross cyberpunk architecture. | [![Spiderfall screensaver](../screenshots/screensaver-spiderfall.png)](../screenshots/screensaver-spiderfall.png)<br>Silk descents through a neon shaft. |
+
+| Kanji Drift                                                                                                                                                     | Silken Flow                                                                                                                                                           | Neon Depths                                                                                                                                                           |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [![Kanji Drift screensaver](../screenshots/screensaver-kanji-drift.png)](../screenshots/screensaver-kanji-drift.png)<br>Kanji dissolve into drifting particles. | [![Silken Flow screensaver](../screenshots/screensaver-silken-flow.png)](../screenshots/screensaver-silken-flow.png)<br>Ribbons flow through mint and violet auroras. | [![Neon Depths screensaver](../screenshots/screensaver-neon-depths.png)](../screenshots/screensaver-neon-depths.png)<br>A journey through an evolving geometric city. |
+
+| Orbital Loom                                                                                                                                                          | Blackglass Foundry                                                                                                                                                                       | Crystal Bloom                                                                                                                                                              |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [![Orbital Loom screensaver](../screenshots/screensaver-orbital-loom.png)](../screenshots/screensaver-orbital-loom.png)<br>Luminous rings surround an eclipsing core. | [![Blackglass Foundry screensaver](../screenshots/screensaver-blackglass-foundry.png)](../screenshots/screensaver-blackglass-foundry.png)<br>Obsidian machinery surrounds a molten core. | [![Crystal Bloom screensaver](../screenshots/screensaver-crystal-bloom.png)](../screenshots/screensaver-crystal-bloom.png)<br>Mineral petals form around a luminous heart. |
+
+![Screensaver selection and idle timing](../screenshots/settings-screensavers.png)
 
 See [Visual language](visual-language.md) for the design system behind
 these surfaces.
