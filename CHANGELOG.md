@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.2](https://github.com/AraneaDev/aranea-desktop/compare/v2.39.1...v2.39.2) (2026-10-23)
+
+
+### Fixes
+
+* recover owned screensaver tabs after renderer crashes ([#217](https://github.com/AraneaDev/aranea-desktop/issues/217)) ([6f84414](https://github.com/AraneaDev/aranea-desktop/commit/6f844140a728a0ceb7173e06d41fca14f6b48671))
+
 ## [2.39.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.39.0...v2.39.1) (2026-10-22)
 
 
