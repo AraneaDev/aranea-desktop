@@ -117,7 +117,7 @@ class Compositor:
 
 
 RENDERER = r"""#!/usr/bin/env python3
-import json, os, pathlib, signal, subprocess, sys, time, urllib.parse, urllib.request
+import json, os, pathlib, select, signal, subprocess, sys, threading, time, urllib.parse, urllib.request
 root = pathlib.Path(os.environ["FIXTURE_ROOT"])
 assert (root / "subscribed").exists()
 assert "--kiosk" in sys.argv
@@ -126,6 +126,35 @@ url = sys.argv[sys.argv.index("--kiosk") + 1]
 query = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
 screen = query["screen"][0]
 behavior = json.loads((root / "behavior").read_text())
+def page_ready():
+    req = urllib.request.Request(url.split("/live/")[0]+"/__ready", data=json.dumps({"screenId":screen}).encode(), headers={"X-Aranea-Session":query["session"][0]})
+    urllib.request.urlopen(req,timeout=2).close()
+wire_lock = threading.Lock()
+def browser_event(value):
+    with wire_lock: os.write(4, json.dumps(value).encode()+b"\0")
+def browser_protocol():
+    pending = b""
+    while True:
+        chunk = os.read(3, 65536)
+        if not chunk: return
+        pending += chunk
+        while b"\0" in pending:
+            raw, pending = pending.split(b"\0", 1)
+            request = json.loads(raw)
+            method = request["method"]
+            with (root / ("browser-commands-"+screen)).open("a") as log: log.write(json.dumps(request)+"\n")
+            if method == "Target.setDiscoverTargets":
+                browser_event({"method":"Target.targetCreated","params":{"targetInfo":{"targetId":"owned-page","type":"page"}}})
+                browser_event({"id":request["id"],"result":{}})
+            elif method == "Target.attachToTarget":
+                browser_event({"id":request["id"],"result":{"sessionId":"owned-session"}})
+            elif method == "Page.reload":
+                with (root / ("reloads-"+screen)).open("a") as log: log.write("reload\n")
+                browser_event({"id":request["id"],"result":{}})
+                if behavior != "reload-no-ready": page_ready()
+if "--remote-debugging-pipe" in sys.argv and behavior != "no-control":
+    threading.Thread(target=browser_protocol, daemon=True).start()
+
 if behavior == "slow-map" or (behavior == "second-slow" and screen == "HDMI-A-1"): time.sleep(3)
 child = {"pid":os.getpid(),"address":hex(os.getpid()),"class":"org.omarchy.screensaver","mapped":behavior != "no-map","monitor":1 if screen == "DP-1" else 2,"workspace":{"name":"special:screensaver-" + screen},"screen":screen,"url":url}
 (root / ("child-"+screen)).write_text(json.dumps(child))
@@ -138,9 +167,13 @@ if behavior == "orphan":
     sys.exit(0)
 if behavior not in ("no-ready", "no-map", "slow-map"):
     time.sleep(.15)
-    req = urllib.request.Request(url.split("/live/")[0]+"/__ready", data=json.dumps({"screenId":screen}).encode(), headers={"X-Aranea-Session":query["session"][0]})
-    urllib.request.urlopen(req,timeout=2).close()
-while True: time.sleep(.1)
+    page_ready()
+while True:
+    crash = root / ("crash-"+screen)
+    if crash.exists() and "--remote-debugging-pipe" in sys.argv:
+        details = json.loads(crash.read_text()); crash.unlink()
+        browser_event({"method":"Target.targetCrashed","params":{"targetId":"owned-page",**details}})
+    time.sleep(.025)
 """
 
 
@@ -490,6 +523,107 @@ class SessionTests(unittest.TestCase):
         )
         self.assertEqual(calls[-1], ["focuswindow", "address:0xface"])
         self.assertTrue((self.root / "event-closed").exists())
+
+    def test_browser_tab_crash_reloads_once_and_retains_code(self):
+        process = self.start()
+        self.ready()
+        original = json.loads((self.root / "child-DP-1").read_text())
+        self.write("crash-DP-1", {"status": "killed", "errorCode": 9})
+        wait_for(lambda: (self.root / "reloads-DP-1").exists(), timeout=2)
+        self.ready()
+        current = json.loads((self.root / "child-DP-1").read_text())
+        self.assertEqual(current["pid"], original["pid"])
+        self.assertFalse((self.root / "reloads-HDMI-A-1").exists())
+        crash = self.api.session_status()["lastCrash"]
+        self.assertEqual((crash["status"], crash["errorCode"], crash["screenId"], crash["recovery"]), ("killed", 9, "DP-1", "reload"))
+        self.assertEqual((self.root / "run/aranea-screensaver/last-crash.json").stat().st_mode & 0o777, 0o600)
+        self.write("crash-DP-1", {"status": "crashed", "errorCode": 11})
+        self.assert_closed(process)
+        self.assertEqual((self.root / "reloads-DP-1").read_text().splitlines(), ["reload"])
+        stopped = self.api.session_status()
+        self.assertIn("crash", stopped["error"].lower())
+        self.assertEqual((stopped["lastCrash"]["errorCode"], stopped["lastCrash"]["recovery"]), (11, "stopped"))
+
+    def test_overlapping_recovery_does_not_extend_first_monitors_deadline(self):
+        self.write("behavior", "reload-no-ready")
+        process = self.start(timeout=2)
+        self.ready()
+        self.write("crash-DP-1", {"status": "killed", "errorCode": 9})
+        wait_for(lambda: (self.root / "reloads-DP-1").exists(), timeout=2)
+        time.sleep(1.5)
+        self.write("crash-HDMI-A-1", {"status": "killed", "errorCode": 9})
+        wait_for(lambda: (self.root / "reloads-HDMI-A-1").exists(), timeout=1)
+        process.join(1.1)
+        self.assertFalse(process.is_alive(), "Second monitor extended the first monitor's ready deadline")
+        self.assertIn("ready deadline", self.api.session_status()["error"])
+
+    def test_recovered_browser_crash_survives_later_successful_session(self):
+        first = self.start(preview=True)
+        self.ready()
+        self.write("crash-DP-1", {"status": "oom", "errorCode": -1})
+        wait_for(lambda: (self.root / "reloads-DP-1").exists(), timeout=2)
+        self.ready()
+        self.event("dismiss")
+        self.assert_closed(first)
+        second = self.start(preview=True)
+        self.ready()
+        retained = self.api.session_status()["lastCrash"]
+        self.assertEqual((retained["status"], retained["errorCode"]), ("oom", -1))
+        self.event("dismiss")
+        self.assert_closed(second)
+        self.assertFalse((self.root / "config").exists())
+        self.assertFalse((self.root / "state").exists())
+
+    def test_browser_recovery_requires_fresh_scene_ready(self):
+        self.write("behavior", "reload-no-ready")
+        process = self.start(timeout=.7)
+        self.ready()
+        self.write("crash-DP-1", {"status": "crashed", "errorCode": 11})
+        wait_for(lambda: (self.root / "reloads-DP-1").exists(), timeout=2)
+        self.assertFalse(self.api.session_status()["ready"])
+        self.assert_closed(process)
+        self.assertIn("ready deadline", self.api.session_status()["error"])
+        self.assertEqual(self.api.session_status()["lastCrash"]["errorCode"], 11)
+
+    def test_browser_ready_requires_private_control_discovery(self):
+        self.write("behavior", "no-control")
+        process = self.start(timeout=.7)
+        wait_for(lambda: len(list(self.root.glob("child-*"))) == 2)
+        self.assertFalse(self.api.session_status()["ready"])
+        self.assert_closed(process)
+        self.assertIn("ready deadline", self.api.session_status()["error"])
+
+    def test_retained_crash_metadata_rejects_untrusted_files_and_fields(self):
+        path = self.root / "last-crash.json"
+        valid = {"schema": 1, "sceneId": "silk-journey", "screenId": "DP-1", "status": "killed", "errorCode": 9, "recovery": "reload", "timestamp": 100}
+        path.write_text(json.dumps(valid)); path.chmod(0o600)
+        self.assertEqual(self.api.read_last_crash(self.root), valid)
+        for changes in ({"schema": True}, {"timestamp": 2**80}, {"errorCode": True}, {"status": "bad\nstatus"}, {"recovery": "shell command"}):
+            path.write_text(json.dumps({**valid, **changes}))
+            self.assertIsNone(self.api.read_last_crash(self.root), changes)
+        path.write_text(json.dumps(valid)); path.chmod(0o644)
+        self.assertIsNone(self.api.read_last_crash(self.root))
+        path.chmod(0o600); path.write_text(json.dumps(valid) + " " * 5000)
+        self.assertIsNone(self.api.read_last_crash(self.root))
+        target = self.root / "private-crash-target"
+        target.write_text(json.dumps(valid)); target.chmod(0o600)
+        path.unlink(); path.symlink_to(target)
+        self.assertIsNone(self.api.read_last_crash(self.root))
+
+    def test_explicit_dismissal_wins_over_queued_browser_crash(self):
+        from types import SimpleNamespace
+        owner = object.__new__(self.api.Supervisor)
+        owner.stop = threading.Event()
+        owner.expected = {"DP-1": None}
+        owner.server = SimpleNamespace(drain_events=lambda: [{"kind": "dismiss", "screenId": "DP-1"}])
+        # Accessing children would fail; dismissal must return before any reload/poll.
+        self.assertFalse(owner.renderer_events())
+
+    def test_ipc_stop_wins_before_browser_crash_polling(self):
+        owner = object.__new__(self.api.Supervisor)
+        owner.stop = threading.Event(); owner.stop.set()
+        # A stop must return without touching browser controls or HTTP state.
+        self.assertFalse(owner.renderer_events())
 
     def test_preview_never_writes_preferences_or_history(self):
         process = self.start(preview=True)

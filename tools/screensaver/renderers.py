@@ -5,8 +5,12 @@ import os
 import signal
 import socket
 import subprocess
+import sys
+from pathlib import Path
 import time
 from dataclasses import dataclass
+
+from tools.screensaver.browser_control import BrowserControl
 
 
 @dataclass
@@ -16,30 +20,54 @@ class OwnedProcess:
     process: subprocess.Popen
     pgid: int
     closed: bool = False
+    browser_control: BrowserControl | None = None
 
 
 def launch_web(
     url, profile_dir, app_id, *, popen=subprocess.Popen, browser="chromium", kiosk=False
 ):
     """Use kiosk for exact Wayland identity; retain app mode for legacy preview."""
-    process = popen(
-        [
-            browser,
-            f"--user-data-dir={profile_dir}",
-            *(["--kiosk", url] if kiosk else [f"--app={url}"]),
-            "--start-fullscreen",
-            "--no-first-run",
-            "--no-default-browser-check",
-            "--disable-background-networking",
-            "--disable-component-update",
-            "--disable-sync",
-            "--disable-extensions",
-            "--disable-features=MediaRouter",
-            f"--class={app_id}",
-        ],
-        start_new_session=True,
-    )
-    return OwnedProcess(process, process.pid)
+    argv = [
+        browser,
+        f"--user-data-dir={profile_dir}",
+        *(["--kiosk", url] if kiosk else [f"--app={url}"]),
+        "--start-fullscreen",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-background-networking",
+        "--disable-component-update",
+        "--disable-sync",
+        "--disable-extensions",
+        "--disable-features=MediaRouter",
+        f"--class={app_id}",
+    ]
+    control = BrowserControl() if kiosk else None
+    owned = None
+    try:
+        options = {"start_new_session": True}
+        if control is not None:
+            incoming, outgoing = control.child_fds
+            argv = [
+                sys.executable,
+                str(Path(__file__).with_name("browser_control.py")),
+                str(incoming),
+                str(outgoing),
+                browser,
+                "--remote-debugging-pipe",
+                *argv[1:],
+            ]
+            options["pass_fds"] = (incoming, outgoing)
+        process = popen(argv, **options)
+        owned = OwnedProcess(process, process.pid, browser_control=control)
+        if control is not None:
+            control.started()
+        return owned
+    except BaseException:
+        if owned is not None:
+            terminate_group(owned)
+        elif control is not None:
+            control.close()
+        raise
 
 
 def launch_video(asset, ipc_path, app_id, lua_path, *, popen=subprocess.Popen):
@@ -89,6 +117,8 @@ def terminate_group(owned, *, grace=1.0, kill_timeout=1.0):
             return False
 
     owned.closed = True
+    if owned.browser_control is not None:
+        owned.browser_control.close()
     if send(signal.SIGTERM):
         deadline = time.monotonic() + grace
         while time.monotonic() < deadline:

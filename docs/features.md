@@ -189,6 +189,11 @@ one scene or shuffle available scenes. **Apply scene** saves that choice;
 **Preview** opens fullscreen without saving. Move the pointer, click, or press
 a key to return after the launch grace period.
 
+A ready browser tab that crashes is reloaded once on its existing monitor. The
+scene must render again within its readiness deadline. A repeated crash or failed
+reload closes the owned screensaver and restores the desktop; crash details remain
+available in the session status.
+
 Automatic sessions use the managed session integration while Aranea is active.
 Omarchy retains inactivity, Stay awake, wake and lock control. Screensaver and
 lock deadlines both count from last activity; edit them with the separate

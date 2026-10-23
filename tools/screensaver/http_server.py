@@ -223,6 +223,13 @@ class SceneServer:
             query["screen"] = screen_id
         return f"http://127.0.0.1:{self._server.server_port}/{quote(entry)}?{urlencode(query)}"
 
+    def rearm(self, screen_id):
+        """Require a fresh ready event when an already-ready owned page reloads."""
+        if screen_id not in self.screen_ids:
+            raise ValueError("Unknown scene screen")
+        with self._lock:
+            self._seen.discard(("ready", screen_id))
+
     def drain_events(self):
         """Return pending bounded, deduplicated renderer events without blocking."""
         events = []
