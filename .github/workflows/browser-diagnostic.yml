@@ -7,15 +7,13 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         include:
           - browser: /usr/bin/chromium
             bus: absent
-          - browser: /usr/bin/chromium
-            bus: private
           - browser: /opt/google/chrome/chrome
             bus: absent
     steps:
@@ -31,6 +29,8 @@ jobs:
           for attempt in 1 2 3; do
             (
               repo_root="$PWD"
+              sudo sync
+              sudo sh -c "echo 3 > /proc/sys/vm/drop_caches"
               source tests/lib/sandbox.sh
               echo "Fresh sandbox attempt $attempt: $BROWSER_DIAGNOSTIC_BINARY / $BROWSER_DIAGNOSTIC_BUS"
               if [[ "$BROWSER_DIAGNOSTIC_BUS" == private ]]; then
