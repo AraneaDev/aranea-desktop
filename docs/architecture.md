@@ -121,6 +121,12 @@ capture/showcase state cannot overwrite it.
 
 ## Screensaver settings ownership
 
+The Python `Supervisor.run` remains the sole session lifecycle owner. Private
+phase helpers launch renderers, wait for mapping/placement, and publish readiness.
+Event observation is shared, while setup and steady-state callers retain their
+different monitor-removal exit order and close-before-recovery checks. Cleanup,
+resource scopes, signal restoration, and all deadlines remain with the supervisor.
+
 `ScreensaversPage.qml` keeps independent scene/mode and exact-second timing drafts
 inside the persistent `SettingsSurface`. Selection and navigation have no command
 side effects. `SettingsLogic.command` allowlists catalog identities, modes and
