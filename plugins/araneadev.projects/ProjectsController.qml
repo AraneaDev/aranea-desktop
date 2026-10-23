@@ -267,7 +267,7 @@ Item {
         error: error
       },
       projects: registry.projects,
-      environments: Environments.projectRows(environmentRecords(), fresh, sessionId),
+      environments: Environments.projectRows(environmentRecords(), fresh, sessionId, live, runtime && runtime.compositorInstance || ''),
       bindings: fresh,
       operations: operations,
       agents: {
@@ -800,6 +800,29 @@ Item {
       expectedRevision: registry.revision
     }))
   }
+  // Launched windows keep naming their workspace across owner restarts while they live.
+  // Best effort: a lost write only drops the label after a restart, never ownership.
+  function recordEnvironmentWindows(projectId: string, environmentId: string, rows: var): void {
+    var instance = runtime && runtime.compositorInstance || ''
+    if (!instance || !rows.length)
+      return
+    invoke(storeRunner, [storePath, 'mutate'], function (response) {
+      if (!response || !response.ok || !response.state || response.state.revision < registry.revision)
+        return
+      registry = response.state
+      invalidateSelections()
+    }, JSON.stringify({
+      action: 'environment-windows',
+      args: {
+        projectId: projectId,
+        environmentId: environmentId,
+        windows: {
+          instance: instance,
+          rows: rows.slice(-8)
+        }
+      }
+    }))
+  }
   // Decide a reserved association from fresh occupancy and proven alternate-checkout bindings.
   function prepareWorkspace(id: string, project: var, checkout: var, selected: var, available: var, proof: var): void {
     var op = operation(id), revision = op.generation, session = op.sessionId
@@ -1250,6 +1273,15 @@ Item {
         completedAt: Date.now()
       })
       retainCompleted()
+      if (next.environmentId)
+        recordEnvironmentWindows(next.projectId, next.environmentId, next.steps.filter(function (row) {
+          return row.binding && row.binding.environmentId === next.environmentId
+        }).map(function (row) {
+          return {
+            address: row.binding.address,
+            pid: row.binding.pid
+          }
+        }))
     }
     publish(next)
     retainCompleted()

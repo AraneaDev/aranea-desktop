@@ -32,9 +32,16 @@ def profile_draft:
 def profile:
   profile_draft and has("id") and has("revision");
 def workspace: integer and . > 0;
+# Launched windows by compositor instance: a naming hint while they live, never ownership.
+def launched_windows:
+  fields(["instance","rows"];[]) and (.instance|text)
+  and (.rows|type == "array" and length > 0 and length <= 8 and all(.[];
+    fields(["address","pid"];[]) and (.address|type == "string" and test("^0x[0-9a-fA-F]+$") and (test("^0x0+$")|not))
+    and (.pid|integer and . > 0)));
 def environment:
-  fields(["id","projectId","checkoutId","activationId","workspaceId","sessionId","createdAt","checkoutSnapshot","profileSnapshot","resolvedTools"];["mode","placedAt"])
+  fields(["id","projectId","checkoutId","activationId","workspaceId","sessionId","createdAt","checkoutSnapshot","profileSnapshot","resolvedTools"];["mode","placedAt","windows"])
   and ((has("mode")|not) or (.mode|mode)) and ((has("placedAt")|not) or (.placedAt|integer and . >= 0))
+  and ((has("windows")|not) or (.windows|launched_windows))
   and (.id|opaque("e")) and (.projectId|opaque("p")) and (.checkoutId|opaque("c")) and (.activationId|opaque("a"))
   and (.workspaceId|workspace) and (.sessionId|text) and (.createdAt|integer and . >= 0)
   and (.checkoutSnapshot|checkout) and (.profileSnapshot|profile) and (.resolvedTools|tools)
@@ -103,6 +110,8 @@ def request_valid:
     elif $action == "environment-associate" then
       fields(["projectId","environmentId","previousWorkspaceId","workspaceId"];["placedAt"]) and (.projectId|opaque("p")) and (.environmentId|opaque("e"))
       and (.previousWorkspaceId|workspace) and (.workspaceId|workspace) and ((has("placedAt")|not) or (.placedAt|integer and . >= 0))
+    elif $action == "environment-windows" then
+      fields(["projectId","environmentId","windows"];[]) and (.projectId|opaque("p")) and (.environmentId|opaque("e")) and (.windows|launched_windows)
     elif $action == "environment-forget" then
       fields(["projectId","environmentId"];[]) and (.projectId|opaque("p")) and (.environmentId|opaque("e"))
     elif $action == "configure" then fields(["projectId"];["name","editorId","terminalId","workspaceMode","openRoles","agentId"]) and (.projectId|text)
@@ -165,12 +174,24 @@ def mutate($r):
           | if any(.profiles[];.id == $a.environment.profileSnapshot.id) then .lastProfileId = $a.environment.profileSnapshot.id else . end
         else error("CHECKOUT_CONFLICT") end
       else . end)
+  # Same-instance records merge (newest last, bounded); another instance's windows are gone.
+  elif $r.action == "environment-windows" then require_project($a.projectId)
+    | .projects |= map(if .id == $a.projectId then
+        if any(.environments[];.id == $a.environmentId) then
+          .environments |= map(if .id == $a.environmentId then
+            .windows = {instance:$a.windows.instance,rows:(
+              (if .windows.instance == $a.windows.instance then .windows.rows else [] end) as $kept
+              | [$kept[]|select(. as $row|$a.windows.rows|index([$row])|not)] + $a.windows.rows | .[-8:])}
+            else . end)
+        else error("ENVIRONMENT_NOT_FOUND") end
+      else . end)
   elif $r.action == "environment-associate" or $r.action == "environment-forget" then require_project($a.projectId)
     | .projects |= map(if .id == $a.projectId then
         if any(.environments[];.id == $a.environmentId) then
           if $r.action == "environment-forget" then .environments |= map(select(.id != $a.environmentId))
           else .environments |= map(if .id == $a.environmentId then
-            if .workspaceId == $a.previousWorkspaceId then .workspaceId = $a.workspaceId | (if $a|has("placedAt") then .placedAt = $a.placedAt else . end) else error("ENVIRONMENT_CONFLICT") end
+            if .workspaceId == $a.previousWorkspaceId then .workspaceId = $a.workspaceId | (if $a|has("placedAt") then .placedAt = $a.placedAt else . end)
+              | (if $a.workspaceId != $a.previousWorkspaceId then del(.windows) else . end) else error("ENVIRONMENT_CONFLICT") end
             else . end) end
         else error("ENVIRONMENT_NOT_FOUND") end
       else . end)

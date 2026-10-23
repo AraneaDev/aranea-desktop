@@ -206,8 +206,13 @@ ShellRoot {
     t.check(t.findChildren(panel, 'workspaceProjectPath')[1].text.indexOf('terminal open') >= 0, 'fresh current-session recovery proves old saved environment')
     changed = JSON.parse(JSON.stringify(changed))
     changed.bindings[0].sessionId = 'stale'
+    changed.environments[0].windowOpen = true
     client.snapshot = changed
     t.check(t.findChildren(panel, 'workspaceProjectPath')[1].text.indexOf('Tools not checked') >= 0, 'stale binding never claims saved environment live')
+    changed = JSON.parse(JSON.stringify(changed))
+    changed.environments[0].windowOpen = false
+    client.snapshot = changed
+    t.equal(panel.rowAt(1).label, 'Workspace 7', 'launch history without its windows leaves the ordinary label')
     panel.activateRow(1, "7")
     t.check(testRoot.lastCommand.indexOf('workspace = "7"') >= 0, "row activation keeps the original workspace focus target")
     t.equal(testRoot.calls.length, 1, "focus never submits a project request")

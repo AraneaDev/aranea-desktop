@@ -796,10 +796,16 @@ function barContext(workspaceId, snapshot) {
         ],
         environments: (snapshot.environments || [])
           .filter(function (/** @type {*} */ environment) {
+            // Launch history alone never names a workspace: one of its launched
+            // windows must still be there, verified now or recorded at launch.
             return (
               environment.projectId === project.id &&
               environment.checkoutId === checkout.id &&
-              environment.workspaceId === Number(workspaceId)
+              environment.workspaceId === Number(workspaceId) &&
+              (environment.windowOpen === true ||
+                verifiedBindings.some(function (/** @type {*} */ binding) {
+                  return binding.environmentId === environment.id
+                }))
             )
           })
           .sort(function (/** @type {*} */ a, /** @type {*} */ b) {
@@ -817,7 +823,8 @@ function barContext(workspaceId, snapshot) {
       })
       var context = projectContext(workspaceId, scoped)
       if (!context) return
-      // A launched environment retains workspace context across owner restarts.
+      // A launched environment keeps its context across owner restarts while a
+      // recorded launch window remains (windowOpen).
       // A bare saved assignment still needs observed tools. Neither grants ownership.
       var observed = verifiedBindings.length > 0
       if (!observed && !context.environmentId) return

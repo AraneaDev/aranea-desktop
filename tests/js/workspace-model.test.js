@@ -35,6 +35,7 @@ test("overview keeps launched context only on occupied unambiguous workspaces", 
       projectId: "p-app",
       checkoutId: "c-fix",
       workspaceId: 7,
+      windowOpen: true,
       profileSnapshot: { name: "Terminal" },
       checkoutSnapshot: { branch: "launch-branch", path: "/saved/checkout" }
     }
@@ -63,12 +64,15 @@ test("bar retains launched environments across restart while hiding bare saved a
       checkoutId: "c-fix",
       workspaceId: 7,
       sessionId: "session-before-restart",
+      windowOpen: true,
       profileSnapshot: { name: "Terminal" },
       checkoutSnapshot: { branch: "main", path: "/projects/app-fix" }
     }
   ]
   assert.equal(model.barContext(7, snapshot).checkoutId, "c-fix")
   assert.match(model.barContext(7, snapshot).detail, /Tools not checked/)
+  snapshot.environments[0].windowOpen = false
+  assert.equal(model.barContext(7, snapshot), null, "launch history alone never names a workspace")
   snapshot.environments = []
   snapshot.bindings = [verifiedBinding({ workspaceId: 7 })]
   assert.equal(model.barContext(7, snapshot).checkoutId, "c-fix")
@@ -151,6 +155,7 @@ test("newest launch labels a reused workspace despite older retained projects", 
     checkoutId: "c-fix",
     workspaceId: 7,
     createdAt: 100,
+    windowOpen: true,
     profileSnapshot: { name: "Terminal" },
     checkoutSnapshot: { branch: "old", path: "/projects/app-fix" }
   }
@@ -168,6 +173,36 @@ test("newest launch labels a reused workspace despite older retained projects", 
   assert.equal(model.barContext(7, snapshot)?.environmentId, "e-new")
   snapshot.environments.find((e) => e.id === "e-other").createdAt = 300
   assert.equal(model.barContext(7, snapshot), null, "equally recent projects remain ambiguous")
+})
+
+test("a window opened on a workspace whose launched tools are gone gets no project name", () => {
+  const snapshot = projectSnapshot()
+  snapshot.environments = [
+    {
+      id: "e-gone",
+      projectId: "p-app",
+      checkoutId: "c-fix",
+      workspaceId: 1,
+      createdAt: 300,
+      windowOpen: false,
+      profileSnapshot: { name: "Claude + Kitty" },
+      checkoutSnapshot: { branch: "master", path: "/projects/app-fix" }
+    },
+    {
+      id: "e-live",
+      projectId: "p-app",
+      checkoutId: "c-main",
+      workspaceId: 1,
+      createdAt: 100,
+      windowOpen: true,
+      profileSnapshot: { name: "Terminal" },
+      checkoutSnapshot: { branch: "main", path: "/projects/app" }
+    }
+  ]
+  assert.equal(model.barContext(1, snapshot)?.environmentId, "e-live")
+  snapshot.environments[1].windowOpen = false
+  assert.equal(model.barContext(1, snapshot), null)
+  assert.equal(model.overviewContext({ id: 1, occupied: true }, snapshot), null)
 })
 
 test("verified open checkout takes precedence over a newer retained launch", () => {
