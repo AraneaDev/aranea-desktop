@@ -6,6 +6,8 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import threading
+import json
 import unittest
 
 root = Path(__file__).resolve().parents[1]
@@ -17,6 +19,30 @@ spec.loader.exec_module(module)
 module.BROWSER = binary
 original = subprocess.Popen
 class Capture(original):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.snapshot_done = threading.Event()
+        if args and "--headless=new" in args[0]:
+            def snapshot():
+                previous = 0
+                for second in (5, 15, 29):
+                    if self.snapshot_done.wait(second - previous):
+                        break
+                    previous = second
+                    members = []
+                    for entry in Path("/proc").iterdir():
+                        if not entry.name.isdigit():
+                            continue
+                        try:
+                            stat = (entry / "stat").read_text().split(") ", 1)[1].split()
+                            if int(stat[2]) != self.pid:
+                                continue
+                            io = dict(line.split(":", 1) for line in (entry / "io").read_text().splitlines())
+                            members.append({"pid": entry.name, "state": stat[0], "minorFaults": stat[7], "majorFaults": stat[9], "userTicks": stat[11], "systemTicks": stat[12], "wait": (entry / "wchan").read_text().strip(), "readBytes": io.get("read_bytes", "").strip()})
+                        except (OSError, ValueError, IndexError):
+                            pass
+                    print("IN_FLIGHT", json.dumps({"seconds": second, "parentPoll": self.poll(), "members": members}), flush=True)
+            threading.Thread(target=snapshot, daemon=True).start()
     def communicate(self, *args, **kwargs):
         try:
             result = super().communicate(*args, **kwargs)
@@ -39,6 +65,8 @@ class Capture(original):
                     value = value.decode("utf-8", errors="replace")
                 print(label, value, flush=True)
             raise
+        finally:
+            self.snapshot_done.set()
 subprocess.Popen = Capture
 results = []
 for attempt in range(1):

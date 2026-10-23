@@ -5,38 +5,40 @@ on:
 permissions:
   contents: read
 jobs:
-  probe:
+  preceding-suite:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - browser: /usr/bin/chromium
-            bus: absent
-          - browser: /opt/google/chrome/chrome
-            bus: absent
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Compare identical isolated cursor assertions and retain timeout output
-        shell: bash
-        env:
-          BROWSER_DIAGNOSTIC_BINARY: ${{ matrix.browser }}
-          BROWSER_DIAGNOSTIC_BUS: ${{ matrix.bus }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install the ordinary CI dependencies
         run: |
-          for attempt in 1 2 3; do
-            (
-              repo_root="$PWD"
-              sudo sync
-              sudo sh -c "echo 3 > /proc/sys/vm/drop_caches"
-              source tests/lib/sandbox.sh
-              echo "Fresh sandbox attempt $attempt: $BROWSER_DIAGNOSTIC_BINARY / $BROWSER_DIAGNOSTIC_BUS"
-              if [[ "$BROWSER_DIAGNOSTIC_BUS" == private ]]; then
-                dbus-run-session -- python3 "$repo_root/tools/diagnose-browser-launch.py" "$BROWSER_DIAGNOSTIC_BINARY"
-              else
-                python3 "$repo_root/tools/diagnose-browser-launch.py" "$BROWSER_DIAGNOSTIC_BINARY"
-              fi
-            )
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes jq libxml2-utils imagemagick librsvg2-bin ripgrep python3 lua5.4 fontconfig
+          sudo tools/install-shellcheck
+          sudo tools/install-shfmt
+          sudo tools/install-actionlint
+          npm ci
+      - name: Reproduce the preceding ordinary suite and retain browser diagnostics
+        shell: bash
+        run: |
+          names=()
+          for file in tests/*.test.sh; do
+            name="$(basename "$file" .test.sh)"
+            [[ "$name" == screensaver-cursor ]] && break
+            names+=("$name")
           done
+          set +e
+          ARANEA_TESTS_SKIP=js,qml-types,qml-behaviour tests/run "${names[@]}"
+          prefix_status=$?
+          set -e
+          echo "Preceding suite exit: $prefix_status"
+          repo_root="$PWD"
+          source tests/lib/sandbox.sh
+          python3 "$repo_root/tools/diagnose-browser-launch.py" /usr/bin/chromium
+          exit "$prefix_status"
