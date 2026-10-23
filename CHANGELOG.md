@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.39.0...v2.39.1) (2026-10-22)
+
+
+### Fixes
+
+* refresh native pointer focus for screensavers ([#214](https://github.com/AraneaDev/aranea-desktop/issues/214)) ([ad911ae](https://github.com/AraneaDev/aranea-desktop/commit/ad911ae96d0b9b34df3814ae0940c08ff4597be1))
+
 ## [2.39.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.38.0...v2.39.0) (2026-10-22)
 
 
