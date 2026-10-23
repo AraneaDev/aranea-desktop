@@ -206,3 +206,33 @@ test("the newest placement on a workspace owns it", () => {
     false
   )
 })
+
+test("recorded launch windows mark an environment open only while that exact window lives on its workspace", () => {
+  const saved = {
+    id: "e-a",
+    projectId: "p",
+    checkoutId: "c",
+    sessionId: "old",
+    workspaceId: 1,
+    profileSnapshot: { roles: ["agent"] },
+    windows: { instance: "hypr-a", rows: [{ address: "0xa1", pid: 11 }] }
+  }
+  const live = { available: true, windows: [{ address: "0xa1", pid: 11, workspaceId: 1 }] }
+  assert.equal(env.projectRows([saved], [], "s", live, "hypr-a")[0].windowOpen, true)
+  for (const [patch, instance] of [
+    [{ windows: [{ address: "0xa1", pid: 12, workspaceId: 1 }] }, "hypr-a"],
+    [{ windows: [{ address: "0xb2", pid: 11, workspaceId: 1 }] }, "hypr-a"],
+    [{ windows: [{ address: "0xa1", pid: 11, workspaceId: 2 }] }, "hypr-a"],
+    [{ available: false }, "hypr-a"],
+    [{}, "hypr-b"],
+    [{}, ""]
+  ])
+    assert.equal(
+      env.projectRows([saved], [], "s", { ...live, ...patch }, instance)[0].windowOpen,
+      false
+    )
+  const { windows, ...unrecorded } = saved
+  assert.equal(windows.rows.length, 1)
+  assert.equal(env.projectRows([unrecorded], [], "s", live, "hypr-a")[0].windowOpen, false)
+  assert.equal(env.projectRows([saved], [], "s")[0].windowOpen, false)
+})

@@ -110,14 +110,35 @@ function coalesced(operations, sessionId, activationId) {
  * Project saved environments separately from legacy associations. Bindings must
  * already have been freshly verified by the runtime in this publication cycle.
  * The immutable creation session is historical; recovery proof belongs to the
- * current binding session. Metadata alone never establishes liveness or closure.
+ * current binding session. Metadata alone never establishes liveness or closure;
+ * `windowOpen` only says a recorded launch window (same compositor instance,
+ * exact address and pid) still sits on the environment's workspace, a naming
+ * hint that survives owner restarts but never proves ownership.
  * @param {Array<EnvironmentData>} environments - immutable saved records
  * @param {Array<EnvironmentData>} bindings - freshly verified native bindings
  * @param {string} sessionId - current owner session
+ * @param {EnvironmentData} [live] - compositor snapshot with windows
+ * @param {string} [instance] - current compositor instance key
  * @returns {Array<EnvironmentData>} detached records with honest status/role summaries
  */
-function projectRows(environments, bindings, sessionId) {
+function projectRows(environments, bindings, sessionId, live, instance) {
+  var liveWindows =
+    live && live.available === true && Array.isArray(live.windows) ? live.windows : []
   return (environments || []).map(function (environment) {
+    var recorded = environment.windows
+    var windowOpen =
+      !!instance &&
+      !!recorded &&
+      recorded.instance === instance &&
+      (recorded.rows || []).some(function (/** @type {EnvironmentData} */ row) {
+        return liveWindows.some(function (window) {
+          return (
+            window.address === row.address &&
+            window.pid === row.pid &&
+            window.workspaceId === environment.workspaceId
+          )
+        })
+      })
     var observedRoles = ["editor", "terminal", "agent"].filter(function (role) {
       return (bindings || []).some(function (binding) {
         return (
@@ -139,7 +160,8 @@ function projectRows(environments, bindings, sessionId) {
     })
     return Object.assign(JSON.parse(JSON.stringify(environment)), {
       status: observedRoles.length ? "observed" : "unconfirmed",
-      observedRoles: observedRoles
+      observedRoles: observedRoles,
+      windowOpen: windowOpen
     })
   })
 }

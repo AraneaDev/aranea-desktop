@@ -6,7 +6,10 @@ tool in the current session. Verified open tools take precedence over retained
 launches. Otherwise, the newest launch supplies context when a workspace has
 been reused; equally recent conflicting projects keep the ordinary controls.
 Launched environments retain their context across
-shell restarts, with tools not checked noted in the tooltip. A bare saved
+shell restarts, with tools not checked noted in the tooltip, but only while a
+window recorded at launch (same Hyprland instance, exact address and pid) is
+still on the workspace. Launch history alone never names a workspace: a window
+opened by hand where a project once ran keeps the ordinary label. A bare saved
 workspace assignment alone does not show a bar label.
 Full context stays in its tooltip, including branch and launch-time context;
 ambiguous or unavailable context falls back to the workspace controls.

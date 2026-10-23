@@ -98,6 +98,7 @@ ShellRoot {
     roleTimeout: 40
     runtime: ({
         sessionId: 'session-one',
+        compositorInstance: 'hypr-test',
         snapshot: function () {
           return {
             available: true,
@@ -261,6 +262,11 @@ ShellRoot {
             next.projects[0].environments.push(request.args.environment)
             next.projects[0].lastProfileId = request.args.environment.profileSnapshot.id
           }
+          if (request.action === 'environment-windows')
+            next.projects[0].environments.forEach(function (env) {
+              if (env.id === request.args.environmentId)
+                env.windows = request.args.windows
+            })
           if (request.action === 'environment-associate')
             next.projects[0].environments.forEach(function (env) {
               if (env.id === request.args.environmentId)
@@ -555,9 +561,21 @@ ShellRoot {
     t.equal(row.sessionId, 'session-one', 'saved creation session remains immutable after successful recovery')
     t.equal(row.status, 'observed', 'current native binding makes an older saved environment observed')
     t.equal(row.observedRoles, ['editor'], 'projection exposes exactly the freshly observed recovered role')
-    t.equal(JSON.stringify(owner.environmentRecords().filter(function (env) {
+    var record = JSON.parse(JSON.stringify(owner.environmentRecords().filter(function (env) {
       return env.id === first.environmentId
-    })[0]), saved, 'successful recovery preserves the complete saved environment and snapshots')
+    })[0]))
+    t.equal(record.windows, {
+      instance: 'hypr-test',
+      rows: [
+        {
+          address: '0x420',
+          pid: 420
+        }
+      ]
+    }, 'completed launch records its exact window for this compositor instance')
+    t.equal(row.windowOpen, true, 'recorded launch window still on its workspace marks the environment open')
+    delete record.windows
+    t.equal(JSON.stringify(record), saved, 'successful recovery preserves the complete saved environment and snapshots')
     var proof = JSON.parse(JSON.stringify(root.nativeBindings[0]))
     t.equal(proof.sessionId, 'session-two', 'recovered binding belongs to the current owner session')
     var cases = [[], [Object.assign({}, proof, {
@@ -575,6 +593,8 @@ ShellRoot {
         if (index < cases.length) {
           t.equal(projected.status, 'unconfirmed', labels[index] + ' cannot become current native evidence')
           t.equal(projected.observedRoles, [], labels[index] + ' exposes no observed role')
+          if (index === 0)
+            t.equal(projected.windowOpen, false, 'a closed launch window no longer marks the environment open')
           check(index + 1)
         } else {
           t.equal(projected.status, 'observed', 'fresh exact proof restores observation without changing metadata')

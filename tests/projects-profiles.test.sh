@@ -183,6 +183,22 @@ environment_snapshots_and_last_used() {
   # A relocation stamps when the environment took its new workspace.
   mutate environment-associate "$(jq -cn --arg p "$project_id" '{projectId:$p,environmentId:"e-11111111-1111-4111-8111-111111111111",previousWorkspaceId:12,workspaceId:14,placedAt:5000}')"
   jq -e '.state.projects[0].environments[0] | .workspaceId == 14 and .placedAt == 5000' "$result" >/dev/null
+  # Launched windows are recorded per compositor instance; a new instance replaces them.
+  windows() { jq -cn --arg p "$project_id" --arg i "$1" --argjson rows "$2" '{projectId:$p,environmentId:"e-11111111-1111-4111-8111-111111111111",windows:{instance:$i,rows:$rows}}'; }
+  mutate environment-windows "$(windows hypr-a '[{"address":"0xa1","pid":11}]')"
+  mutate environment-windows "$(windows hypr-a '[{"address":"0xa1","pid":11},{"address":"0xb2","pid":12}]')"
+  jq -e '.state.projects[0].environments[0].windows == {instance:"hypr-a",rows:[{address:"0xa1",pid:11},{address:"0xb2",pid:12}]}' "$result" >/dev/null
+  mutate environment-windows "$(windows hypr-b '[{"address":"0xc3","pid":13}]')"
+  jq -e '.state.projects[0].environments[0].windows == {instance:"hypr-b",rows:[{address:"0xc3",pid:13}]} and .state.projects[0].environments[1].windows == null' "$result" >/dev/null
+  cp "$registry" "$TMPDIR/original"
+  for rows in '[]' '[{"address":"0x0","pid":1}]' '[{"address":"0xa","pid":0}]' '[{"address":"0xa","pid":1,"extra":1}]'; do
+    if mutate environment-windows "$(windows hypr-b "$rows")"; then return 1; fi
+    cmp "$registry" "$TMPDIR/original"
+  done
+  mutate environment-associate "$(jq -cn --arg p "$project_id" '{projectId:$p,environmentId:"e-11111111-1111-4111-8111-111111111111",previousWorkspaceId:14,workspaceId:15}')"
+  # A workspace move invalidates recorded windows; they belonged to the old placement.
+  jq -e '.state.projects[0].environments[0] | .workspaceId == 15 and (has("windows")|not)' "$result" >/dev/null
+  mutate environment-associate "$(jq -cn --arg p "$project_id" '{projectId:$p,environmentId:"e-11111111-1111-4111-8111-111111111111",previousWorkspaceId:15,workspaceId:14,placedAt:5000}')"
   cp "$registry" "$TMPDIR/original"
   if mutate environment-associate "$(jq -cn --arg p "$project_id" '{projectId:$p,environmentId:"e-11111111-1111-4111-8111-111111111111",previousWorkspaceId:9,workspaceId:13}')"; then return 1; fi
   jq -e '.error.code == "ENVIRONMENT_CONFLICT"' "$result" >/dev/null
