@@ -51,7 +51,21 @@ class CursorTests(unittest.TestCase):
             )
             owned = OwnedProcess(process, process.pid)
             try:
-                stdout, stderr = process.communicate(timeout=30)
+                # A cold CI browser can block on filesystem page reads before loading
+                # this tiny fixture; its virtual-time budget still stays at 1s.
+                stdout, stderr = process.communicate(timeout=90)
+            except subprocess.TimeoutExpired as error:
+                def partial(value):
+                    if isinstance(value, bytes):
+                        value = value.decode("utf-8", errors="replace")
+                    return (value or "")[-4000:]
+
+                self.fail(
+                    f"Browser did not finish within 90 seconds: {Path(BROWSER).resolve()} "
+                    f"(exit={process.poll()!r})\n"
+                    f"Partial stderr:\n{partial(error.stderr)}\n"
+                    f"Partial stdout:\n{partial(error.stdout)}"
+                )
             finally:
                 terminate_group(owned)
             self.assertEqual(process.returncode, 0, stderr[-2000:])
