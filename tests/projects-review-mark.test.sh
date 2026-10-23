@@ -32,6 +32,15 @@ mark_saves() {
   jq -e --arg c "$linked_id" --arg h "$head_a" '.ok and (.state.projects[0].checkouts[]|select(.id == $c)|.review
     | .reviewedHead == $h and .reviewedTaskAt == 123 and (.reviewedAt|type == "number" and . > 0 and . == floor))' "$result" >/dev/null
 }
+# Catch SHA-256 marks being rejected or making the persisted registry unreadable.
+mark_sha256_saves_and_reloads() {
+  setup
+  local head
+  head=$(printf 'b%.0s' {1..64})
+  mark "$linked_id" "$(jq -cn --arg h "$head" '{head:$h,taskFinishedAt:123}')"
+  "$store" snapshot >"$result"
+  jq -e --arg c "$linked_id" --arg h "$head" '.ok and (.state.projects[0].checkouts[]|select(.id == $c)|.review.reviewedHead == $h)' "$result" >/dev/null
+}
 # Catch a missing task time being refused or dropped.
 mark_null_task_time() {
   setup
@@ -50,6 +59,12 @@ mark_validates() {
   local bad
   for bad in \
     '{"head":"abc","taskFinishedAt":1}' \
+    "$(jq -cn --arg h "$(printf 'a%.0s' {1..39})" '{head:$h,taskFinishedAt:1}')" \
+    "$(jq -cn --arg h "$(printf 'a%.0s' {1..41})" '{head:$h,taskFinishedAt:1}')" \
+    "$(jq -cn --arg h "$(printf 'a%.0s' {1..63})" '{head:$h,taskFinishedAt:1}')" \
+    "$(jq -cn --arg h "$(printf 'a%.0s' {1..65})" '{head:$h,taskFinishedAt:1}')" \
+    "$(jq -cn --arg h "$(printf 'A%.0s' {1..64})" '{head:$h,taskFinishedAt:1}')" \
+    "$(jq -cn --arg h "$(printf 'a%.0s' {1..64})"$'\n' '{head:$h,taskFinishedAt:1}')" \
     "$(jq -cn --arg h "${head_a:0:39}A" '{head:$h,taskFinishedAt:1}')" \
     "$(jq -cn --arg h "${head_a:0:39}g" '{head:$h,taskFinishedAt:1}')" \
     "$(jq -cn --arg h "$head_a"$'\n' '{head:$h,taskFinishedAt:1}')" \
@@ -58,6 +73,17 @@ mark_validates() {
     "$(jq -cn --arg h "$head_a" '{head:$h,taskFinishedAt:1,reviewedAt:5}')"; do
     if mark "$linked_id" "$bad"; then return 1; fi
     jq -e '.error.code == "INVALID_REQUEST"' "$result" >/dev/null
+  done
+}
+# Catch malformed stored reviewed heads being silently loaded as valid registry state.
+registry_refuses_malformed_mark() {
+  setup
+  local bad
+  cp "$ARANEA_STATE_ROOT/projects.json" "$TMPDIR/registry-valid"
+  for bad in "$(printf 'a%.0s' {1..39})" "$(printf 'a%.0s' {1..41})" "$(printf 'a%.0s' {1..63})" "$(printf 'a%.0s' {1..65})" "$(printf 'A%.0s' {1..64})" "$(printf 'a%.0s' {1..64})"$'\n'; do
+    jq --arg h "$bad" '.projects[0].checkouts[1].review = {reviewedHead:$h,reviewedTaskAt:null,reviewedAt:1}' "$TMPDIR/registry-valid" >"$ARANEA_STATE_ROOT/projects.json"
+    if "$store" snapshot >"$result"; then return 1; fi
+    jq -e '.ok == false and .state == null and .error.code == "REGISTRY_INVALID"' "$result" >/dev/null
   done
 }
 # Catch unknown ids without a clear code.
@@ -87,7 +113,7 @@ registry_validates_with_mark() {
   "$store" snapshot >"$result"
   jq -e --arg c "$linked_id" '.state.projects[0].checkouts[]|select(.id == $c)|.review.reviewedTaskAt == 1' "$result" >/dev/null
 }
-cases=(mark_saves mark_null_task_time mark_refuses_primary mark_validates unknown_ids remove_drops_mark registry_validates_with_mark)
+cases=(registry_refuses_malformed_mark mark_sha256_saves_and_reloads mark_saves mark_null_task_time mark_refuses_primary mark_validates unknown_ids remove_drops_mark registry_validates_with_mark)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e

@@ -349,7 +349,7 @@ project_git_remove_missing() {
 
 # Report a task checkout's commits and files against where its branch started; reads only.
 project_git_review() {
-  local remote base base_sha merge_base='' head current excludes record ahead behind dirty=false untracked=false
+  local remote base base_sha merge_base='' head current excludes record ahead behind dirty=false untracked=false object_format id_pattern
   # Reads here never fetch a missing object, so repository transport settings cannot run.
   local -x ARANEA_GIT_NO_LAZY_FETCH=1
   [[ $primary != true ]] || project_git_fail PRIMARY_CHECKOUT 'The main checkout has nothing to review.' 'Choose a task checkout.'
@@ -357,10 +357,16 @@ project_git_review() {
   base=$(project_git_default_base "$remote")
   [[ -n $base ]] || project_git_fail NO_DEFAULT_BRANCH 'Cannot find the default branch to review against.' 'Create a main or master branch, or run git remote set-head origin --auto.'
   # Without the repository lock a fetch can land mid-read, so every value derives from these two SHAs.
-  head=$(project_git_read -C "$path" rev-parse --verify HEAD 2>/dev/null || true)
+  object_format=$(project_git_read -C "$path" rev-parse --show-object-format=storage 2>/dev/null || true)
+  case "$object_format" in
+    sha1) id_pattern='^[0-9a-f]{40}$' ;;
+    sha256) id_pattern='^[0-9a-f]{64}$' ;;
+    *) project_git_fail GIT_ERROR 'Git could not determine the repository object format.' 'Inspect this checkout in a terminal, then refresh.' ;;
+  esac
+  head=$(project_git_read -C "$path" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)
   base_sha=$(project_git_read -C "$path" rev-parse --verify "$base^{commit}" 2>/dev/null || true)
-  [[ $base_sha =~ ^[0-9a-f]{40}$ ]] && merge_base=$(project_git_read -C "$path" merge-base "$base_sha" "$head" 2>/dev/null || true)
-  [[ $merge_base =~ ^[0-9a-f]{40}$ && $head =~ ^[0-9a-f]{40}$ ]] || project_git_fail GIT_ERROR 'Git could not find where this branch started.' 'Inspect this checkout in a terminal, then refresh.'
+  [[ $base_sha =~ $id_pattern && $head =~ $id_pattern ]] && merge_base=$(project_git_read -C "$path" merge-base "$base_sha" "$head" 2>/dev/null || true)
+  [[ $merge_base =~ $id_pattern && $head =~ $id_pattern ]] || project_git_fail GIT_ERROR 'Git could not find where this branch started.' 'Inspect this checkout in a terminal, then refresh.'
   current=$(project_git_read -C "$path" symbolic-ref --quiet HEAD 2>/dev/null || true)
   current=${current#refs/heads/}
   if ! { ahead=$(project_git_read -C "$path" rev-list --count "$merge_base..$head" 2>/dev/null) &&

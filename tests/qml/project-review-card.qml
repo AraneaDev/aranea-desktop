@@ -392,6 +392,18 @@ ShellRoot {
   }
   // Open diff sends one exact launcher request.
   function diffFlow() {
+    var client = entry.reviewClient
+    var invalidBases = ['a'.repeat(39), 'a'.repeat(41), 'a'.repeat(63), 'a'.repeat(65), 'A'.repeat(64), 'a'.repeat(64) + '\n', 'HEAD;id']
+    invalidBases.forEach(function (bad) {
+      t.check(!client.openDiff(host.checkoutPath, bad, 'kitty'), 'malformed merge base is refused')
+    })
+    t.equal(host.launches.length, 0, 'invalid merge bases never dispatch')
+    t.check(client.openDiff(host.checkoutPath, 'a'.repeat(64), 'kitty'), 'SHA-256 merge base dispatches')
+    t.equal(JSON.parse(host.launches[0].input).mergeBase, 'a'.repeat(64), 'SHA-256 merge base is preserved')
+    host.launches[0].done(0, JSON.stringify({
+      ok: true
+    }), '')
+    host.launches = []
     host.button('reviewOpenDiff').clicked()
     t.equal(host.launches.length, 1, 'Open diff sends one launcher request')
     t.equal(JSON.parse(host.launches[0].input), {

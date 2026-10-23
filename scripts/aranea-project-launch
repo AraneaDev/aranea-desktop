@@ -23,7 +23,7 @@ if /usr/bin/jq -e 'type=="object" and has("kind")' <<<"$request" >/dev/null; the
   /usr/bin/jq -e '
     ((keys)==["cwd","kind","mergeBase","terminalId"]) and .kind=="diff" and
     ((.cwd|type)=="string") and (.cwd|startswith("/")) and (.cwd|test("[\\x00-\\x1f\\x7f]")|not) and
-    ((.mergeBase|type)=="string") and (.mergeBase|test("^[0-9a-f]{40}$")) and (.mergeBase|length)==40 and
+    ((.mergeBase|type)=="string") and (.mergeBase|test("^([0-9a-f]{40}|[0-9a-f]{64})$")) and (.mergeBase|length == 40 or length == 64) and
     ((.terminalId|type)=="string") and (.terminalId|IN("kitty","alacritty","foot","ghostty"))
   ' <<<"$request" >/dev/null || fail INVALID_LAUNCH 'Only a diff of a registered checkout is allowed.'
   # shellcheck source=scripts/lib/paths.sh

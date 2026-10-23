@@ -16,7 +16,7 @@ def distinct: length == (unique|length);
 def fields($required; $optional): type == "object" and ((keys - ($required + $optional))|length == 0) and ($required - keys|length == 0);
 def review_mark:
   fields(["reviewedHead","reviewedTaskAt","reviewedAt"];[])
-  and (.reviewedHead|type == "string" and test("^[0-9a-f]{40}$") and length == 40)
+  and (.reviewedHead|type == "string" and test("^([0-9a-f]{40}|[0-9a-f]{64})$") and (length == 40 or length == 64))
   and (.reviewedTaskAt == null or (.reviewedTaskAt|integer and . >= 0))
   and (.reviewedAt|integer and . > 0);
 def checkout:
@@ -122,7 +122,7 @@ def request_valid:
     elif $action == "select-checkout" then fields(["projectId","checkoutId"];[]) and (.projectId|text) and (.checkoutId|text)
     elif $action == "checkout-remove" then fields(["projectId","checkoutId"];[]) and (.projectId|text) and (.checkoutId|text)
     elif $action == "review-mark" then fields(["projectId","checkoutId","head","taskFinishedAt"];[]) and (.projectId|text) and (.checkoutId|text)
-      and (.head|type == "string" and test("^[0-9a-f]{40}$") and length == 40) and (.taskFinishedAt == null or (.taskFinishedAt|integer and . >= 0))
+      and (.head|type == "string" and test("^([0-9a-f]{40}|[0-9a-f]{64})$") and (length == 40 or length == 64)) and (.taskFinishedAt == null or (.taskFinishedAt|integer and . >= 0))
     elif $action == "associate" then fields(["projectId","checkoutId","mode","workspaceId","separate"];["placedAt"]) and (.projectId|text) and (.checkoutId|text)
       and ((has("placedAt")|not) or (.placedAt|integer and . >= 0))
       and (.mode|mode) and (.workspaceId == null or (.workspaceId|integer and . > 0)) and (.separate|type == "boolean")
