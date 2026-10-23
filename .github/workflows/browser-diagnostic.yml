@@ -11,7 +11,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        browser: [/usr/bin/chromium, /opt/google/chrome/chrome]
+        include:
+          - browser: /usr/bin/chromium
+            bus: absent
+          - browser: /usr/bin/chromium
+            bus: private
+          - browser: /opt/google/chrome/chrome
+            bus: absent
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -20,7 +26,17 @@ jobs:
         shell: bash
         env:
           BROWSER_DIAGNOSTIC_BINARY: ${{ matrix.browser }}
+          BROWSER_DIAGNOSTIC_BUS: ${{ matrix.bus }}
         run: |
-          repo_root="$PWD"
-          source tests/lib/sandbox.sh
-          python3 "$repo_root/tools/diagnose-browser-launch.py" "$BROWSER_DIAGNOSTIC_BINARY"
+          for attempt in 1 2 3; do
+            (
+              repo_root="$PWD"
+              source tests/lib/sandbox.sh
+              echo "Fresh sandbox attempt $attempt: $BROWSER_DIAGNOSTIC_BINARY / $BROWSER_DIAGNOSTIC_BUS"
+              if [[ "$BROWSER_DIAGNOSTIC_BUS" == private ]]; then
+                dbus-run-session -- python3 "$repo_root/tools/diagnose-browser-launch.py" "$BROWSER_DIAGNOSTIC_BINARY"
+              else
+                python3 "$repo_root/tools/diagnose-browser-launch.py" "$BROWSER_DIAGNOSTIC_BINARY"
+              fi
+            )
+          done

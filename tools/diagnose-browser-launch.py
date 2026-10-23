@@ -10,7 +10,6 @@ import unittest
 root = Path(__file__).resolve().parents[1]
 binary = sys.argv[1]
 print("BROWSER", binary, "REALPATH", os.path.realpath(binary), flush=True)
-print("VERSION", subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=10).stdout.strip(), flush=True)
 spec = importlib.util.spec_from_file_location("cursor_diagnostic", root / "tests/screensaver-cursor.test.py")
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
@@ -19,7 +18,10 @@ original = subprocess.Popen
 class Capture(original):
     def communicate(self, *args, **kwargs):
         try:
-            return super().communicate(*args, **kwargs)
+            result = super().communicate(*args, **kwargs)
+            print("COMPLETED_STDERR", result[1], flush=True)
+            print("COMPLETED_STDOUT", result[0], flush=True)
+            return result
         except subprocess.TimeoutExpired as error:
             print("TIMEOUT browser_pid", self.pid, "poll", self.poll(), flush=True)
             for label, value in (("STDOUT", error.stdout), ("STDERR", error.stderr)):
@@ -29,10 +31,11 @@ class Capture(original):
             raise
 subprocess.Popen = Capture
 results = []
-for attempt in range(3):
+for attempt in range(1):
     started = time.monotonic()
     result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromModule(module))
     results.append(result.wasSuccessful())
     print("ATTEMPT", attempt + 1, "SUCCESS", result.wasSuccessful(), "SECONDS", time.monotonic() - started, flush=True)
+print("VERSION", subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=10).stdout.strip(), flush=True)
 print("RESULTS", results, flush=True)
 sys.exit(0 if all(results) else 1)
