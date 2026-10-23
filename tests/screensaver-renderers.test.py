@@ -188,10 +188,34 @@ class RendererTests(unittest.TestCase):
             self.assertIn(b"408", client.recv(4096))
             self.assertLess(time.monotonic() - started, 0.9)
 
+    def test_browser_spawn_failure_does_not_leak_private_pipe_fds(self):
+        before = len(os.listdir("/proc/self/fd"))
+        def unavailable(*args, **kwargs):
+            raise FileNotFoundError("browser unavailable")
+        with self.assertRaises(FileNotFoundError):
+            self.renderers.launch_web("http://127.0.0.1/", self.root / "profile", "org.omarchy.screensaver", popen=unavailable, kiosk=True)
+        self.assertEqual(len(os.listdir("/proc/self/fd")), before)
+
+    def test_browser_control_start_failure_cleans_exact_owned_child_and_fds(self):
+        before = len(os.listdir("/proc/self/fd"))
+        children = []
+        def spawn(argv, **kwargs):
+            child = subprocess.Popen([sys.executable, "-c", "import time;time.sleep(60)"], **kwargs)
+            children.append(child)
+            return child
+        with patch.object(self.renderers.BrowserControl, "started", side_effect=ValueError("control unavailable")):
+            with self.assertRaisesRegex(ValueError, "control unavailable"):
+                self.renderers.launch_web("http://127.0.0.1/", self.root / "profile", "org.omarchy.screensaver", popen=spawn, kiosk=True)
+        self.assertEqual(len(children), 1)
+        self.assertIsNotNone(children[0].poll())
+        self.assertEqual(len(os.listdir("/proc/self/fd")), before)
+
     def test_fixed_renderer_argv_and_owned_sessions(self):
         records = []
 
         def spawn(argv, **kwargs):
+            for fd in kwargs.get("pass_fds", ()):
+                self.addCleanup(os.close, os.dup(fd))
             record = self.root / f"argv-{len(records)}.json"
             code = (
                 "import json,sys;open(sys.argv[1],'w').write(json.dumps(sys.argv[2:]))"
@@ -224,6 +248,7 @@ class RendererTests(unittest.TestCase):
             popen=spawn,
         )
         for owned in [web, kiosk, video]:
+            self.addCleanup(self.renderers.terminate_group, owned)
             self.assertEqual(os.getpgid(owned.process.pid), owned.pgid)
             self.assertEqual(owned.pgid, owned.process.pid)
             self.assertEqual(owned.process.wait(timeout=2), 0)
@@ -247,10 +272,16 @@ class RendererTests(unittest.TestCase):
                 "--class=org.omarchy.screensaver",
             ],
         )
+        self.assertEqual(kioskargs[:2], [sys.executable, str(ROOT / "tools/screensaver/browser_control.py")])
+        self.assertEqual(len(set(kioskargs[2:4])), 2)
+        self.assertTrue(all(value.isdecimal() and int(value) >= 3 for value in kioskargs[2:4]))
+        self.assertIsNotNone(kiosk.browser_control)
+        self.assertFalse(any(value.startswith("--remote-debugging-port") for value in kioskargs))
         self.assertEqual(
-            kioskargs,
+            kioskargs[4:],
             [
                 "chromium",
+                "--remote-debugging-pipe",
                 f"--user-data-dir={self.root / 'profile-kiosk'}",
                 "--kiosk",
                 "http://127.0.0.1:123/live/?session=token",

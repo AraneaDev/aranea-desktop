@@ -120,6 +120,35 @@ def stop_session():
         return dict(EMPTY)
 
 
+def read_last_crash(root):
+    """Read only bounded, private diagnostic fields retained across later sessions."""
+    try:
+        descriptor = os.open(root / "last-crash.json", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(descriptor) as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077 or info.st_size > 4096:
+                return None
+            value = json.loads(stream.read(4097))
+        if not isinstance(value, dict) or type(value.get("schema")) is not int or value["schema"] != 1:
+            return None
+        validate_id(value.get("sceneId"))
+        if (
+            not isinstance(value.get("screenId"), str)
+            or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", value["screenId"])
+            or not isinstance(value.get("status"), str)
+            or not re.fullmatch(r"[A-Za-z0-9 _-]{1,64}", value["status"])
+            or type(value.get("errorCode")) is not int
+            or not -(2**31) <= value["errorCode"] < 2**31
+            or value.get("recovery") not in ("reload", "stopped")
+            or type(value.get("timestamp")) is not int
+            or not 0 <= value["timestamp"] < 2**63
+        ):
+            return None
+        return {key: value[key] for key in ("schema", "sceneId", "screenId", "status", "errorCode", "recovery", "timestamp")}
+    except (OSError, ValueError, TypeError, UnicodeError, RecursionError):
+        return None
+
+
 class Supervisor:
     def __init__(self, scene, preview, root, hyprland, started):
         self.started = started
@@ -136,6 +165,9 @@ class Supervisor:
         self.retirement_pool = ThreadPoolExecutor(max_workers=64)
         self.expected = {}
         self.ready = set()
+        self.recoveries = {}
+        self.recovery_deadlines = {}
+        self.ready_deadline = None
         self.server = None
         self.control = None
         self.thread = None
@@ -151,6 +183,9 @@ class Supervisor:
             preview=preview,
             error=None,
         )
+        last_crash = read_last_crash(root)
+        if last_crash is not None:
+            self.state["lastCrash"] = last_crash
 
     def serve_control(self):
         while not self.control_done.is_set():
@@ -200,6 +235,7 @@ class Supervisor:
             if (name, monitor["id"]) not in current:
                 del self.expected[name]
                 self.ready.discard(name)
+                self.recovery_deadlines.pop(name, None)
                 child = self.children.get(name)
                 if child:
                     self.retired[name] = self.retirement_pool.submit(
@@ -292,12 +328,51 @@ class Supervisor:
             for event in events
         )
 
+    def surface_ready(self, name):
+        """Require both page readiness and its private crash observation channel."""
+        child = self.children[name]
+        return name in self.ready and (
+            child.browser_control is None or child.browser_control.connected
+        )
+
+    def recover_browser(self, name, control, crash):
+        """Reload a ready owned tab once; never loop on repeated/startup crashes."""
+        if self.stop.is_set():
+            return
+        recover = name in self.ready and not self.recoveries.get(name)
+        record = {
+            "schema": 1,
+            "sceneId": self.scene.id,
+            "screenId": name,
+            "status": crash.status,
+            "errorCode": crash.error_code,
+            "recovery": "reload" if recover else "stopped",
+            "timestamp": int(time.time()),
+        }
+        self.state["lastCrash"] = record
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", prefix="crash-", dir=self.root, delete=False) as stream:
+                temporary = Path(stream.name)
+                json.dump(record, stream)
+            temporary.replace(self.root / "last-crash.json")
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        if not recover:
+            raise ValueError(f"Browser tab crashed ({crash.status}, code {crash.error_code})")
+        self.recoveries[name] = 1
+        self.ready.discard(name)
+        self.state["ready"] = False
+        self.recovery_deadlines[name] = time.monotonic() + READY_TIMEOUT
+        self.server.rearm(name)
+        if not self.stop.is_set():
+            control.reload(crash.target_id)
+
     def renderer_events(self):
-        for name, child in self.children.items():
-            if name in self.expected and child.process.poll() is not None:
-                if child.process.returncode:
-                    raise ValueError("Renderer exited with an error")
-                return False
+        if self.stop.is_set():
+            return False
+        # Explicit dismissal wins over recovery: do not reload after user input.
         if self.server:
             for event in self.server.drain_events():
                 if event["screenId"] not in self.expected:
@@ -308,6 +383,21 @@ class Supervisor:
                     raise ValueError("Renderer failed")
                 else:
                     return False
+        for name, child in self.children.items():
+            if name not in self.expected:
+                continue
+            if child.process.poll() is not None:
+                if child.process.returncode:
+                    raise ValueError("Renderer exited with an error")
+                return False
+            if child.browser_control is not None:
+                for crash in child.browser_control.poll():
+                    if self.stop.is_set():
+                        return False
+                    self.recover_browser(name, child.browser_control, crash)
+        for name in list(self.recovery_deadlines):
+            if name not in self.expected or self.surface_ready(name):
+                self.recovery_deadlines.pop(name)
         return True
 
     def run(self, accepted=None):
@@ -331,7 +421,7 @@ class Supervisor:
                     )
                     self.server.__enter__()
                 start = time.monotonic()
-                ready_deadline = start + READY_TIMEOUT
+                self.ready_deadline = start + READY_TIMEOUT
                 observed = start
                 mapped_any = False
                 for index, monitor in enumerate(self.monitors):
@@ -362,7 +452,7 @@ class Supervisor:
                         )
                     self.children[name] = child
                     deadline = (
-                        ready_deadline
+                        self.ready_deadline
                         if mapped_any
                         else self.started + FIRST_MAP_TIMEOUT
                     )
@@ -449,12 +539,16 @@ class Supervisor:
                             ):
                                 self.ready.add(name)
                     if not self.state["ready"]:
-                        if self.expected.keys() <= self.ready:
+                        if all(self.surface_ready(name) for name in self.expected):
                             self.refresh_pointer()
                             if not self.state["preview"]:
                                 write_last_scene(None, self.scene.id)
                             self.state["ready"] = True
-                        elif time.monotonic() >= ready_deadline:
+                        elif any(
+                            not self.surface_ready(name)
+                            and time.monotonic() >= self.recovery_deadlines.get(name, self.ready_deadline)
+                            for name in self.expected
+                        ):
                             raise ValueError("Renderer ready deadline exceeded")
                     time.sleep(0.025)
         except (OSError, ValueError, TypeError) as error:

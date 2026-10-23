@@ -24,6 +24,27 @@ scripts/aranea-doctor --fix
 `--fix` repairs hooks and reconciles plugin deployment. It does not replace a
 missing theme update or install every optional application.
 
+## A screensaver shows “Aw, Snap!”
+
+This is Chromium's crashed-tab page. A ready owned screensaver tab gets one
+in-place reload per monitor. If it crashes again, or the scene does not become
+ready after reload, Aranea closes that owned session and restores the desktop.
+Normal browser windows and saved screensaver/timer preferences are not changed.
+
+Read the retained diagnostic:
+
+```bash
+scripts/aranea-screensaver status --json
+```
+
+`session.lastCrash` records the scene, monitor, browser status, numeric error code,
+recovery action and timestamp. `reload` means recovery was attempted; current
+`session.ready` confirms whether the scene has become ready. `stopped` means the
+crash could not be retried safely or the one-reload allowance was already used.
+The diagnostic remains through later successful sessions in the same login.
+Record any visible Chromium error code too; recovery does not establish what
+caused the browser crash.
+
 ## Aranea is not active
 
 Check the current theme and switch back:

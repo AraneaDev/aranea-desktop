@@ -76,6 +76,9 @@ scripts/aranea-screensaver status --json
 scripts/aranea-screensaver list --json
 ```
 
+The session status also retains `lastCrash` after a browser-tab failure, including
+the numeric error code and recovery action. See [screensaver crash troubleshooting](troubleshooting.md#a-screensaver-shows-aw-snap).
+
 Saved selection lives in `~/.config/aranea/screensaver.json`; timing stays in
 Omarchy's `shell.json`. See the [session integration guide](../integrations/session/README.md#automatic-screensavers-and-timing)
 for launcher ownership, fallback and reload behavior.
