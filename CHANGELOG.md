@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.3](https://github.com/AraneaDev/aranea-desktop/compare/v2.39.2...v2.39.3) (2026-10-23)
+
+
+### Fixes
+
+* restore screensaver picker after fullscreen previews ([#220](https://github.com/AraneaDev/aranea-desktop/issues/220)) ([7899434](https://github.com/AraneaDev/aranea-desktop/commit/789943430e2e4e91a9b4ab4ba9027f8763a94774))
+
 ## [2.39.2](https://github.com/AraneaDev/aranea-desktop/compare/v2.39.1...v2.39.2) (2026-10-23)
 
 
