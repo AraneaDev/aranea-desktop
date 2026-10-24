@@ -2,13 +2,15 @@
 
 # Aranea Desktop
 
-**A cyberpunk command center for Omarchy.**
+**A cyberpunk desktop for Omarchy.**
 
-A coordinated desktop with a command center, grouped controls, project tools,
-thirty wallpapers, and nine live screensavers. Obsidian, mint, violet, and the
-Aranea spider carry through the desktop, lock screen, and boot splash.
+Launch apps, manage your projects, and customize your workspace from one
+coordinated desktop. A command center, grouped system controls, project
+workspaces, and application integrations share an obsidian, mint, and violet
+palette.
 
 [![Release](https://img.shields.io/github/v/release/AraneaDev/aranea-desktop?label=release)](https://github.com/AraneaDev/aranea-desktop/releases)
+[![Desktop page](https://img.shields.io/badge/desktop%20page-aranea--development.nl-0b7285)](https://aranea-development.nl/en/desktop)
 [![CI](https://img.shields.io/github/actions/workflow/status/AraneaDev/aranea-desktop/ci.yml?label=CI)](https://github.com/AraneaDev/aranea-desktop/actions/workflows/ci.yml)
 [![Language](https://img.shields.io/github/languages/top/AraneaDev/aranea-desktop)](https://github.com/AraneaDev/aranea-desktop)
 [![Last commit](https://img.shields.io/github/last-commit/AraneaDev/aranea-desktop?label=last%20commit)](https://github.com/AraneaDev/aranea-desktop/commits/master)
