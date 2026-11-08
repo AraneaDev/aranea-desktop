@@ -66,9 +66,38 @@ sync_cache() {
   }
 }
 
-# Prints the newest stable vX.Y.Z tag in the cache; pre-releases never count.
+# Prints the cache's vX.Y.Z and vX.Y.Z-SUFFIX tags oldest first by version,
+# a pre-release before the release it leads up to (v4.5.0-rc1 < v4.5.0).
+ordered_tags() {
+  local tag
+  upstream_git tag --list 'v*' | while IFS= read -r tag; do
+    if [[ "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+      printf '%s %s %s 1 ~ %s\n' "${BASH_REMATCH[@]:1:3}" "$tag"
+    elif [[ "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)-([0-9A-Za-z.]+)$ ]]; then
+      printf '%s %s %s 0 %s %s\n' "${BASH_REMATCH[@]:1:4}" "$tag"
+    fi
+  done | sort -k1,1n -k2,2n -k3,3n -k4,4n -k5,5V | cut -d' ' -f6
+}
+
+# Prints the default target for pin BASE ($1): the newest stable vX.Y.Z tag.
+# Pre-releases count only when BASE is a pre-release newer than every stable
+# tag; the newest tag past BASE is then the target, or BASE itself when
+# nothing is newer, so an older stable tag is never reported as drift.
 latest_tag() {
-  upstream_git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1
+  local -a tags
+  local i base_at=-1 stable_at=-1
+  mapfile -t tags < <(ordered_tags)
+  for i in "${!tags[@]}"; do
+    [[ "${tags[i]}" == "$1" ]] && base_at=$i
+    [[ "${tags[i]}" != *-* ]] && stable_at=$i
+  done
+  if [[ "$1" == *-* ]] && ((base_at > stable_at)); then
+    printf '%s\n' "${tags[-1]}"
+  elif ((stable_at >= 0)); then
+    printf '%s\n' "${tags[stable_at]}"
+  else
+    return 1
+  fi
 }
 
 # Prints the upstream path of plugin NAME ($1): shell/plugins/NAME, or
@@ -220,7 +249,7 @@ sync_cache
 upstream_git rev-parse --verify --quiet "$base^{commit}" >/dev/null ||
   die 1 "pinned version $base (.omarchy-version) is not an upstream ref"
 if [[ -z "$target" ]]; then
-  target="$(latest_tag || true)"
+  target="$(latest_tag "$base" || true)"
   [[ -n "$target" ]] || die 1 "no vX.Y.Z release tags found upstream"
 elif ! upstream_git rev-parse --verify --quiet "$target^{commit}" >/dev/null; then
   die 2 "unknown upstream ref: $target"
