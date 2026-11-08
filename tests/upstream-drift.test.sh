@@ -198,6 +198,22 @@ jq -e '.paths[] | select(.plugin == "araneadev.bar") | .upstream == "shell/plugi
 jq -e '.paths[] | select(.plugin == "araneadev.ghost") | .upstream == "shell/plugins/ghost" and .status == "missing-upstream"' <<<"$json" >/dev/null
 rm -rf "$aranea/plugins/araneadev.audio"
 
+# --- a pre-release pin newer than every stable tag (v1.1.1 is the newest
+# stable here, older than v1.2.0-beta1) is compared with newer pre-releases,
+# never with an older stable tag, until a stable release passes it.
+printf 'v1.2.0-beta1\n' >"$aranea/.omarchy-version"
+json="$("$drift" --json)"
+jq -e '.target == "v1.2.0-beta1" and .drift == false' <<<"$json" >/dev/null
+upstream_commit shell/plugins/lock/Lock.qml beta2 'Second beta lock change'
+upstream_git tag v1.2.0-beta2
+json="$("$drift" --json)"
+jq -e '.target == "v1.2.0-beta2" and .drift == true' <<<"$json" >/dev/null
+jq -e '.paths[] | select(.plugin == "araneadev.lock") | [.commits[].subject] == ["Second beta lock change"]' <<<"$json" >/dev/null
+upstream_git tag v1.2.0
+jq -e '.target == "v1.2.0"' <<<"$("$drift" --json)" >/dev/null
+printf 'v1.0.0\n' >"$aranea/.omarchy-version"
+jq -e '.target == "v1.2.0"' <<<"$("$drift" --json)" >/dev/null
+
 # --- the weekly workflow: least privilege, pinned checkout, one issue
 workflow="$repo_root/.github/workflows/upstream-drift.yml"
 test -f "$workflow"
