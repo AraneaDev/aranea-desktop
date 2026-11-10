@@ -1,7 +1,7 @@
 # Native rendering acceptance
 
 Run `ARANEA_QML_SHELL_DIR=/path/to/omarchy/shell tests/native-rendering.test.sh`.
-Individual fixtures accept `bar`, `tray` or `picker`. CI sets
+Individual fixtures accept `bar`, `tray`, `picker` or `menu`. CI sets
 `ARANEA_CHECK_REQUIRE_ALL=1`, so missing dependencies fail rather than skip.
 
 Each invocation creates a private headless Sway compositor, runtime directory,
@@ -17,6 +17,9 @@ selects CPU OpenGL; it does not select Qt Quick's shaderless software backend.
 The fixtures reject that backend and sample captured pixels from the actual
 production tray and management view, including dark/light symbolic and color icons. The picker captures an empty and
 a populated clipboard and verifies the separator pixels against its background.
+The menu measures the production layer-shell card across submenu navigation,
+back navigation and replacement requests, and checks that typing holds the
+search field stationary while each new destination opens centered.
 
 The bar copy replaces only Hyprland records and adds read-only observers.
 Sway always places Top layers below fullscreen, whereas the target Hyprland bug
