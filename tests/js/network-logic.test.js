@@ -776,3 +776,30 @@ test("keyTargetConfirmed refuses a section the cursor was moved into automatical
   )
   assert.equal(logic.keyTargetConfirmed(null), false)
 })
+
+test("portal telemetry hides Internet ping and loss without discarding samples", () => {
+  const model = require("../../plugins/araneadev.network/Model.js")
+  for (const state of ["portal", "limited", "none"]) {
+    assert.equal(model.internetPingReadable([null, null], state), false)
+    assert.equal(model.internetPingReadable([25], state), false)
+  }
+  assert.equal(model.internetPingReadable([25], "full"), true)
+  assert.equal(model.internetPingReadable([null], "unknown"), true)
+  assert.equal(model.internetPingReadable([], "full"), false)
+})
+
+test("connectivity respects disabled probes and disconnects before cached NM state", () => {
+  const model = require("../../plugins/araneadev.network/Model.js")
+  const states = { Portal: 1, Limited: 2, Full: 3, None: 4 }
+  for (const [value, want] of [
+    [1, "portal"],
+    [2, "limited"],
+    [3, "full"],
+    [4, "none"],
+    [5, "unknown"]
+  ])
+    assert.equal(model.connectivityState("wifi", value, states, true), want)
+  assert.equal(model.connectivityState("wifi", 1, states, false), "unknown")
+  assert.equal(model.connectivityState("disconnected", 1, states, true), "none")
+  assert.equal(model.captivePortalUrl, "http://ping.omacom.io/nm-check.txt")
+})

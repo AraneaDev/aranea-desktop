@@ -54,12 +54,12 @@ Item {
       font.family: empty.iconFontFamily
       font.pixelSize: empty.iconSize
       horizontalAlignment: Text.AlignHCenter
-      width: empty.contentWidth
+      width: Math.max(0, Math.min(empty.contentWidth, empty.width))
     }
 
     Item {
       visible: empty.imageSource.toString().length > 0
-      width: empty.contentWidth
+      width: Math.max(0, Math.min(empty.contentWidth, empty.width))
       height: empty.imageSize
       Image {
         anchors.horizontalCenter: parent.horizontalCenter
@@ -76,12 +76,13 @@ Item {
     Text {
       textFormat: Text.PlainText
       text: empty.message
+      elide: Text.ElideRight
       color: empty.foreground
       opacity: 0.7
       font.family: empty.fontFamily
       font.pixelSize: empty.messageSize
       horizontalAlignment: Text.AlignHCenter
-      width: empty.contentWidth
+      width: Math.max(0, Math.min(empty.contentWidth, empty.width))
     }
   }
 }

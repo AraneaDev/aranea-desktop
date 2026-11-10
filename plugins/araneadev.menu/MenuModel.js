@@ -841,6 +841,15 @@ function normalizeItem(id, raw) {
  * @returns {Array<MenuItem>} the items, or [] when the text is empty or invalid
  */
 function parseMenuJsonc(raw) {
+  return readMenuJsonc(raw) || []
+}
+
+/**
+ * Reads normalized menu rows, distinguishing a partial or wrong-shaped source from an empty menu.
+ * @param {*} raw - JSONC text
+ * @returns {Array<MenuItem>|null} normalized rows, or null for an invalid source
+ */
+function readMenuJsonc(raw) {
   var stripped = stripJsonc(raw)
   if (!stripped.trim()) return []
 
@@ -848,9 +857,9 @@ function parseMenuJsonc(raw) {
   try {
     parsed = JSON.parse(stripped)
   } catch (e) {
-    return []
+    return null
   }
-  if (typeof parsed !== "object" || parsed === null) return []
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null
 
   var source =
     parsed.items && typeof parsed.items === "object" && !Array.isArray(parsed.items)
@@ -863,6 +872,20 @@ function parseMenuJsonc(raw) {
     out.push(normalizeItem(id, entry))
   }
   return out
+}
+
+/**
+ * Keeps the last good rows while a watched file is incomplete. A required
+ * shipped menu cannot be empty, but users may intentionally clear extensions.
+ * @param {Array<MenuItem>} previous - rows from the previous successful read
+ * @param {*} raw - JSONC text from the latest read
+ * @param {boolean} required - whether the source must contain rows
+ * @returns {Array<MenuItem>} accepted rows, or the unchanged previous array
+ */
+function keepMenuRows(previous, raw, required) {
+  var items = readMenuJsonc(raw)
+  if (!items || (required && items.length === 0)) return previous
+  return items
 }
 
 /**
@@ -1148,6 +1171,8 @@ if (typeof module !== "undefined")
     semanticDetail: semanticDetail,
     normalizeItem: normalizeItem,
     parseMenuJsonc: parseMenuJsonc,
+    readMenuJsonc: readMenuJsonc,
+    keepMenuRows: keepMenuRows,
     mergeMenuSources: mergeMenuSources,
     swapProviderRows: swapProviderRows
   }
@@ -1337,6 +1362,8 @@ if (typeof module !== "undefined") {
     semanticDetail: semanticDetail,
     normalizeItem: normalizeItem,
     parseMenuJsonc: parseMenuJsonc,
+    readMenuJsonc: readMenuJsonc,
+    keepMenuRows: keepMenuRows,
     mergeMenuSources: mergeMenuSources,
     mergeAppRows: mergeAppRows,
     swapProviderRows: swapProviderRows,

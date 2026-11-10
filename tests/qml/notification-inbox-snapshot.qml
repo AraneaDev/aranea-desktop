@@ -77,6 +77,93 @@ ShellRoot {
     return center.evals.n
   }
 
+  QtObject {
+    id: migrationSignals
+    signal closed
+    signal hintsChanged
+  }
+
+  Component {
+    id: restoredInbox
+    Notif.Inbox {
+      stateDir: svc.popupStateDir
+      normalUrgency: 1
+    }
+  }
+
+  // A real stored sender replacement must delete disk state without dismissing it.
+  function checkTransientReplacement() {
+    var ref = {
+      id: 91,
+      appName: "migration",
+      summary: "Migration reminder",
+      urgency: 1,
+      hints: {},
+      tracked: false,
+      closed: migrationSignals.closed,
+      hintsChanged: migrationSignals.hintsChanged,
+      dismiss: function () {
+        this.tracked = false
+      }
+    }
+    svc.handleNotification(ref)
+    t.equal(svc.inbox.count, 1, "migration reminder starts in retained inbox")
+    svc.inbox.enqueue(["true"], function () {
+      ref.hints = {
+        transient: true
+      }
+      migrationSignals.hintsChanged()
+      t.equal(svc.inbox.count, 0, "transient replacement removes the stored row")
+      t.check(ref.tracked, "storage removal does not dismiss updated sender")
+      svc.inbox.enqueue(["true"], function () {
+        var restored = restoredInbox.createObject(testRoot)
+        restored.load(function () {
+          t.equal(restored.count, 0, "restart cannot restore transient migration reminder")
+          t.equal(Object.keys(svc.inboxRefs).length, 0, "transient sender no longer held by inbox")
+          t.equal(svc.popupModel.count, 1, "replacement uses existing transient toast path")
+          restored.destroy()
+          svc.clearPopups()
+          checkSuppressedTransient()
+        })
+      })
+    })
+  }
+
+  // DND still drops transient updates after removing their persisted version.
+  function checkSuppressedTransient() {
+    svc.setDoNotDisturb(true)
+    var ref = {
+      id: 92,
+      appName: "migration",
+      urgency: 1,
+      hints: {},
+      tracked: false,
+      closed: migrationSignals.closed,
+      hintsChanged: migrationSignals.hintsChanged,
+      dismiss: function () {
+        this.tracked = false
+      }
+    }
+    svc.handleNotification(ref)
+    t.equal(svc.inbox.count, 1, "DND retains ordinary inbox arrival")
+    ref.hints = {
+      transient: 1
+    }
+    migrationSignals.hintsChanged()
+    t.equal(svc.inbox.count, 0, "DND transient update still removes stored row")
+    t.equal(svc.popupModel.count, 0, "DND suppresses replacement toast")
+    t.check(!ref.tracked && svc.doNotDisturb, "suppressed update releases sender and preserves DND")
+    svc.inbox.enqueue(["true"], function () {
+      var restored = restoredInbox.createObject(testRoot)
+      restored.load(function () {
+        t.equal(restored.count, 0, "pending write cannot restore suppressed transient update")
+        restored.destroy()
+        svc.setDoNotDisturb(false)
+        t.done()
+      })
+    })
+  }
+
   Component.onCompleted: {
     t.waitFor(function () {
       return svc.inbox.loadedOnce
@@ -129,7 +216,7 @@ ShellRoot {
         svc.inbox.clear()
       }), 1, "a clear re-evaluates rows once")
       t.equal(center.rows, [], "a cleared inbox has no rows")
-      t.done()
+      checkTransientReplacement()
     })
   }
 }

@@ -6,6 +6,7 @@
 
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Services.Notifications
 import qs.Commons
@@ -31,8 +32,6 @@ Item {
   // The notification server, once created; null in tests.
   property var server: null
 
-  // Omarchy install root ($OMARCHY_PATH), for omarchy-hyprland-focus-app.
-  property string omarchyPath: Quickshell.env("OMARCHY_PATH")
   // The user's home directory ($HOME).
   readonly property string home: Quickshell.env("HOME")
   // History + DND live under XDG_STATE_HOME: they're persistent user state
@@ -80,6 +79,10 @@ Item {
   // and the next read of that role segfaults in QQmlListModel::data. A JS
   // map only holds a wrapper, which degrades to a catchable error instead.
   property var liveRefs: ({})
+  // Changes when sender actions or their lifetime change; refreshes card bindings.
+  property int actionsRevision: 0
+  onLiveRefsChanged: actionsRevision += 1
+  onActionsRevisionChanged: validateKeyboard()
 
   // Live Notification objects of inbox entries, by inbox file name. A stored
   // notification stays tracked while it waits in the center, so a sender's
@@ -87,6 +90,7 @@ Item {
   // sender's own action. Empty after a shell restart: those entries fall back
   // to execArgv / focusing the app.
   property var inboxRefs: ({})
+  onInboxRefsChanged: actionsRevision += 1
   // The last snapshot each live sender gave for its inbox entry (by file
   // name), so refreshInbox can tell a real update from a repeat signal.
   property var liveSnapshots: ({})
@@ -102,7 +106,167 @@ Item {
 
   // Whether any screen holds the toast with this key.
   function popupHeld(key: string): bool {
-    return (service.popupHolds[key] || 0) > 0
+    return service.keyboardMode || (service.popupHolds[key] || 0) > 0
+  }
+
+  // Keyboard ownership belongs to a single retained toast, never its index.
+  property bool keyboardMode: false
+  // Original sender ID retained for the keyboard session.
+  property int keyboardOriginalId: -1
+  // Timestamp distinguishes a reused sender ID from the selected card.
+  property double keyboardTimestamp: 0
+  // Current sender identity, held outside the popup model.
+  property var keyboardRef: null
+  // Native window object identity prevents address reuse redirecting stale keys.
+  property var keyboardWindowRef: null
+  // Choice snapshot prevents pending keys invoking changed actions.
+  property string keyboardSignature: ""
+  // Zero-based selected choice in visible order, including a real card click.
+  property int keyboardChoice: 0
+
+  // Meaningful clicks use argv, a live native default or an observed PID window.
+  // Display-name app focusing remains a pointer fallback, not a choice.
+  function popupHasMeaningfulClick(originalId): bool {
+    let at = popupIndexFor(originalId)
+    if (at < 0)
+      return false
+    if (NotificationLogic.parseExecArgv(popupModelObject.get(at).execArgv))
+      return true
+    try {
+      let ref = liveRefs[originalId]
+      if (ref && ref.tracked) {
+        for (let i = 0; ref.actions && i < Math.min(ref.actions.length, 16); i++) {
+          if (ref.actions[i] && ref.actions[i].identifier === "default")
+            return true
+        }
+      }
+    } catch (e) {}
+    return popupSenderWindow(originalId) !== null
+  }
+
+  // Snapshot the command/default/button choices for stale-key refusal.
+  function choiceSignature(originalId): string {
+    let at = popupIndexFor(originalId)
+    if (at < 0)
+      return ""
+    let win = popupSenderWindow(originalId)
+    return JSON.stringify([popupModelObject.get(at).execArgv, popupHasMeaningfulClick(originalId), win ? [win.address, win.pid, win.wmClass] : null, popupActionChoices(originalId)])
+  }
+
+  // Check the retained row, sender and choice set before dispatching a key.
+  function keyboardSelectionValid(): bool {
+    let at = popupIndexFor(keyboardOriginalId)
+    let win = popupSenderWindow(keyboardOriginalId)
+    return keyboardMode && (win ? win.toplevel : null) === keyboardWindowRef && at >= 0 && popupModelObject.get(at).timestamp === keyboardTimestamp && liveRefs[keyboardOriginalId] === keyboardRef && choiceSignature(keyboardOriginalId) === keyboardSignature
+  }
+
+  // End ownership when the selected identity or its choices disappear.
+  function validateKeyboard(): void {
+    if (keyboardMode && !keyboardSelectionValid())
+      stopKeyboard()
+  }
+
+  Connections {
+    target: popupModelObject
+    function onCountChanged() {
+      service.validateKeyboard()
+    }
+    function onDataChanged() {
+      service.validateKeyboard()
+    }
+  }
+
+  // Select a stable card identity, defaulting to the newest live popup.
+  function startKeyboard(originalId): bool {
+    let id = originalId === undefined ? (popupModelObject.count > 0 ? popupModelObject.get(0).originalId : -1) : originalId
+    let at = popupIndexFor(id)
+    if (at < 0)
+      return false
+    stopKeyboard()
+    keyboardOriginalId = id
+    keyboardTimestamp = popupModelObject.get(at).timestamp
+    keyboardRef = liveRefs[id]
+    let win = popupSenderWindow(id)
+    keyboardWindowRef = win ? win.toplevel : null
+    keyboardSignature = choiceSignature(id)
+    keyboardChoice = 0
+    keyboardMode = true
+    return keyboardMode
+  }
+
+  // Release focus ownership and the shared expiry pause on every exit.
+  function stopKeyboard(): void {
+    keyboardMode = false
+    keyboardOriginalId = -1
+    keyboardTimestamp = 0
+    keyboardRef = null
+    keyboardWindowRef = null
+    keyboardSignature = ""
+    keyboardChoice = 0
+  }
+
+  // Number of visible choices on the selected card.
+  function keyboardChoiceCount(): int {
+    return actionsFor(keyboardOriginalId).length + (popupHasMeaningfulClick(keyboardOriginalId) ? 1 : 0)
+  }
+
+  // Invoke a choice only while the original card and choices still match.
+  function invokeKeyboardChoice(index): bool {
+    if (!keyboardSelectionValid()) {
+      stopKeyboard()
+      return false
+    }
+    let id = keyboardOriginalId
+    let click = popupHasMeaningfulClick(id)
+    if (index < 0 || index >= keyboardChoiceCount())
+      return false
+    stopKeyboard()
+    if (click && index === 0) {
+      invokePopupDefault(popupIndexFor(id))
+      return true
+    }
+    return invokePopupAction(id, index - (click ? 1 : 0))
+  }
+
+  // Handle Escape, selection movement, Enter and numbered choices.
+  function keyboardPressed(key, text): bool {
+    if (!keyboardSelectionValid()) {
+      stopKeyboard()
+      return false
+    }
+    if (key === Qt.Key_Escape) {
+      stopKeyboard()
+      return true
+    }
+    if (key === Qt.Key_Return || key === Qt.Key_Enter) {
+      invokeKeyboardChoice(keyboardChoice)
+      return true
+    }
+    let count = keyboardChoiceCount()
+    if (count > 0 && (key === Qt.Key_Down || key === Qt.Key_Right || key === Qt.Key_Tab))
+      keyboardChoice = (keyboardChoice + 1) % count
+    else if (count > 0 && (key === Qt.Key_Up || key === Qt.Key_Left || key === Qt.Key_Backtab))
+      keyboardChoice = (keyboardChoice + count - 1) % count
+    else if (/^[1-9]$/.test(text || ""))
+      invokeKeyboardChoice(Number(text) - 1)
+    return true
+  }
+
+  // Dismiss, invoke or enter keyboard mode according to meaningful choices.
+  function actOnNewest(): bool {
+    if (popupModelObject.count === 0)
+      return false
+    let id = popupModelObject.get(0).originalId
+    let mode = NotificationLogic.newestActionMode(actionsFor(id).length, popupHasMeaningfulClick(id))
+    if (mode === "keyboard")
+      startKeyboard(id)
+    else if (mode === "click")
+      invokePopupDefault(popupIndexFor(id))
+    else if (mode === "button")
+      invokePopupAction(id, 0)
+    else
+      dismissPopup(popupIndexFor(id))
+    return true
   }
 
   // PersistentProperties handles in-process QML reloads. The on-disk
@@ -254,11 +418,13 @@ Item {
     }
 
     liveRefs[snapshot.originalId] = notification
+    actionsRevision += 1
     // Guard the delete: a newer notification may have reused this originalId
     // (freedesktop replaces_id) and taken over the map slot.
     notification.closed.connect(function () {
       if (service.liveRefs[snapshot.originalId] === notification)
         delete service.liveRefs[snapshot.originalId]
+      service.actionsRevision += 1
     })
     watchForUpdates(notification, snapshot)
     // Qt.callLater avoids "QV4::Object::insertMember" crashes when a
@@ -278,6 +444,7 @@ Item {
   function storeInInbox(notification, snapshot) {
     var fileName = NotificationLogic.popupFileName(snapshot)
     inboxRefs[fileName] = notification
+    actionsRevision += 1
     liveSnapshots[fileName] = snapshot
     // The sender closing its notification (it was read elsewhere, the app
     // quit) only ends the live link; the entry waits until the user clears it.
@@ -285,6 +452,7 @@ Item {
       if (service.inboxRefs[fileName] === notification) {
         delete service.inboxRefs[fileName]
         delete service.liveSnapshots[fileName]
+        service.actionsRevision += 1
       }
     })
     inbox.upsert(snapshot)
@@ -309,9 +477,20 @@ Item {
     } catch (e) {
       return
     }
+    // A transient replacement no longer belongs in the persisted inbox.
+    // Unlink without dismissing; the sender uses the normal toast/DND path.
+    if (isTransient(notification)) {
+      delete service.inboxRefs[fileName]
+      delete service.liveSnapshots[fileName]
+      service.actionsRevision += 1
+      inbox.remove(fileName)
+      service.handleNotification(notification)
+      return
+    }
     // Compare with what the sender sent last time, not with the model: the
     // model shows persisted copies, which reuse one path per entry, so a
     // change of image alone would look like no change.
+    service.actionsRevision += 1
     var previous = service.liveSnapshots[fileName]
     if (previous && !NotificationLogic.popupRowChanged(previous, updated))
       return
@@ -322,7 +501,7 @@ Item {
   // Everything the card draws. A change to any of these is a client updating
   // the notification in place, which is the only kind of update we ever hear
   // about after the popup exists.
-  readonly property var updateSignals: ["summaryChanged", "bodyChanged", "appNameChanged", "appIconChanged", "imageChanged", "urgencyChanged", "expireTimeoutChanged", "hintsChanged"]
+  readonly property var updateSignals: ["summaryChanged", "bodyChanged", "appNameChanged", "appIconChanged", "imageChanged", "urgencyChanged", "expireTimeoutChanged", "hintsChanged", "actionsChanged"]
 
   // A client that updates a notification through replaces_id does not produce
   // a second onNotification: the server writes the new content onto the object
@@ -348,6 +527,9 @@ Item {
     // outlive its popup — in both cases there is nothing here to refresh.
     if (service.liveRefs[originalId] !== notification)
       return
+    // Even unchanged labels may now refer to a replacement sender action.
+    if (service.keyboardMode && service.keyboardOriginalId === originalId)
+      service.stopKeyboard()
     var updated
     try {
       updated = NotificationLogic.replacementSnapshot(notification, originalId, timestamp)
@@ -356,6 +538,7 @@ Item {
       return
     }
 
+    service.actionsRevision += 1
     var roles = NotificationLogic.popupRoles()
     for (let i = 0; i < popupModelObject.count; i++) {
       let row = popupModelObject.get(i)
@@ -421,12 +604,14 @@ Item {
 
   // Opens or closes the notification center through the host shell.
   function toggleCenter(): void {
+    service.stopKeyboard()
     if (service.shell && typeof service.shell.toggle === "function")
       service.shell.toggle("araneadev.notifications")
   }
 
   // Opens the notification center through the host shell.
   function openCenter(): void {
+    service.stopKeyboard()
     if (service.shell && typeof service.shell.summon === "function")
       service.shell.summon("araneadev.notifications", "")
   }
@@ -477,11 +662,26 @@ Item {
     var entry = inbox.get(fileName)
     if (!entry)
       return
+    var ref = inboxRefs[fileName]
     var argv = NotificationLogic.parseExecArgv(entry.execArgv)
     if (argv)
       Util.execArgv(argv)
-    else if (!invokeDefaultAction(inboxRefs[fileName]))
-      focusApp(entry)
+    else if (!invokeDefaultAction(ref)) {
+      // The persisted/presentation row omits PID claims. Use only this row's
+      // current tracked sender snapshot, never historical or closed metadata.
+      let focusEntry = {
+        app: entry.app,
+        senderPid: 0
+      }
+      try {
+        let live = liveSnapshots[fileName]
+        if (ref && ref.tracked && inboxRefs[fileName] === ref && live && live.originalId === entry.originalId && live.timestamp === entry.timestamp)
+          focusEntry.senderPid = NotificationLogic.senderPid(live.senderPid)
+      } catch (e) {
+        // A sender destroyed during activation contributes no live claim.
+      }
+      focusApp(focusEntry)
+    }
     dismissInbox(fileName)
   }
 
@@ -510,14 +710,137 @@ Item {
     return false
   }
 
+  // Resolve the stable identity at the time an action is used, never a slot.
+  function popupIndexFor(originalId): int {
+    for (let i = 0; i < popupModelObject.count; i++) {
+      if (popupModelObject.get(i).originalId === originalId)
+        return i
+    }
+    return -1
+  }
+
+  // Exec hints are persistent data. Sender actions exist only while the
+  // current tracked object lives, and are copied as plain descriptors.
+  function notificationActionChoices(row, ref): var {
+    let choices = []
+    let exec = NotificationLogic.parseExecActions(row ? row.execActions : "") || []
+    for (let i = 0; i < exec.length; i++)
+      choices.push({
+        label: exec[i].label,
+        argv: exec[i].argv
+      })
+    try {
+      if (ref && ref.tracked) {
+        let sender = NotificationLogic.senderActionButtons(ref.actions)
+        for (let j = 0; j < sender.length; j++)
+          choices.push(sender[j])
+      }
+    } catch (e) {
+      // Sender already destroyed; its actions must not survive it.
+    }
+    return choices
+  }
+
+  // Resolve plain choices for the current popup and its live sender.
+  function popupActionChoices(originalId): var {
+    let at = popupIndexFor(originalId)
+    return at < 0 ? [] : notificationActionChoices(popupModelObject.get(at), liveRefs[originalId])
+  }
+
+  // Retained cards keep argv data, but sender objects never survive restore.
+  function inboxActionsFor(fileName): var {
+    let row = inbox.get(fileName)
+    if (!row)
+      return []
+    return notificationActionChoices(row, inboxRefs[fileName]).map(function (choice) {
+      return {
+        label: choice.label
+      }
+    })
+  }
+
+  // Invoke one current inbox button by stable filename and visible index.
+  function invokeInboxAction(fileName, index): bool {
+    if (typeof index !== "number" || !isFinite(index) || Math.floor(index) !== index || index < 0)
+      return false
+    let row = inbox.get(fileName)
+    if (!row)
+      return false
+    let ref = inboxRefs[fileName]
+    let choice = notificationActionChoices(row, ref)[index]
+    if (!invokeNotificationChoice(choice, ref))
+      return false
+    if (inbox.has(fileName) && (!inboxRefs[fileName] || inboxRefs[fileName] === ref))
+      dismissInbox(fileName)
+    return true
+  }
+
+  // Resolves a native action only on the object that is still tracked now.
+  function invokeNotificationChoice(choice, ref): bool {
+    if (!choice)
+      return false
+    if (choice.argv) {
+      Util.execArgv(choice.argv)
+      return true
+    }
+    try {
+      if (!ref || !ref.tracked)
+        return false
+      for (let i = 0; i < Math.min(ref.actions.length, 16); i++) {
+        let action = ref.actions[i]
+        if (action && String(action.identifier) === choice.identifier) {
+          action.invoke()
+          return true
+        }
+      }
+    } catch (e) {
+      // Destroyed sender actions cannot be invoked.
+    }
+    return false
+  }
+
+  // Public presentation contract: no commands or live objects enter the card.
+  function actionsFor(originalId): var {
+    let choices = popupActionChoices(originalId)
+    return choices.map(function (choice) {
+      return {
+        label: choice.label
+      }
+    })
+  }
+
+  // Execute exactly one selected button, then consume only its own popup.
+  function invokePopupAction(originalId, index): bool {
+    service.stopKeyboard()
+    if (typeof index !== "number" || !isFinite(index) || Math.floor(index) !== index || index < 0)
+      return false
+    let at = popupIndexFor(originalId)
+    if (at < 0)
+      return false
+    let timestamp = popupModelObject.get(at).timestamp
+    let choices = popupActionChoices(originalId)
+    let ref = liveRefs[originalId]
+    if (!invokeNotificationChoice(choices[index], ref))
+      return false
+    // The callback may synchronously remove the popup or deliver another one.
+    at = popupIndexFor(originalId)
+    if (at >= 0 && popupModelObject.get(at).timestamp === timestamp && (!liveRefs[originalId] || liveRefs[originalId] === ref))
+      removePopup(at, "invoke")
+    return true
+  }
+
   // Run the popup's click action, then dismiss. Omarchy's own toasts carry the
   // action as an argv vector in the `execArgv` role (see execArgvFromHints).
   // Third-party clients register a libnotify action under the canonical
   // identifier "default" instead; that one only works while the sender is live.
   function invokePopupDefault(index) {
+    service.stopKeyboard()
     if (index < 0 || index >= popupModelObject.count)
       return
     var entry = popupModelObject.get(index)
+    var originalId = entry.originalId
+    var timestamp = entry.timestamp
+    var ref = liveRefs[originalId]
 
     // Run the argv (via Util.execArgv, no shell interpretation). Detached so it
     // outlives the shell, which installer toasts depend on: they restart it.
@@ -527,29 +850,78 @@ Item {
       removePopup(index, "invoke")
       return
     }
-    var ref = entry ? liveRefs[entry.originalId] : null
     var invoked = invokeDefaultAction(ref)
     // Chat apps (Slack, Discord, Vesktop, etc.) rarely register a "default"
     // libnotify action — they just expect clicking the notification to
     // focus their window. Fall back to focusing the sending app by class so
     // that click-to-jump actually works.
-    if (!invoked)
+    if (!invoked && !focusWindow(popupSenderWindow(originalId)))
       focusApp(entry)
-    removePopup(index, "invoke")
+    var current = popupIndexFor(originalId)
+    if (current >= 0 && popupModelObject.get(current).timestamp === timestamp && (!liveRefs[originalId] || liveRefs[originalId] === ref))
+      removePopup(current, "invoke")
   }
 
-  // Try to focus an existing Hyprland window matching the notification's
-  // sender. The helper handles case-insensitive class matching.
-  function focusApp(entry) {
-    if (!entry || !entry.app)
-      return
-    focusAppProc.command = [service.omarchyPath + "/bin/omarchy-hyprland-focus-app", String(entry.app)]
-    focusAppProc.running = true
+  // Read current controlled compositor records; no display name enters a command.
+  function openWindows(): var {
+    let list = Hyprland.toplevels ? Hyprland.toplevels.values : []
+    let windows = []
+    for (let i = 0; i < list.length; i++) {
+      let ipc = list[i].lastIpcObject
+      if (!ipc || !/^0x[0-9a-f]+$/i.test(String(ipc.address || "")))
+        continue
+      windows.push({
+        toplevel: list[i],
+        address: String(ipc.address),
+        pid: NotificationLogic.senderPid(ipc.pid),
+        wmClass: String(ipc["class"] || "")
+      })
+    }
+    return windows
   }
 
-  Process {
-    id: focusAppProc
-    running: false
+  // A validated protocol claim matches only a current observed, unique PID window.
+  function windowForPid(pid): var {
+    let want = NotificationLogic.senderPid(pid)
+    if (!want)
+      return null
+    let matches = openWindows().filter(function (win) {
+      return win.pid === want
+    })
+    return matches.length === 1 ? matches[0] : null
+  }
+
+  // Shared meaningful-click and activation target for a popup's current snapshot.
+  function popupSenderWindow(originalId): var {
+    let at = popupIndexFor(originalId)
+    return at < 0 ? null : windowForPid(popupModelObject.get(at).senderPid)
+  }
+
+  // Focus only a currently observed address, retaining native object identity.
+  function focusWindow(win): bool {
+    if (!win)
+      return false
+    let current = openWindows().filter(function (candidate) {
+      return candidate.toplevel === win.toplevel && candidate.address === win.address && candidate.pid === win.pid
+    })
+    if (current.length !== 1)
+      return false
+    Hyprland.dispatch('hl.dsp.focus({window = hl.get_window("address:' + win.address + '")})')
+    return true
+  }
+
+  // PID preference, then a unique literal class match for pointer activation only.
+  function focusApp(entry): bool {
+    if (!entry)
+      return false
+    let win = windowForPid(entry.senderPid)
+    if (!win) {
+      let matches = openWindows().filter(function (candidate) {
+        return NotificationLogic.senderClassMatches(entry.app, candidate.wmClass)
+      })
+      win = matches.length === 1 ? matches[0] : null
+    }
+    return focusWindow(win)
   }
 
   // ---------------------------------------------------- settings persistence
@@ -620,6 +992,7 @@ Item {
   }
 
   Component.onDestruction: {
+    service.stopKeyboard()
     // A toggle less than 200 ms old would otherwise be lost with the timer.
     if (settingsSaveTimer.running) {
       // Write synchronously: this object is about to go.
@@ -660,6 +1033,18 @@ Item {
 
   IpcHandler {
     target: "notifications"
+
+    function act(): string {
+      return service.actOnNewest() ? "ok" : "none"
+    }
+
+    function keyboard(): string {
+      if (service.keyboardMode) {
+        service.stopKeyboard()
+        return "off"
+      }
+      return service.startKeyboard() ? "on" : "none"
+    }
 
     function dndState(): string {
       return service.doNotDisturb ? "on" : "off"

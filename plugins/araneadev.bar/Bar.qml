@@ -593,6 +593,8 @@ Item {
   // Stop the tooltip timer and clear the pending and shown tooltip.
   function clearTooltip(): void {
     tooltipTimer.stop()
+    if (tooltipShown)
+      tooltipWarmTimer.restart()
     pendingTooltipTarget = null
     pendingTooltipText = ""
     tooltipTarget = null
@@ -1455,6 +1457,7 @@ Item {
 
   // Arm a tooltip for target: checked after a deferred call, shown after tooltipTimer if still hovered.
   function showTooltip(target, text) {
+    var warm = tooltipShown || tooltipWarmTimer.running
     clearTooltip()
 
     if (!targetTooltipHovered(target) || !text) {
@@ -1478,7 +1481,10 @@ Item {
       tooltipText = pendingTooltipText
       pendingTooltipTarget = null
       pendingTooltipText = ""
-      tooltipTimer.restart()
+      if (warm)
+        tooltipShown = true
+      else
+        tooltipTimer.restart()
     })
   }
 
@@ -1499,6 +1505,12 @@ Item {
       else
         root.clearTooltip()
     }
+  }
+
+  // Keep adjacent tooltip targets warm across their leave/enter event gap.
+  Timer {
+    id: tooltipWarmTimer
+    interval: 400
   }
 
   Timer {
@@ -1572,8 +1584,40 @@ Item {
     }
   }
 
+  // Fullscreen changes do not refresh Quickshell's window records by themselves.
+  Connections {
+    target: Hyprland
+    function onRawEvent(event) {
+      if (event && String(event.name) === "fullscreen")
+        Hyprland.refreshToplevels()
+    }
+  }
+
   component BarPanel: PanelWindow {
     id: barWindow
+
+    // A faded top layer can be lifted above fullscreen by the compositor.
+    // Drop its input explicitly, without remapping or changing drag geometry.
+    readonly property bool underFullscreen: {
+      var monitor = Hyprland.monitorFor(screen)
+      var workspace = monitor ? monitor.activeWorkspace : null
+      var windows = Hyprland.toplevels.values
+      if (!workspace)
+        return false
+      for (let i = 0; i < windows.length; i++) {
+        let window = windows[i]
+        if (window && window.workspace && window.workspace.id === workspace.id && window.lastIpcObject && (Number(window.lastIpcObject.fullscreen) & 2) !== 0)
+          return true
+      }
+      return false
+    }
+    // Root is the deliberate owner of this inline surface.
+    // qmllint disable unqualified
+    mask: (root.barMoveActive || root.barDragSource) ? null : (root.barHidden || underFullscreen ? noInputRegion : null)
+    // qmllint enable unqualified
+    Region {
+      id: noInputRegion
+    }
 
     // Hiding parks the bar just past its screen edge instead of unmapping it.
     // Unmapping frees the layer surface and the whole scene graph, so every
@@ -1696,6 +1740,17 @@ Item {
         }
       }
       visible: tooltipMotion.present
+      // Mapping starts at a whole-number scale. Reveal only after Qt receives
+      // the same fractional scale as the owning bar; keep it latched until hide.
+      readonly property bool scaleReady: visible && Math.round(devicePixelRatio * 120) === Math.round(barWindow.devicePixelRatio * 120)
+      property bool revealed: false
+      onVisibleChanged: if (!visible)
+        revealed = false
+      onScaleReadyChanged: if (scaleReady)
+        Qt.callLater(function () {
+          if (tooltipWindow.scaleReady)
+            tooltipWindow.revealed = true
+        })
       mask: Region {}
       color: "transparent"
       implicitWidth: Math.ceil(tooltipBubble.implicitWidth) + Style.space(8)
@@ -1748,7 +1803,7 @@ Item {
         x: Style.space(4)
         y: Style.space(4)
         scale: tooltipMotion.scale
-        opacity: tooltipMotion.opacity
+        opacity: tooltipWindow.revealed ? tooltipMotion.opacity : 0
         text: root.tooltipText || tooltipWindow.retainedText
         fontFamily: Aranea.Typography.uiFamily
       }
@@ -1984,10 +2039,31 @@ Item {
         }
 
         HoverHandler {
-          onHoveredChanged: root.setCenterSectionHovered(hovered)
+          id: centerHover
+          // Hold the boundary while indicators expand beneath a still pointer.
+          // This inline section shares the bar root and its sibling anchor.
+          // qmllint disable unqualified
+          readonly property real measuredEdge: centerRoot.hasAnchor ? centerAnchorModule.x : unanchoredCenter.x
+          property real peekEdge: 0
+          readonly property bool peeking: hovered && point.position.x < peekEdge
+          onMeasuredEdgeChanged: if (!root.centerSectionRevealHeld)
+            peekEdge = measuredEdge
+          onPeekingChanged: root.setCenterSectionHovered(peeking)
+          Component.onDestruction: if (peeking)
+            root.setCenterSectionHovered(false)
+        }
+        Connections {
+          target: root
+          function onCenterSectionRevealHeldChanged() {
+            if (!root.centerSectionRevealHeld)
+              centerHover.peekEdge = centerHover.measuredEdge
+          }
         }
 
+        // qmllint enable unqualified
+
         ModuleList {
+          id: unanchoredCenter
           visible: !centerRoot.hasAnchor
           entries: centerRoot.entries
           region: "center"
@@ -2033,10 +2109,31 @@ Item {
         }
 
         HoverHandler {
-          onHoveredChanged: root.setCenterSectionHovered(hovered)
+          id: verticalCenterHover
+          // Hold the boundary while indicators expand beneath a still pointer.
+          // This inline section shares the bar root and its sibling anchor.
+          // qmllint disable unqualified
+          readonly property real measuredEdge: centerRoot.hasAnchor ? verticalCenterAnchorModule.y : unanchoredVerticalCenter.y
+          property real peekEdge: 0
+          readonly property bool peeking: hovered && point.position.y < peekEdge
+          onMeasuredEdgeChanged: if (!root.centerSectionRevealHeld)
+            peekEdge = measuredEdge
+          onPeekingChanged: root.setCenterSectionHovered(peeking)
+          Component.onDestruction: if (peeking)
+            root.setCenterSectionHovered(false)
+        }
+        Connections {
+          target: root
+          function onCenterSectionRevealHeldChanged() {
+            if (!root.centerSectionRevealHeld)
+              verticalCenterHover.peekEdge = verticalCenterHover.measuredEdge
+          }
         }
 
+        // qmllint enable unqualified
+
         ModuleList {
+          id: unanchoredVerticalCenter
           visible: !centerRoot.hasAnchor
           entries: centerRoot.entries
           region: "center"

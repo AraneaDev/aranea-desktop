@@ -286,6 +286,8 @@ Panel {
     root.keyboardCursor = false
     if (name === "open")
       root.activate(arg.index)
+    else if (name === "invokeAction" && row.kind === "entry")
+      root.service.invokeInboxAction(row.entry.fileName, arg.actionIndex)
     else if (name === "dismiss")
       root.dismissAt(arg.index, false)
     else if (name === "toggle")
@@ -301,6 +303,9 @@ Panel {
     root.lastStop = -1
     root.pendingRemovalKey = ""
     if (opened) {
+      // Bell, direct shell and service IPC routes share this open boundary.
+      if (root.service)
+        root.service.stopKeyboard()
       root.now = Date.now()
       root.confirmingClear = false
     }

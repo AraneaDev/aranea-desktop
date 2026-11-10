@@ -228,3 +228,37 @@ test("menu model final review fixes (4b)", () => {
   // m5: only strings and finite numbers are ids
   eq(menu.normalizeAppIds(["a", {}, [], null, NaN, 7, true], 12), ["a", "7"], "id types")
 })
+
+test("partial menu reads preserve rows while a user may clear extensions", () => {
+  const previous = menu.parseMenuJsonc('{"go":{"label":"Go"}}')
+  if (menu.keepMenuRows(previous, '{"go":', true) !== previous)
+    throw new Error("partial default replaced valid rows")
+  if (menu.keepMenuRows(previous, "", true) !== previous)
+    throw new Error("empty shipped menu replaced valid rows")
+  if (menu.keepMenuRows(previous, "// cleared", false).length !== 0)
+    throw new Error("user could not clear extensions")
+  if (menu.keepMenuRows(previous, "[]", false) !== previous)
+    throw new Error("wrong-shaped user menu replaced valid rows")
+})
+
+test("menu reads distinguish invalid sources while preserving normalization", () => {
+  for (const raw of ['{"go":', "[]", '[{"label":"Go"}]', "null", "42", '"menu"', "false"]) {
+    if (menu.readMenuJsonc(raw) !== null) throw new Error(`accepted invalid menu: ${raw}`)
+    if (menu.parseMenuJsonc(raw).length !== 0) throw new Error("legacy parse must return an array")
+  }
+  for (const raw of ["", "// cleared", "{}", '{"items":{}}']) {
+    if (menu.readMenuJsonc(raw).length !== 0) throw new Error(`empty menu was invalid: ${raw}`)
+  }
+  const rows = menu.readMenuJsonc('{"items":{"go":{"label":7,"aliases":["open",12,null]}}}')
+  if (
+    rows.length !== 1 ||
+    rows[0].id !== "go" ||
+    rows[0].label !== "7" ||
+    rows[0].aliases.join(",") !== "open,12"
+  )
+    throw new Error("read helper bypassed Aranea normalization")
+  const previous = menu.parseMenuJsonc('{"old":{"label":"Old"}}')
+  const replacement = menu.keepMenuRows(previous, '{"new":{"label":"New"}}', true)
+  if (replacement.length !== 1 || replacement[0].id !== "new" || previous[0].id !== "old")
+    throw new Error("complete replacement was not accepted without mutating previous rows")
+})

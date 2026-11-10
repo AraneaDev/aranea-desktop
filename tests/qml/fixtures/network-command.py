@@ -56,3 +56,12 @@ elif name == "omarchy-network-status" and args == ["--verbose"]:
     def finish(state):
         state["finished"] += 1
     update(finish)
+
+elif name == "omarchy-network-captive-portal":
+    update(lambda state: state.update(portalArgv=args))
+elif name == "omarchy-dns":
+    if args:
+        delay, code = update(lambda state: (state.get("dnsDelay", 0), state.get("dnsExit", 0)), read_only=True)
+        time.sleep(delay)
+        sys.exit(code)
+    print("DHCP")

@@ -82,8 +82,42 @@ function isWithinQuietHours(window, date) {
   return start < end ? current >= start && current < end : current >= start || current < end
 }
 
+/**
+ * Copy bounded non-default sender actions without retaining QObject handles.
+ * The default belongs to the card click; settings is suppressed upstream.
+ * @param {*} actions - Live sender actions.
+ * @returns {Array<{identifier: string, label: string}>} Visible buttons.
+ */
+function senderActionButtons(actions) {
+  var out = []
+  for (var i = 0; actions && i < Math.min(actions.length, 16); i++) {
+    var action = actions[i]
+    if (!action) continue
+    var identifier = String(action.identifier || "")
+    if (!identifier || identifier.length > 256 || identifier === "default") continue
+    var label = String(action.text || identifier).slice(0, 256)
+    if (/^settings$/i.test(label) || /^settings$/i.test(identifier)) continue
+    out.push({ identifier: identifier, label: label })
+  }
+  return out
+}
+
+/**
+ * Choose the newest toast's shortcut behavior from meaningful choices.
+ * @param {number} buttonCount - Number of visible buttons.
+ * @param {boolean} clickable - Whether the card has a real default action.
+ * @returns {string} Dismiss, click, button or keyboard mode.
+ */
+function newestActionMode(buttonCount, clickable) {
+  if (buttonCount + (clickable ? 1 : 0) > 1) return "keyboard"
+  if (clickable) return "click"
+  return buttonCount > 0 ? "button" : "dismiss"
+}
+
 if (typeof module !== "undefined")
   module.exports = {
+    newestActionMode: newestActionMode,
+    senderActionButtons: senderActionButtons,
     clampTimestamp: clampTimestamp,
     holdPopup: holdPopup,
     popupPlacement: popupPlacement,

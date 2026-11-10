@@ -59,7 +59,13 @@ Item {
   property int failedAttempts: 0
   // Resolved path of the current wallpaper.
   property string backgroundPath: ""
-  // Incremented whenever backgroundPath changes, to cache-bust the view's image.
+  // Cached still returned by the host's shared lock-poster helper for videos.
+  property string videoPosterPath: ""
+  // Video sources are never given directly to the lock's Image component.
+  readonly property bool videoBackground: Commons.Util.isVideoPath(backgroundPath)
+  // The original image or last-good cached video still; empty means plain background.
+  readonly property string lockBackgroundPath: videoBackground ? videoPosterPath : backgroundPath
+  // Incremented whenever backgroundPath or its cached poster changes, to reload the image.
   property int backgroundVersion: 0
   // Last lifecycle event logged by logEvent() (reported by IPC status).
   property string lastEvent: "init"
@@ -157,6 +163,20 @@ Item {
       readlinkProc.running = true
   }
 
+  // Resolves a video into the host's cached still; keeps a last-good poster on failure.
+  function refreshPoster(): void {
+    if (!videoBackground) {
+      videoPosterPath = ""
+      return
+    }
+    if (posterProc.running)
+      return
+    posterProc.sourcePath = backgroundPath
+    posterProc.running = true
+  }
+
+  onBackgroundPathChanged: refreshPoster()
+
   // Starts the check for fingerprint PAM plus an enrolled finger (updates fingerprintConfigured).
   function refreshFingerprintStatus(): void {
     if (!fingerprintCheckProc.running)
@@ -223,8 +243,14 @@ Item {
     runWake()
   }
 
-  // Restarts the 5 s idle timer that blanks keyboard and display backlights, noting when it was armed.
+  // Restarts blanking after ordinary activity (5 s).
   function armBlankTimer(): void {
+    armBlankTimerWithDelay(5000)
+  }
+
+  // Sets the blanking grace period, including 15 s after a detected resume.
+  function armBlankTimerWithDelay(delayMs: int): void {
+    idleBlankTimer.interval = delayMs
     idleBlankTimer.armedAt = Date.now()
     idleBlankTimer.restart()
   }
@@ -348,7 +374,7 @@ Item {
       LockView {
         id: lockView
         anchors.fill: parent
-        backgroundPath: root.backgroundPath
+        backgroundPath: root.lockBackgroundPath
         backgroundVersion: root.backgroundVersion
         fingerprintConfigured: root.fingerprintConfigured
         authenticatingPassword: root.authenticatingPassword
@@ -385,7 +411,7 @@ Item {
 
     LockView {
       anchors.fill: parent
-      backgroundPath: root.backgroundPath
+      backgroundPath: root.lockBackgroundPath
       backgroundVersion: root.backgroundVersion
       fingerprintConfigured: root.fingerprintConfigured
       authenticatingPassword: false
@@ -461,6 +487,37 @@ Item {
           root.backgroundPath = next
           root.backgroundVersion += 1
         }
+        root.refreshPoster()
+      }
+    }
+  }
+
+  Process {
+    id: posterProc
+    // Snapshot identifies stale results when the wallpaper changes during extraction.
+    property string sourcePath: ""
+    // The host helper shares its cache across outputs. Bound the whole invocation,
+    // including a busy cache lock; a missing helper safely leaves a plain still.
+    command: ["timeout", "-k", "1", "20", "bash", Quickshell.env("OMARCHY_PATH") + "/shell/plugins/lock/poster.sh", sourcePath]
+    stdout: StdioCollector {
+      id: posterOutput
+      waitForEnd: true
+    }
+    onExited: function (exitCode) {
+      var next = String(posterOutput.text || "").trim()
+      if (sourcePath !== root.backgroundPath) {
+        // Successful extraction prunes the host's older cache entries, even
+        // when this response is obsolete. Never retain an evicted fallback.
+        if (exitCode === 0 && next.length > 0 && next !== root.videoPosterPath && root.videoPosterPath !== "") {
+          root.videoPosterPath = ""
+          root.backgroundVersion += 1
+        }
+        root.refreshPoster()
+        return
+      }
+      if (exitCode === 0 && next.length > 0 && next !== root.videoPosterPath) {
+        root.videoPosterPath = next
+        root.backgroundVersion += 1
       }
     }
   }
@@ -509,6 +566,8 @@ Item {
 
   Timer {
     id: idleBlankTimer
+    // NVIDIA resume can light the panel several seconds after the timer thaws.
+    readonly property int resumeMs: 15000
     interval: 5000
     repeat: false
     property double armedAt: 0
@@ -517,7 +576,7 @@ Item {
       // blank the freshly woken unlock screen under the user. Wall-clock time
       // exposes the gap: take a fresh run-up instead of blanking.
       if (Date.now() - armedAt > interval + 2000) {
-        root.armBlankTimer()
+        root.armBlankTimerWithDelay(resumeMs)
         return
       }
       // Only a password check in flight should hold the display up. The

@@ -1,3 +1,24 @@
+var captivePortalUrl = "http://ping.omacom.io/nm-check.txt"
+
+/**
+ * Maps NetworkManager's probe state, ignoring disabled checks and stale links.
+ * @param {string} kind - the live connection kind
+ * @param {*} connectivity - the NetworkConnectivity value
+ * @param {{Portal: *, Limited: *, Full: *, None: *}} states - NetworkConnectivity enum values
+ * @param {boolean} checksEnabled - whether NM probing is enabled
+ * @returns {string} portal, limited, full, none or unknown
+ */
+function connectivityState(kind, connectivity, states, checksEnabled) {
+  if (kind === "disconnected") return "none"
+  // Ignore stale cached results when the operator has disabled probing.
+  if (!checksEnabled) return "unknown"
+  if (connectivity === states.Portal) return "portal"
+  if (connectivity === states.Limited) return "limited"
+  if (connectivity === states.Full) return "full"
+  if (connectivity === states.None) return "none"
+  return "unknown"
+}
+
 /**
  * Parses the tab-separated status line the bar icon's helper prints: kind,
  * label, signal strength and frequency.
@@ -312,6 +333,19 @@ function pingPacketLossPercent(samples) {
 }
 
 /**
+ * Whether Internet probe latency and loss have a meaningful presentation.
+ * @param {*} samples - the retained latency history
+ * @param {string} connectivity - the normalized reachability state
+ * @returns {boolean} true when samples may be shown
+ */
+function internetPingReadable(samples, connectivity) {
+  var values = Array.isArray(samples) ? samples : []
+  if (connectivity === "portal" || connectivity === "limited" || connectivity === "none")
+    return false
+  return values.length > 0
+}
+
+/**
  * Formats a packet-loss percentage for display.
  * @param {*} percent - the packet loss percentage
  * @param {*} hasSamples - whether a probe has returned a sample yet
@@ -535,6 +569,9 @@ function shouldRepromptPassphrase(reason, needsCredentials, reasons) {
 
 if (typeof module !== "undefined") {
   module.exports = {
+    captivePortalUrl: captivePortalUrl,
+    connectivityState: connectivityState,
+    internetPingReadable: internetPingReadable,
     parseNetworkStatus: parseNetworkStatus,
     wifiIconFor: wifiIconFor,
     connectionIcon: connectionIcon,

@@ -2,6 +2,11 @@
 // depend on the Omarchy installed on the machine running it.
 {
   "apps": {"icon":"A","label":"Apps","aliases":["app","applications"],"provider":"apps"},
+  // Appearance and kernel entries match the final 4.5.0 shipped menu.
+  "appearance": {"icon":"󰏘","label":"Appearance","aliases":["style"]},
+  "appearance.font": {"icon":"","label":"Font","provider":"fonts"},
+  "update": {"icon":"","label":"Update","aliases":["restart","refresh"]},
+  "update.kernel": {"icon":"","label":"Kernel","when":"(( $(omarchy-kernel list | wc -l) > 1 ))","provider":"kernels"},
   "setup": {"icon":"S","label":"Setup","aliases":["settings"]},
   "setup.power": {"icon":"P","label":"Power Profile","action":"omarchy-launch-power"},
   "system": {"icon":"Y","label":"System","aliases":["power-menu"]},

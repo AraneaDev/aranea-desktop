@@ -786,3 +786,94 @@ test("DND switch: pending, echo and queued clicks", () => {
   })
   assert.deepEqual(inbox.dndEcho({ target: true, queued: undefined }, true).state, idle)
 })
+
+test("notification actions retain argv and reject empty commands", () => {
+  const assert = require("node:assert/strict")
+  const actions = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
+  assert.deepEqual(
+    JSON.parse(
+      JSON.stringify(
+        actions.parseExecActions('[{"label":"Open","argv":["xdg-open","/tmp/a b.mp4"]}]')
+      )
+    ),
+    [{ label: "Open", argv: ["xdg-open", "/tmp/a b.mp4"] }]
+  )
+  assert.equal(actions.parseExecActions('[{"label":"Open","argv":[]}]'), null)
+  assert.equal(actions.parseExecActions('{"label":"Open"}'), null)
+})
+
+test("notification actions fail closed at upstream bounds", () => {
+  const assert = require("node:assert/strict")
+  const n = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
+  const encode = (argv) => JSON.stringify([{ label: "Open", argv }])
+  for (const value of [
+    "",
+    "broken",
+    "[]",
+    "null",
+    '[{"label":"  ","argv":["open"]}]',
+    '[{"label":1,"argv":["open"]}]',
+    '[{"label":"Open","argv":["open"]},null]',
+    encode(["-open"]),
+    encode(["open", 1]),
+    encode(["open", "a\u0000b"]),
+    encode(["open", "a".repeat(4097)]),
+    encode(Array(33).fill("open")),
+    JSON.stringify(Array(4).fill({ label: "Open", argv: ["open"] })),
+    encode(Array(9).fill("a".repeat(4096))),
+    " ".repeat(32769)
+  ])
+    assert.equal(n.parseExecActions(value), null, value.slice(0, 80))
+  assert.equal(n.parseExecActions(encode(["open", "a".repeat(4096)]))[0].argv[1].length, 4096)
+  assert.equal(n.parseExecActions(encode(Array(32).fill("open")))[0].argv.length, 32)
+  assert.equal(
+    n.parseExecActions(JSON.stringify([{ label: "a".repeat(257), argv: ["open"] }]))[0].label
+      .length,
+    256
+  )
+  assert.equal(n.parseExecArgv('["open","a\\u0000b"]'), null)
+})
+
+test("newest-card policy counts a real click as a choice", () => {
+  const logic = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
+  for (const [buttons, click, want] of [
+    [0, false, "dismiss"],
+    [0, true, "click"],
+    [1, false, "button"],
+    [1, true, "keyboard"],
+    [2, false, "keyboard"]
+  ]) {
+    if (logic.newestActionMode(buttons, click) !== want)
+      throw new Error(`wrong mode for ${buttons}/${click}`)
+  }
+})
+
+test("multi-word sender names match full class suffixes", () => {
+  const l = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
+  if (!l.senderClassMatches("Telegram Desktop", "org.telegram.desktop"))
+    throw new Error("sender window was not found")
+  if (l.senderClassMatches("Telegram Desktop", "org.telegram.desktop.fake"))
+    throw new Error("unrelated window matched")
+  if (l.senderClassMatches(".*", "anything")) throw new Error("display name became a regex")
+  for (const [name, cls] of [
+    ["Slack", "slack"],
+    ["Foo.Bar", "foo.bar"],
+    ["Brave Browser", "brave-browser"]
+  ])
+    if (!l.senderClassMatches(name, cls)) throw new Error("literal class lost: " + cls)
+  if (l.senderClassMatches("Slack", "slack-other")) throw new Error("partial class matched")
+})
+
+test("sender-pid claims have bounded integer shape in snapshots and replacements", () => {
+  const assert = require("node:assert/strict")
+  const l = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
+  for (const value of [7, 2147483647])
+    assert.equal(l.snapshotOf({ hints: { "sender-pid": value } }, 1).senderPid, value)
+  for (const value of [undefined, null, true, "7", [], {}, 0, -1, 1.5, Infinity, 2147483648])
+    assert.equal(l.snapshotOf({ hints: { "sender-pid": value } }, 1).senderPid, 0)
+  const updated = l.replacementSnapshot({ id: 99, hints: { "sender-pid": 8 } }, 7, 100)
+  assert.equal(updated.senderPid, 8)
+  assert.equal(updated.originalId, 7)
+  assert.equal(updated.timestamp, 100)
+  assert.equal(l.popupRowChanged({ senderPid: 7 }, { senderPid: 8 }), true)
+})

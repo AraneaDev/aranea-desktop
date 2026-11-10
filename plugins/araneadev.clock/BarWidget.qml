@@ -2,7 +2,6 @@
 // Label formats, timezone action and Clock IPC retain their existing behavior.
 pragma ComponentBehavior: Bound
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
@@ -19,7 +18,7 @@ BarWidget {
   id: root
   moduleName: "omarchy.clock"
 
-  // The minute SystemClock below keeps current; the label and the formats
+  // The epoch-aligned WallClock below keeps current; the label and the formats
   // below read from it rather than Date.now() so every binding updates
   // together on the same tick.
   property date displayDate: clock.date
@@ -46,7 +45,7 @@ BarWidget {
   // Re-reads the clock and forwards to the open panel, if any (the IPC
   // refresh method and the periodic poll both call this).
   function refresh() {
-    displayDate = new Date()
+    clock.refresh()
     // qmllint disable missing-property
     if (panelLoader.item && panelLoader.item.refresh)
       panelLoader.item.refresh()
@@ -213,9 +212,8 @@ BarWidget {
   onBarChanged: injectPanel()
   onSettingsChanged: injectPanel()
 
-  SystemClock {
+  WallClock {
     id: clock
-    precision: SystemClock.Minutes
     onDateChanged: root.displayDate = date
   }
 
@@ -273,6 +271,7 @@ BarWidget {
 
   WidgetButton {
     id: button
+    pressFeedbackButtons: Qt.NoButton
     fontFamily: Aranea.Typography.technicalFamily
     anchors.fill: parent
     bar: root.bar

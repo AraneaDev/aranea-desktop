@@ -87,8 +87,42 @@ function isWithinQuietHours(window, date) {
   return start < end ? current >= start && current < end : current >= start || current < end
 }
 
+/**
+ * Copy bounded non-default sender actions without retaining QObject handles.
+ * The default belongs to the card click; settings is suppressed upstream.
+ * @param {*} actions - Live sender actions.
+ * @returns {Array<{identifier: string, label: string}>} Visible buttons.
+ */
+function senderActionButtons(actions) {
+  var out = []
+  for (var i = 0; actions && i < Math.min(actions.length, 16); i++) {
+    var action = actions[i]
+    if (!action) continue
+    var identifier = String(action.identifier || "")
+    if (!identifier || identifier.length > 256 || identifier === "default") continue
+    var label = String(action.text || identifier).slice(0, 256)
+    if (/^settings$/i.test(label) || /^settings$/i.test(identifier)) continue
+    out.push({ identifier: identifier, label: label })
+  }
+  return out
+}
+
+/**
+ * Choose the newest toast's shortcut behavior from meaningful choices.
+ * @param {number} buttonCount - Number of visible buttons.
+ * @param {boolean} clickable - Whether the card has a real default action.
+ * @returns {string} Dismiss, click, button or keyboard mode.
+ */
+function newestActionMode(buttonCount, clickable) {
+  if (buttonCount + (clickable ? 1 : 0) > 1) return "keyboard"
+  if (clickable) return "click"
+  return buttonCount > 0 ? "button" : "dismiss"
+}
+
 if (typeof module !== "undefined")
   module.exports = {
+    newestActionMode: newestActionMode,
+    senderActionButtons: senderActionButtons,
     clampTimestamp: clampTimestamp,
     holdPopup: holdPopup,
     popupPlacement: popupPlacement,
@@ -339,8 +373,15 @@ function execArgvFromHints(hints) {
  * @returns {?Array<string>} the argv, or null when the hint is malformed or empty
  */
 function parseExecArgv(value) {
+  if (Array.isArray(value)) {
+    try {
+      value = JSON.stringify(value)
+    } catch (e) {
+      return null
+    }
+  }
   var text = String(value || "")
-  if (!text) return null
+  if (!text || text.length > 32768) return null
 
   var parsed
   try {
@@ -349,12 +390,56 @@ function parseExecArgv(value) {
     return null
   }
 
-  if (!Array.isArray(parsed) || parsed.length === 0) return null
+  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 32) return null
   for (var i = 0; i < parsed.length; i++) {
-    if (typeof parsed[i] !== "string") return null
+    if (
+      typeof parsed[i] !== "string" ||
+      parsed[i].length > 4096 ||
+      parsed[i].indexOf("\u0000") >= 0
+    )
+      return null
   }
   if (!parsed[0] || parsed[0].charAt(0) === "-") return null
   return parsed
+}
+
+/**
+ * Validate the omarchy-actions JSON hint as one complete set of buttons.
+ * Uses the upstream bounds: three buttons, 256-character labels and the
+ * same bounded argv as the card click. No partial array can run.
+ * @param {*} value - JSON action array.
+ * @returns {?Array<{label: string, argv: Array<string>}>} Valid actions or null.
+ */
+function parseExecActions(value) {
+  var text = String(value || "")
+  if (!text || text.length > 32768) return null
+  var parsed
+  try {
+    parsed = JSON.parse(text)
+  } catch (e) {
+    return null
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 3) return null
+  var out = []
+  for (var i = 0; i < parsed.length; i++) {
+    var entry = parsed[i]
+    if (!entry || typeof entry !== "object" || typeof entry.label !== "string") return null
+    var label = entry.label.slice(0, 256)
+    var argv = parseExecArgv(entry.argv)
+    if (!label.trim() || !argv) return null
+    out.push({ label: label, argv: argv })
+  }
+  return out
+}
+
+/**
+ * Canonical validated JSON for snapshots; old or malformed entries have none.
+ * @param {*} value - JSON action array.
+ * @returns {string} Validated JSON or an empty string.
+ */
+function serializedExecActions(value) {
+  var actions = parseExecActions(value)
+  return actions ? JSON.stringify(actions) : ""
 }
 
 /**
@@ -403,6 +488,43 @@ function normalizedHints(value) {
 }
 
 /**
+ * Validates a protocol sender-pid claim; this is not OS authentication.
+ * @param {*} value - Protocol hint value.
+ * @returns {number} Positive signed 32-bit integer, or zero.
+ */
+function senderPid(value) {
+  return typeof value === "number" &&
+    isFinite(value) &&
+    Math.floor(value) === value &&
+    value > 0 &&
+    value <= 2147483647
+    ? value
+    : 0
+}
+
+/**
+ * Matches exact classes or a literal multi-word class suffix.
+ * @param {*} name - Display name.
+ * @param {*} wmClass - Observed window class.
+ * @returns {boolean} Whether the class matches without regex interpolation.
+ */
+function senderClassMatches(name, wmClass) {
+  var lower = String(wmClass || "").toLowerCase()
+  var source = String(name || "")
+    .trim()
+    .toLowerCase()
+  if (!source || !lower) return false
+  if (source === lower) return true
+  var words = source.split(/[^a-z0-9]+/).filter(function (word) {
+    return word
+  })
+  if (words.length < 2) return false
+  var tail = "." + words.join(".")
+  var dotted = "." + lower.replace(/[^a-z0-9]+/g, ".")
+  return dotted.slice(-tail.length) === tail
+}
+
+/**
  * Normalize the dynamic D-Bus notification object once, before it reaches
  * the QML model and card delegates. The protocol is intentionally dynamic;
  * the rest of the UI should not have to defend every optional field again.
@@ -445,12 +567,14 @@ function snapshotOf(notification, timestamp) {
     id: id,
     originalId: id,
     app: n.appName,
+    senderPid: senderPid(n.hints["sender-pid"]),
     appIcon: n.appIcon,
     summary: n.summary,
     body: n.body,
     image: n.image,
     glyph: glyphFromHints(n.hints),
     execArgv: execArgvFromHints(n.hints),
+    execActions: serializedExecActions(stringHint(n.hints, "omarchy-actions")),
     urgency: n.urgency,
     expireTimeout: n.expireTimeout,
     timestamp: normalizedTimestamp
@@ -460,6 +584,7 @@ function snapshotOf(notification, timestamp) {
 // Everything the popup card draws, and therefore everything an in-place
 // update has to write through to the row and its file.
 var POPUP_ROLES = [
+  "senderPid",
   "app",
   "appIcon",
   "summary",
@@ -467,6 +592,7 @@ var POPUP_ROLES = [
   "image",
   "glyph",
   "execArgv",
+  "execActions",
   "urgency",
   "expireTimeout"
 ]
@@ -561,6 +687,7 @@ function historyEntry(value, normalUrgency) {
     image: e.image || "",
     glyph: e.glyph || "",
     execArgv: e.execArgv || "",
+    execActions: serializedExecActions(e.execActions),
     urgency: typeof e.urgency === "number" ? e.urgency : normalUrgency,
     expireTimeout: 0,
     timestamp: e.timestamp || 0,
@@ -747,6 +874,7 @@ function shownImages(record, live, copied) {
 
 if (typeof module !== "undefined") {
   module.exports = {
+    newestActionMode: newestActionMode,
     holdPopup: holdPopup,
     clampTimestamp: clampTimestamp,
     shownImages: shownImages,
@@ -760,8 +888,11 @@ if (typeof module !== "undefined") {
     glyphFromHints: glyphFromHints,
     execArgvFromHints: execArgvFromHints,
     parseExecArgv: parseExecArgv,
+    parseExecActions: parseExecActions,
     shouldRenderCompactGlyph: shouldRenderCompactGlyph,
     normalizeNotification: normalizeNotification,
+    senderClassMatches: senderClassMatches,
+    senderPid: senderPid,
     snapshotOf: snapshotOf,
     popupRoles: popupRoles,
     popupRowChanged: popupRowChanged,

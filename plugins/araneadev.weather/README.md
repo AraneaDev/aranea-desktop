@@ -52,11 +52,22 @@ Added to stock, all from open-meteo on the same refresh:
 - **Pending place:** a saved or cleared place shows at once and pulses until
   `omarchy-weather-location` exits; the file is then read back.
 
-Without configured coordinates, the open-meteo and air requests use the coordinates wttr.in
-reports for the automatic place.
+Automatic location uses `https://geo.omarchy.org/` with a four-second deadline
+and a 16 KiB response limit. Valid detected names and coordinates stay in memory;
+saved names or coordinates always win and discovery never writes `weather.json`.
+Forecast requests wait for discovery, then use its coordinates, the previous
+detected place on failure, or wttr.in's IP fallback when no place is known.
+Failures retain last-good forecasts and wait for the next refresh to discover
+again. Process startup, cancellation, refresh generations and per-coordinate
+daily/air ownership prevent overlapping work.
+When a peer supplies a different detected city, adoption invalidates and cancels
+all requests for the old effective place, including pending discovery. Each
+collector and publication checks its launch epoch and effective query, so late
+responses cannot overwrite the peer's data or label old readings as the new city.
+Automatic peers still share the stable configured query rather than the detected
+coordinates.
 
-The pure rules live in `Model.js` (stock, verbatim apart from docs) and `WeatherLogic.js`
-(tested under Node).
+The pure rules live in `Model.js` and `WeatherLogic.js` (tested under Node).
 
 ## Integration
 

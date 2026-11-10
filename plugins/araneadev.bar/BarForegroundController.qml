@@ -43,6 +43,7 @@ Item {
   // Request a transparent or opaque bar; transparent applies at once, then the contrast probe refines the foreground.
   function setRequestedTransparency(value: bool): void {
     var nextTransparent = value
+    var changed = root.requestedTransparent !== nextTransparent
     root.requestedTransparent = nextTransparent
     if (!nextTransparent) {
       root.foregroundAnimationEnabled = false
@@ -56,7 +57,8 @@ Item {
     // probe is asynchronous and should only refine the foreground color; it
     // must not leave an opaque bar behind while it runs or if it is delayed.
     root.transparent = true
-    root.scheduleTransparentForegroundRefresh()
+    if (changed)
+      root.scheduleTransparentForegroundRefresh()
   }
 
   // Re-enable foreground animation two event-loop turns later, after the color jump has settled.

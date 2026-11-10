@@ -190,7 +190,7 @@ Panel {
       toggleWeekStart()
   }
 
-  // ---- Today. SystemClock keeps this honest across midnight so the
+  // ---- Today. WallClock keeps this honest across midnight so the
   //      highlight rolls over without the panel being reopened.
   property date today: new Date()
   // today's dateKey, so grid cells can mark it without comparing Date
@@ -411,7 +411,8 @@ Panel {
 
   // Re-reads today's date and snaps the grid back to it.
   function refresh() {
-    root.today = new Date()
+    clock.refresh()
+    root.today = clock.date
     root.goToToday()
   }
 
@@ -599,9 +600,8 @@ Panel {
     return call.answer
   }
 
-  SystemClock {
+  WallClock {
     id: clock
-    precision: SystemClock.Minutes
     onDateChanged: {
       if (Model.keyForDate(clock.date) === String(root.todayKey))
         return

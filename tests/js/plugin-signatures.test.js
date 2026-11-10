@@ -189,6 +189,11 @@ test("lock and lock-view QML expose their typed function signatures", () => {
   requiresSignature(lockQml, "function queueSessionLock(): void", "lock queueSessionLock")
   requiresSignature(lockQml, "function requestSessionLock(): void", "lock requestSessionLock")
   requiresSignature(lockQml, "function armBlankTimer(): void", "lock armBlankTimer")
+  requiresSignature(
+    lockQml,
+    "function armBlankTimerWithDelay(delayMs: int): void",
+    "lock armBlankTimerWithDelay"
+  )
 })
 
 test("notification QML exposes its typed function signatures", () => {

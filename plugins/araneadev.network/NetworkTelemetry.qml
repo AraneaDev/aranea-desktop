@@ -14,6 +14,9 @@ Item {
   // Retain the last good sample while a band change temporarily loses its route.
   property bool bandBusy: false
 
+  // Reachability affects presentation only, keeping probe history intact.
+  property string connectivity: "unknown"
+
   // Live connection details from `ip` / /sys / iw.
   property var info: ({})  // { iface, type, ip, prefix, gateway, speed, duplex, ssid, signal, freq, bitrate, rx_bytes, tx_bytes, router_ping_ms, internet_ping_ms }
 
@@ -49,7 +52,7 @@ Item {
   // How many of the most recent samples the rolling average is taken over.
   readonly property int pingAverageWindow: 5
   // Whether there is at least one internet ping sample to report on.
-  readonly property bool hasInternetPing: internetPingSamples.length > 0
+  readonly property bool hasInternetPing: Model.internetPingReadable(internetPingSamples, connectivity)
   // Every stat row stays mounted whether or not there is data behind it, so a
   // sample arriving late never reflows the grid. This says whether the numbers
   // are real yet or the row should read "--".

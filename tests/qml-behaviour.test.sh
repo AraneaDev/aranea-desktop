@@ -52,19 +52,26 @@ sandbox_on_exit cleanup
 # Runs one test file; prints its result and returns non-zero when it failed.
 run_test() {
   local test_file="$1" name plugin waited=0 status=0
-  local state_home="$XDG_STATE_HOME"
+  local state_home="$XDG_STATE_HOME" fixture_home="$HOME"
   name="$(basename "$test_file" .qml)"
   # Short path: the quickshell IPC socket path is limited to 108 bytes.
   run_dir="$(mktemp -d /tmp/aranea-qt.XXXXXX)"
   mkdir -p "$run_dir/cfg/plugins" "$run_dir/run"
   chmod 700 "$run_dir/run"
+  if [[ "$name" == lock-* ]]; then
+    # Lock reads HOME/.local/state directly. Keep each lock's wallpaper and
+    # state private even when an earlier desktop fixture wrote a background.
+    fixture_home="$run_dir/home"
+    state_home="$fixture_home/.local/state"
+    mkdir -p "$state_home/omarchy/current"
+  fi
   ln -s "$shell_dir/Commons" "$run_dir/cfg/Commons"
   ln -s "$shell_dir/Ui" "$run_dir/cfg/Ui"
   ln -s "$repo_root/tests/qml/lib" "$run_dir/cfg/lib"
   ln -s "$repo_root/tests/qml/fixtures" "$run_dir/cfg/fixtures"
   for plugin in "$repo_root"/plugins/araneadev.*; do
     [[ -d "$plugin" ]] || continue
-    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == network-telemetry-panel || "$name" == health-alerts || "$name" == clock-civil-dates || "$name" == worldclock-panel || ("$name" == clock-embedded-controllers || "$name" == unified-clock || "$name" == clock-production-loader) || "$name" == updates-production-host || "$name" == production-widget-panels) ]]; then
+    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == agents-provider-protocol || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == network-telemetry-panel || "$name" == weather-location || "$name" == health-alerts || "$name" == clock-civil-dates || "$name" == worldclock-panel || ("$name" == clock-embedded-controllers || "$name" == unified-clock || "$name" == clock-production-loader) || "$name" == updates-production-host || "$name" == production-widget-panels || "$name" == notification-center-keyboard) ]]; then
       # Adapt only native windows/attached layer-shell state. Placement, mask,
       # motion, coordinator, focus timer and production panel content stay real.
       mkdir -p "$run_dir/cfg/plugins/araneadev.shared"
@@ -82,6 +89,46 @@ source = source.replace('WlrLayershell.', 'nativeLayer.')
 source = re.sub(r'(?m)^(  |        )anchors \{', r'\1nativeAnchors {', source)
 pathlib.Path(sys.argv[2]).write_text(source)
 PYBOUNDARY
+    elif [[ "$plugin" == */araneadev.network && "$name" == network-telemetry-panel ]]; then
+      # Replace NetworkManager I/O only; retain production actions and telemetry.
+      mkdir -p "$run_dir/cfg/plugins/araneadev.network"
+      for source in "$plugin"/*; do
+        [[ "${source##*/}" == Panel.qml ]] && continue
+        ln -s "$source" "$run_dir/cfg/plugins/araneadev.network/${source##*/}"
+      done
+      python - "$plugin/Panel.qml" "$run_dir/cfg/plugins/araneadev.network/Panel.qml" <<'PYNETWORK'
+import pathlib, re, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+source = source.replace('import Quickshell.Networking\n', 'import Quickshell.Networking\nimport "../../fixtures/network-host" as NetworkBoundary\n')
+source = re.sub(r'\bNetworking\.', 'NetworkBoundary.Networking.', source)
+pathlib.Path(sys.argv[2]).write_text(source)
+PYNETWORK
+    elif [[ "$plugin" == */araneadev.notifications && ("$name" == notifications || "$name" == notification-inbox-focus) ]]; then
+      # Only replace native Hyprland records/dispatch; service matching,
+      # keyboard identity, activation and inbox lifecycle run unchanged.
+      mkdir -p "$run_dir/cfg/plugins/araneadev.notifications"
+      for source in "$plugin"/*; do
+        [[ "${source##*/}" == Service.qml ]] && continue
+        ln -s "$source" "$run_dir/cfg/plugins/araneadev.notifications/${source##*/}"
+      done
+      sed 's|import Quickshell.Hyprland|import "../../fixtures/notification-hyprland"|' "$plugin/Service.qml" >"$run_dir/cfg/plugins/araneadev.notifications/Service.qml"
+    elif [[ "$plugin" == */araneadev.notifications && ("$name" == notification-toasts || "$name" == notification-center-keyboard) ]]; then
+      # Only substitute native windows/attached layer state. The production
+      # output selector, focus item, cards and countdown timers remain real.
+      mkdir -p "$run_dir/cfg/plugins/araneadev.notifications"
+      for source in "$plugin"/*; do
+        [[ "${source##*/}" == Toasts.qml ]] && continue
+        ln -s "$source" "$run_dir/cfg/plugins/araneadev.notifications/${source##*/}"
+      done
+      python - "$plugin/Toasts.qml" "$run_dir/cfg/plugins/araneadev.notifications/Toasts.qml" <<'PYTOASTBOUNDARY'
+import pathlib, re, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+source = source.replace('import QtQuick\n', 'import QtQuick\nimport "../../fixtures/agent-panel-host"\n', 1)
+source = re.sub(r'\bPanelWindow\s*\{', 'NativePanelWindow {', source)
+source = source.replace('WlrLayershell.', 'nativeLayer.')
+source = re.sub(r'(?m)^      anchors \{', '      nativeAnchors {', source)
+pathlib.Path(sys.argv[2]).write_text(source)
+PYTOASTBOUNDARY
     elif [[ "$plugin" == */araneadev.clock && ("$name" == unified-clock || "$name" == clock-production-loader) ]]; then
       # Native windows ignore ancestor Item visibility; the Item boundary must too.
       mkdir -p "$run_dir/cfg/plugins/araneadev.clock"
@@ -90,6 +137,26 @@ PYBOUNDARY
         ln -s "$source" "$run_dir/cfg/plugins/araneadev.clock/${source##*/}"
       done
       sed 's/visible: false/visible: true/' "$plugin/BarWidget.qml" >"$run_dir/cfg/plugins/araneadev.clock/BarWidget.qml"
+    elif [[ "$plugin" == */araneadev.lock && ("$name" == lock-recovery || "$name" == lock-poster-pruning) ]]; then
+      # Only the native compositor/PAM boundary is replaced; keep real timers,
+      # Process/collector ownership, wallpaper selection and failure handling.
+      mkdir -p "$run_dir/cfg/plugins/araneadev.lock"
+      for source in "$plugin"/*; do
+        [[ "${source##*/}" == Service.qml ]] && continue
+        ln -s "$source" "$run_dir/cfg/plugins/araneadev.lock/${source##*/}"
+      done
+      python - "$plugin/Service.qml" "$run_dir/cfg/plugins/araneadev.lock/Service.qml" <<'PYLOCKBOUNDARY'
+import pathlib, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+source = source.replace('import QtQuick', 'import QtQuick\nimport "../../fixtures/lock-host"\nimport "../../fixtures/agent-panel-host"', 1)
+source = source.replace('WlSessionLock {', 'NativeSessionLock {')
+source = source.replace('WlSessionLockSurface {', 'Rectangle {')
+source = source.replace('PamContext {', 'NativePamContext {')
+source = source.replace('PanelWindow {', 'NativePanelWindow {')
+source = source.replace('WlrLayershell.', 'nativeLayer.')
+source = source.replace('    anchors {', '    nativeAnchors {')
+pathlib.Path(sys.argv[2]).write_text(source)
+PYLOCKBOUNDARY
     elif [[ "$plugin" == */araneadev.settings && "$name" == settings-window-geometry ]]; then
       # Keep the production window's geometry/content bindings; only replace
       # its compositor boundary with the same inert host used by panel tests.
@@ -123,7 +190,7 @@ source = source.replace('WlrLayershell.', 'nativeLayer.')
 source = source.replace('    anchors {', '    nativeAnchors {')
 pathlib.Path(sys.argv[2]).write_text(source)
 PYOSDWINDOW
-    elif [[ "$plugin" == */araneadev.bar && ("$name" == sudo-relay || "$name" == clock-aliases || "$name" == bar-foreground) ]]; then
+    elif [[ "$plugin" == */araneadev.bar && ("$name" == sudo-relay || "$name" == clock-aliases || "$name" == bar-foreground || "$name" == bar-surface-components) ]]; then
       mkdir -p "$run_dir/cfg/plugins/araneadev.bar"
       for source in "$plugin"/*; do
         [[ "${source##*/}" == Bar.qml ]] && continue
@@ -204,9 +271,15 @@ CLOCKCOMMAND
       ln -s "$run_dir/display-bin/clock-command" "$run_dir/display-bin/$display_command"
     done
   fi
+  if [[ "$name" == weather-location ]]; then
+    # Only process I/O is fake; all weather collectors and cancellation stay real.
+    for display_command in weather-fixture curl omarchy-weather-location; do
+      ln -s "$repo_root/tests/qml/fixtures/weather-command.py" "$run_dir/display-bin/$display_command"
+    done
+  fi
   if [[ "$name" == network-telemetry-panel || "$name" == network-telemetry ]]; then
     # Fake only command I/O; production telemetry and host lifecycle remain real.
-    for display_command in network-fixture omarchy-network-status omarchy-network-band omarchy-dns nmcli ip busctl; do
+    for display_command in network-fixture omarchy-network-captive-portal omarchy-network-status omarchy-network-band omarchy-dns nmcli ip busctl; do
       ln -s "$repo_root/tests/qml/fixtures/network-command.py" "$run_dir/display-bin/$display_command"
     done
   fi
@@ -244,6 +317,72 @@ IDLEACTION
       ln -s "$run_dir/display-bin/idle-action" "$run_dir/display-bin/$display_command"
     done
   fi
+  if [[ "$name" == lock-recovery ]]; then
+    # Fake only the host poster helper output and display commands; no real
+    # wallpaper, cache, brightness, PAM or session lock is touched.
+    cat >"$run_dir/display-bin/bash" <<'LOCKBASH'
+#!/usr/bin/python3
+import os, pathlib, sys, time
+args = sys.argv[1:]
+if args and args[0].endswith("/shell/plugins/lock/poster.sh"):
+    if "bad" in args[1] or ("recover" in args[1] and not pathlib.Path(os.environ["ARANEA_TEST_SANDBOX"], "poster-ready").exists()):
+        sys.exit(1)
+    if "delayed" in args[1]:
+        time.sleep(0.3)
+    print(os.environ["ARANEA_TEST_SANDBOX"] + "/poster-" + pathlib.Path(args[1]).name + ".png")
+    sys.exit(0)
+os.execv("/usr/bin/bash", ["bash", *args])
+LOCKBASH
+    cat >"$run_dir/display-bin/lock-action" <<'LOCKACTION'
+#!/usr/bin/python3
+import pathlib, sys
+if pathlib.Path(sys.argv[0]).name == "omarchy-hyprland-session-lock-stranded":
+    sys.exit(2)
+LOCKACTION
+    chmod +x "$run_dir/display-bin/bash" "$run_dir/display-bin/lock-action"
+    for display_command in omarchy-system-wake omarchy-brightness-keyboard omarchy-brightness-display omarchy-hyprland-session-lock-stranded; do
+      ln -sf "$run_dir/display-bin/lock-action" "$run_dir/display-bin/$display_command"
+    done
+    for display_command in delayed.mp4 other.webm recover.mp4; do
+      cp "$repo_root/unlock.png" "${ARANEA_TEST_SANDBOX:?}/poster-$display_command.png"
+    done
+    mkdir -p "$fixture_home/.local/state/omarchy/current"
+    touch "${ARANEA_TEST_SANDBOX:?}/recover.mp4"
+    ln -s "$ARANEA_TEST_SANDBOX/recover.mp4" "$fixture_home/.local/state/omarchy/current/background"
+  fi
+  if [[ "$name" == agents-provider-protocol ]]; then
+    if ! python3 -c 'from compression import zstd' 2>/dev/null; then
+      echo "SKIP: agents-provider-protocol requires Python with zstd for the target Codex collector"
+      [[ "$require_all" == 1 ]] && return 1
+      return 0
+    fi
+    python3 "$repo_root/tests/lib/agent-provider-fixtures.py" "${shell_dir%/shell}" "$ARANEA_TEST_SANDBOX/provider-fixtures.json"
+  fi
+  if [[ "$name" == lock-poster-pruning ]]; then
+    # Run the exact host helper, including cache pruning. Only thumbnail decoding
+    # is controlled, to order extraction B after the wallpaper changes to C.
+    cat >"$run_dir/display-bin/ffmpegthumbnailer" <<'THUMBNAIL'
+#!/usr/bin/python3
+import os, pathlib, shutil, sys, time
+args = sys.argv[1:]
+source = pathlib.Path(args[args.index("-i") + 1])
+root = pathlib.Path(os.environ["ARANEA_TEST_SANDBOX"])
+if source.name == "C.mp4":
+    (root / "failed-C").touch()
+    sys.exit(1)
+if source.name == "B.mp4":
+    (root / "started-B").touch()
+    deadline = time.monotonic() + 4
+    while not (root / "release-B").exists():
+        if time.monotonic() > deadline:
+            sys.exit(2)
+        time.sleep(0.01)
+shutil.copyfile(root / "still.png", args[args.index("-o") + 1])
+THUMBNAIL
+    chmod +x "$run_dir/display-bin/ffmpegthumbnailer"
+    cp "$repo_root/unlock.png" "$ARANEA_TEST_SANDBOX/still.png"
+    touch "$ARANEA_TEST_SANDBOX/A.mp4" "$ARANEA_TEST_SANDBOX/B.mp4" "$ARANEA_TEST_SANDBOX/C.mp4"
+  fi
   # Replace the entire native sudo helper; never execute a grant or policy command.
   mkdir -p "$run_dir/sudo-bin" "$run_dir/sudo-state"
   if [[ "$name" == sudo-widget || "$name" == sudo-relay ]]; then
@@ -259,7 +398,7 @@ IDLEACTION
   (cd "$run_dir" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
     -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE QT_QPA_PLATFORM=offscreen \
     PATH="$run_dir/sudo-bin:$run_dir/display-bin:$PATH" OMARCHY_PATH="${shell_dir%/shell}" ARANEA_SUDO_FIXTURE_ROOT="$run_dir/sudo-state" ARANEA_DISPLAY_FIXTURE_ROOT="$run_dir/display-state" \
-    ARANEA_CLOCK_TEST_PLUGIN_ROOT="$run_dir/external/plugins" XDG_RUNTIME_DIR="$run_dir/run" XDG_CACHE_HOME="$run_dir/cache" XDG_STATE_HOME="$state_home" \
+    HOME="$fixture_home" ARANEA_CLOCK_TEST_PLUGIN_ROOT="$run_dir/external/plugins" XDG_RUNTIME_DIR="$run_dir/run" XDG_CACHE_HOME="$run_dir/cache" XDG_STATE_HOME="$state_home" \
     "$quickshell_bin" -p "$run_dir/cfg") >"$run_dir/log" 2>&1 &
   qs_pid=$!
   while ((waited < timeout_s * 5)); do

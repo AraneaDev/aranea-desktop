@@ -192,7 +192,7 @@ ShellRoot {
             t.check(emo.opened && shell.ran.length === 1, "and does nothing")
 
             // ---------- No results: no outline, Enter does nothing ----------
-            type("zzqqxx")
+            type("z".repeat(1000))
             t.check(emo.displayModel.count === 0 && !emo.outlineShown, "no results shows no outline")
             shell.ran = []
             emo.handleKey(key(Qt.Key_Return))

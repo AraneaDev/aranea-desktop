@@ -66,9 +66,15 @@ Item {
   // Public contract member.
   readonly property bool showPasswordCursor: inputEnabled && !authenticatingPassword && failureMessage.length === 0
 
-  // Focuses the password input.
+  // Actual TextInput eligibility, including the temporary PAM disablement.
+  readonly property bool passwordInputEnabled: passwordInput.enabled
+  // Actual keyboard focus, used by the containing Window's deferred restoration.
+  readonly property bool passwordInputFocused: passwordInput.activeFocus
+
+  // Focuses only an enabled password input; preview and PAM must not steal focus.
   function forcePasswordFocus() {
-    passwordInput.forceActiveFocus()
+    if (passwordInput.enabled && !passwordInput.activeFocus)
+      passwordInput.forceActiveFocus()
   }
 
   // Synchronizes the input with the service-owned password value.
@@ -81,6 +87,10 @@ Item {
   }
 
   onPasswordTextChanged: syncPasswordText()
+  onPasswordInputEnabledChanged: {
+    if (passwordInputEnabled)
+      Qt.callLater(forcePasswordFocus)
+  }
 
   TextMetrics {
     id: dotMetrics

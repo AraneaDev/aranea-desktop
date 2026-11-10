@@ -105,7 +105,7 @@ Item {
     watchChanges: true
     printErrors: false
     onLoaded: {
-      sources.defaultMenuItems = MenuModel.parseMenuJsonc(text())
+      sources.defaultMenuItems = MenuModel.keepMenuRows(sources.defaultMenuItems, text(), true)
       sources.defaultMenuSeen = true
       sources.updated()
     }
@@ -122,7 +122,7 @@ Item {
     watchChanges: true
     printErrors: false
     onLoaded: {
-      sources.userMenuItems = MenuModel.parseMenuJsonc(text())
+      sources.userMenuItems = MenuModel.keepMenuRows(sources.userMenuItems, text(), false)
       sources.userMenuSeen = true
       sources.updated()
     }

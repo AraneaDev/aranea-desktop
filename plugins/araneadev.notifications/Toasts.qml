@@ -2,14 +2,17 @@
 // Quickshell.screens) holding the stacked toast cards. Service.qml creates
 // it with itself as `root` unless windowEnabled is off (tests).
 //
-// Layer is Overlay, exclusionMode Ignore, no keyboard focus: popups are
-// passive surfaces and must never steal input from the focused application.
+// Passive until an explicit notification shortcut requests keyboard control.
+// One output then owns focus until Escape, an action, removal or teardown.
+
+pragma ComponentBehavior: Bound
 
 import QtQuick
 import "../araneadev.shared" as Aranea
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import qs.Commons
 
 import "components"
@@ -21,18 +24,69 @@ Scope {
   // The notification service (Service.qml): popup model, timing and actions.
   required property var root
 
+  // Native output boundary. Ownership stays on the chosen output for the
+  // session, even if another application changes the focused monitor.
+  property var outputScreens: Quickshell.screens
+  // Output currently focused by Hyprland, used only when acquiring ownership.
+  property string focusedOutputName: Hyprland.focusedMonitor ? String(Hyprland.focusedMonitor.name) : ""
+  // Chosen output retains keyboard ownership for the complete session.
+  property string keyboardOutputName: ""
+  // Instantiated native surfaces are the candidates for keyboard ownership.
+  readonly property var surfaces: outputVariants.instances
+
+  // Choose one existing focused output, falling back to the first output.
+  function acquireKeyboard(): void {
+    keyboardOutputName = ""
+    if (!root.keyboardMode)
+      return
+    if (!surfaces.length) {
+      root.stopKeyboard()
+      return
+    }
+    let selected = surfaces[0].screen
+    for (let i = 0; i < surfaces.length; i++) {
+      if (String(surfaces[i].screen.name) === focusedOutputName) {
+        selected = surfaces[i].screen
+        break
+      }
+    }
+    keyboardOutputName = String(selected.name)
+  }
+
+  onOutputScreensChanged: {
+    if (root.keyboardMode && keyboardOutputName) {
+      let present = false
+      for (let i = 0; i < outputScreens.length; i++)
+        present = present || String(outputScreens[i].name) === keyboardOutputName
+      if (!present)
+        root.stopKeyboard()
+    }
+  }
+  Connections {
+    target: toasts.root
+    function onKeyboardModeChanged() {
+      toasts.acquireKeyboard()
+    }
+  }
+  Component.onCompleted: acquireKeyboard()
+  Component.onDestruction: root.stopKeyboard()
+
   Variants {
-    model: Quickshell.screens
+    id: outputVariants
+    objectName: "notificationToastOutputs"
+    model: toasts.outputScreens
 
     PanelWindow {
       id: popupWindow
+      objectName: "notificationToastWindow"
       required property var modelData
       screen: modelData
       visible: toasts.root.popupModel.count > 0
 
       WlrLayershell.namespace: "omarchy-notifications"
       WlrLayershell.layer: WlrLayer.Overlay
-      WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+      readonly property bool takesKeyboard: toasts.root.keyboardMode && toasts.keyboardOutputName === String(modelData.name)
+      WlrLayershell.keyboardFocus: takesKeyboard ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
       exclusionMode: ExclusionMode.Ignore
       color: "transparent"
 
@@ -55,6 +109,17 @@ Scope {
         item: popupColumn
       }
 
+      Item {
+        id: keyCatcher
+        objectName: "notificationToastKeys"
+        focus: popupWindow.takesKeyboard
+        onFocusChanged: if (focus)
+          forceActiveFocus()
+        Keys.onPressed: function (event) {
+          event.accepted = toasts.root.keyboardPressed(event.key, event.text)
+        }
+      }
+
       ColumnLayout {
         id: popupColumn
         anchors.right: parent.right
@@ -71,6 +136,7 @@ Scope {
           // also reuses.
           delegate: Item {
             id: cardSlot
+            objectName: "notificationToastSlot"
             required property int index
             required property string app
             required property string appIcon
@@ -78,12 +144,20 @@ Scope {
             required property string body
             required property string image
             required property string glyph
+            required property string execActions
             required property int urgency
             required property double expireTimeout
             required property double timestamp
             required property int originalId
             // The notification service, read once so the delegate's calls stay short.
             readonly property var svc: toasts.root
+            // Hint updates and sender lifetime both invalidate an old press.
+            readonly property var actionView: ({
+                hint: cardSlot.execActions,
+                revision: cardSlot.svc.actionsRevision,
+                buttons: cardSlot.svc.actionsFor(cardSlot.originalId),
+                clickable: cardSlot.svc.popupHasMeaningfulClick(cardSlot.originalId)
+              })
 
             // Each card sizes itself based on mode (text vs media); the slot
             // tracks the card so the column auto-fits to whichever is widest.
@@ -147,11 +221,19 @@ Scope {
               cornerRadius: cardSlot.svc.cornerRadius
               fontFamily: Aranea.Typography.uiFamily
               glyph: cardSlot.glyph
+              actions: cardSlot.actionView.buttons
+              keyboardChoices: cardSlot.svc.keyboardMode && cardSlot.svc.keyboardOriginalId === cardSlot.originalId
+              keyboardClick: cardSlot.actionView.clickable
+              keyboardChoice: cardSlot.svc.keyboardChoice
+              hasCursor: keyboardChoices
 
               motionEnabled: cardSlot.svc.motionEnabled
 
               onCloseRequested: cardSlot.svc.dismissPopup(cardSlot.index)
               onSwipeDismissed: cardSlot.svc.dismissPopup(cardSlot.index)
+              onActionRequested: function (actionIndex) {
+                cardSlot.svc.invokePopupAction(cardSlot.originalId, actionIndex)
+              }
               onCardClicked: cardSlot.svc.invokePopupDefault(cardSlot.index)
             }
           }

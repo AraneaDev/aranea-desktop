@@ -1,5 +1,6 @@
 // Real default Clock loader, hosted dropdowns and own-entry settings transport.
 import QtQuick
+import QtTest
 import Quickshell
 import Quickshell.Io
 import "lib"
@@ -20,6 +21,12 @@ ShellRoot {
   QmlTest {
     id: t
   }
+  TestCase {
+    id: pointer
+    when: false
+  }
+  // Commands invoked by the real clock middle-click handler.
+  property var barCommands: []
   FileView {
     id: calls
     path: Quickshell.env("ARANEA_TEST_SANDBOX") + "/clock-calls.log"
@@ -46,6 +53,9 @@ ShellRoot {
         fixture.writtenId = id
         fixture.written = entry
       }
+    }
+    function run(command) {
+      fixture.barCommands = fixture.barCommands.concat([command])
     }
     function requestPopout(owner) {
       activePopout = owner
@@ -94,12 +104,65 @@ ShellRoot {
     }
     Clock.BarWidget {
       id: peer
+      x: 300
       moduleName: "araneadev.clock"
       bar: bar
       settings: clock.settings
     }
   }
+  // Hold actual pointer presses through the host WidgetButton animation and
+  // inspect the painted Text's transformed bounds, then its real actions.
+  function checkClockPresses() {
+    var button = t.childrenOf(clock).filter(function (child) {
+      return child.heldButtons !== undefined
+    })[0]
+    var label = t.childrenOf(button).filter(function (child) {
+      return child.text === clock.displayText && child.font !== undefined
+    })[0]
+    t.check(label && label.visible && label.paintedWidth > 0, "clock has an actual painted label")
+    var originalSettings = clock.settings
+    var buttons = [Qt.LeftButton, Qt.RightButton, Qt.MiddleButton]
+    for (var i = 0; i < buttons.length; i++) {
+      clock.close()
+      pointer.wait(220)
+      var before = label.mapToItem(clock, 0, 0, label.width, label.height)
+      pointer.mousePress(button, button.width / 2, button.height / 2, buttons[i])
+      pointer.wait(220)
+      t.equal(label.scale, 1, "held clock label keeps its painted scale for button " + buttons[i])
+      var after = label.mapToItem(clock, 0, 0, label.width, label.height)
+      t.equal([after.x, after.y, after.width, after.height], [before.x, before.y, before.width, before.height], "held clock label keeps transformed geometry for button " + buttons[i])
+      pointer.mouseRelease(button, button.width / 2, button.height / 2, buttons[i])
+      pointer.wait(30)
+      if (buttons[i] === Qt.LeftButton) {
+        t.check(clock.opened && bar.activePopout === clock, "real left click opens the shared popup")
+        pointer.mouseClick(button, button.width / 2, button.height / 2, Qt.LeftButton)
+        t.check(!clock.opened, "second real left click closes the shared popup")
+      } else if (buttons[i] === Qt.RightButton) {
+        t.equal(clock.configuredFormat, "h:mm AP", "real right click advances the configured format ring")
+        t.equal(fixture.written.format, clock.configuredFormat, "format click persists through the actual shell boundary")
+        clock.settings = originalSettings
+      } else {
+        t.equal(fixture.barCommands, ["omarchy-menu-timezone"], "real middle click invokes timezone picker once")
+      }
+      // The bar drag owner can hold a button without delivering MouseArea input.
+      button.heldButtons = buttons[i]
+      pointer.wait(220)
+      t.equal(label.scale, 1, "bar-owned held press leaves the actual label still for button " + buttons[i])
+      button.heldButtons = Qt.NoButton
+    }
+    clock.close()
+    fixture.written = null
+    fixture.writtenId = ""
+  }
   Component.onCompleted: t.step(1800, function () {
+    var minuteClock = t.childrenOf(clock).filter(function (child) {
+      return child.step === 60000
+    })[0]
+    t.check(!!minuteClock, "bar uses the epoch-aligned minute clock")
+    minuteClock.date = new Date(2026, 9, 25, 2, 59)
+    t.equal(clock.displayText, "02:59", "minute clock keeps the configured bar format")
+    clock.refresh()
+    t.check(Math.abs(clock.displayDate.getTime() - Date.now()) < 1000, "explicit bar refresh restores the current epoch")
     var p = clock.clockPanel
     t.check(p !== null, "default production panel loads")
     t.check(p && typeof p.openSection === "function", "default panel exposes unified sections")
@@ -331,6 +394,7 @@ ShellRoot {
                     t.check(!p.selectPage("weather") && p.calendarActive, "unavailable optional page preserves Calendar")
                     clock.close()
                     peer.close()
+                    checkClockPresses()
                     t.done()
                   })
                 })

@@ -155,8 +155,8 @@ Panel {
       if (locationProc.running)
         requests.push({
           process: locationProc,
-          dataKey: "wttrLocation",
-          data: root.wttrLocation
+          dataKey: "detectedLocationState",
+          data: root.detectedLocationState
         })
       root.canceledWeatherRequests = {
         query: root.locationQuery,
@@ -181,6 +181,7 @@ Panel {
     geocodeProc.running = false
     root.awaitingPeer = false
     root.fetchClaimMs = 0
+    root.refreshStarting = false
     root.disarmPointer()
   }
 
@@ -268,15 +269,39 @@ Panel {
       latitude: null,
       longitude: null
     })
+  // Network discovery is ephemeral and never persisted to weather.json.
+  property var detectedLocationState: ({
+      name: "",
+      latitude: null,
+      longitude: null
+    })
+  // Explicit saved names or coordinates always take precedence.
+  readonly property bool autoLocation: Model.isAutoLocation(configuredLocationState)
+  // Effective request location, independent of saved settings.
+  readonly property var locationState: Model.effectiveLocation(configuredLocationState, detectedLocationState)
+  // The configured query owns cancellation even while detection changes place.
+  readonly property string configuredLocationQuery: Model.wttrLocationQuery(configuredLocationState.name, configuredLocationState.latitude, configuredLocationState.longitude)
+  // A saved-location change waits until every canceled process has settled.
+  property bool configuredRefreshPending: false
+  // Request ownership epoch; saved changes and adopted effective places invalidate it.
+  property int locationGeneration: 0
+  // Whether the bounded automatic lookup is still resolving.
+  readonly property bool detectingLocation: locationProc.running
   // The configured place name, "" for IP auto-detect.
   readonly property string configuredLocation: configuredLocationState.name
   // The wttr.in path segment for the configured location.
-  readonly property string locationQuery: Model.wttrLocationQuery(configuredLocationState.name, configuredLocationState.latitude, configuredLocationState.longitude)
+  readonly property string locationQuery: Model.wttrLocationQuery(locationState.name, locationState.latitude, locationState.longitude)
 
   // Keep the previous report visible while the new location loads. The
   // place label pulses while the new place saves, so stale data is never
   // presented under the newly configured location label for long.
-  onLocationQueryChanged: {
+  onConfiguredLocationQueryChanged: {
+    root.configuredRefreshPending = true
+    root.refreshStarting = false
+    root.locationGeneration++
+    locationProc.running = false
+    forecastRetryTimer.stop()
+    dailyForecastRetryTimer.stop()
     if (savingLocation)
       savingLocationQueryStarted = true
     forecastRetries = 0
@@ -293,7 +318,7 @@ Panel {
     autoCoords = null
     forecast = null
     air = null
-    Qt.callLater(root.autoRefresh)
+    Qt.callLater(root.resumeConfiguredRefresh)
   }
 
   // Watches weather.json so a hand edit (or omarchy-weather-location run
@@ -375,7 +400,7 @@ Panel {
 
   // The place name shown in the hero row: configured, else wttr's detected
   // area, else wttr's resolved area name.
-  readonly property string reportLocation: configuredLocation || wttrLocation || (areaInfo && areaInfo.areaName && areaInfo.areaName[0] ? areaInfo.areaName[0].value : "")
+  readonly property string reportLocation: configuredLocation || (autoLocation ? detectedLocationState.name : "") || wttrLocation || (areaInfo && areaInfo.areaName && areaInfo.areaName[0] ? areaInfo.areaName[0].value : "")
   // The hero temperature's bare number, in the active unit.
   readonly property string reportTempNum: current ? String(useImperial ? current.temp_F : current.temp_C) : ""
   // The WIND stat, formatted with its unit.
@@ -417,6 +442,8 @@ Panel {
   property real fetchClaimMs: 0
   // How many times an automatic refresh deferred for the bar to be injected.
   property int readyDefers: 0
+  // Covers the asynchronous gap before a claimed Process reports running.
+  property bool refreshStarting: false
   // Counts refreshes, so the open-meteo and air requests go out once per
   // refresh even when automatic mode asks twice (before and after wttr).
   property int refreshCycle: 0
@@ -427,7 +454,9 @@ Panel {
   // The refresh and coordinates the last air request went out for.
   property string airKey: ""
   // True while any of this instance's weather requests is running.
-  readonly property bool fetchInFlight: forecastProc.running || dailyForecastProc.running || airProc.running
+  readonly property bool fetchInFlight: locationProc.running || forecastProc.running || dailyForecastProc.running || airProc.running
+  onFetchInFlightChanged: if (!root.fetchInFlight && root.configuredRefreshPending)
+    Qt.callLater(root.resumeConfiguredRefresh)
   // A clock for the location-time readings (rain soon, the trend, the
   // trace): set on open, on new data and each minute while open.
   property real nowMs: Date.now()
@@ -530,23 +559,47 @@ Panel {
   function refresh() {
     if (root.embedded && !root.sectionActive)
       return
+    // A manual refresh shares the same ownership as the periodic one.
+    if (root.refreshStarting || root.fetchInFlight)
+      return
     awaitingPeer = false
     peerWaitTimer.stop()
+    readyTimer.stop()
+    forecastRetryTimer.stop()
+    dailyForecastRetryTimer.stop()
+    root.configuredRefreshPending = false
+    root.refreshStarting = true
     root.fetchClaimMs = Date.now()
     root.refreshCycle++
-    // Each full refresh cycle gets a fresh retry budget, so an earlier
-    // exhausted round (e.g. waking with the network still down) doesn't
-    // starve retries for the rest of the session.
     forecastRetries = 0
     dailyForecastRetries = 0
-    if (!forecastProc.running)
-      forecastProc.running = true
-    if (root.locationQuery === "" && !locationProc.running)
+    if (root.autoLocation) {
+      locationProc.requestGeneration = root.locationGeneration
+      locationProc.requestLocationQuery = root.locationQuery
       locationProc.running = true
-    // With stored coordinates this fetches open-meteo right away - no need
-    // to wait for the slow wttr response. Without them it uses the last
-    // coordinates wttr reported, if any.
+      return
+    }
+    root.startForecastRequests()
+  }
+
+  // Continue the same refresh after discovery, including its failure fallback.
+  function startForecastRequests() {
+    if (root.embedded && !root.sectionActive)
+      return
+    if (!forecastProc.running) {
+      root.refreshStarting = true
+      forecastProc.requestGeneration = root.locationGeneration
+      forecastProc.requestLocationQuery = root.locationQuery
+      forecastProc.running = true
+    }
     refreshDailyForecast(null)
+  }
+
+  // Resume a saved-location refresh after the final canceled process exits.
+  function resumeConfiguredRefresh() {
+    if (!root.configuredRefreshPending || root.fetchInFlight || root.refreshStarting)
+      return
+    root.autoRefresh()
   }
 
   // An automatic refresh (the timer, an open, a location change): adopts a
@@ -558,17 +611,20 @@ Panel {
   function autoRefresh() {
     if (root.embedded && !root.sectionActive)
       return
+    // A delayed host-ready callback cannot queue another discovery cycle.
+    if (root.isFetching())
+      return
     var hosts = root.instancePanels()
     var bundles = []
     var peerFetching = false
     for (let i = 0; i < hosts.length; i++) {
       let p = hosts[i]
       bundles.push(p.sharedWeather)
-      if (p !== root && p.locationQuery === root.locationQuery && typeof p.isFetching === "function" && p.isFetching())
+      if (p !== root && p.configuredLocationQuery === root.configuredLocationQuery && typeof p.isFetching === "function" && p.isFetching())
         peerFetching = true
     }
     var freshMinutes = Math.max(root.refreshMinutes / 2, root.refreshMinutes - 1)
-    var fresh = WeatherLogic.sharedBundle(bundles, root.locationQuery, Date.now(), freshMinutes)
+    var fresh = WeatherLogic.sharedBundle(bundles, root.configuredLocationQuery, Date.now(), freshMinutes)
     var plan = WeatherLogic.refreshPlan({
       ready: !!root.bar || root.readyDefers >= 6,
       selfFetching: root.isFetching(),
@@ -591,7 +647,7 @@ Panel {
   // Whether this instance is fetching, or has just claimed a fetch whose
   // processes have not reported running yet.
   function isFetching() {
-    return root.fetchInFlight || Date.now() - root.fetchClaimMs < 2000
+    return root.refreshStarting || root.fetchInFlight || Date.now() - root.fetchClaimMs < 2000
   }
 
   // Every instance's loaded panel, this one included, through the bar's
@@ -615,14 +671,18 @@ Panel {
   // Publishes this instance's report after one of its own responses landed,
   // and hands it to the other instances (offerShared). PRIMARY (the
   // response that makes a refresh, see fetchedAtMs) also stamps the
-  // fetch time.
-  function publishShared(primary) {
+  // fetch time. Collector publications must carry their captured launch epoch
+  // and effective query; explicit snapshot callers may omit those arguments.
+  function publishShared(primary, generation, effectiveQuery) {
+    if (generation !== undefined && !root.requestIsCurrent(generation, effectiveQuery))
+      return
     root.publishedAtMs = Date.now()
     if (primary === true)
       root.fetchedAtMs = root.publishedAtMs
     root.nowMs = root.publishedAtMs
     root.sharedWeather = {
-      locationQuery: root.locationQuery,
+      locationQuery: root.configuredLocationQuery,
+      effectiveLocationQuery: root.locationQuery,
       fetchedAtMs: root.fetchedAtMs,
       publishedAtMs: root.publishedAtMs,
       report: root.report,
@@ -631,6 +691,7 @@ Panel {
       air: root.air,
       autoCoords: root.autoCoords,
       wttrLocation: root.wttrLocation,
+      detectedLocationState: root.detectedLocationState,
       label: root.label
     }
     var hosts = root.instancePanels()
@@ -642,7 +703,7 @@ Panel {
   // Takes another instance's freshly published BUNDLE when it is for this
   // instance's location and newer than what this one shows.
   function offerShared(bundle) {
-    if (bundle && bundle.locationQuery === root.locationQuery && bundle.publishedAtMs > root.publishedAtMs)
+    if (bundle && bundle.locationQuery === root.configuredLocationQuery && bundle.publishedAtMs > root.publishedAtMs)
       root.adoptShared(bundle)
   }
 
@@ -654,11 +715,19 @@ Panel {
     peerWaitTimer.stop()
     if (!bundle || !(bundle.publishedAtMs > root.publishedAtMs))
       return
+    var detected = root.autoLocation && bundle.detectedLocationState ? bundle.detectedLocationState : root.detectedLocationState
+    var nextLocation = Model.effectiveLocation(root.configuredLocationState, detected)
+    var nextQuery = Model.wttrLocationQuery(nextLocation.name, nextLocation.latitude, nextLocation.longitude)
+    if (nextQuery !== root.locationQuery)
+      root.supersedeWeatherRequests()
+    root.configuredRefreshPending = false
     root.report = bundle.report || root.report
     root.dailyForecastReport = bundle.daily || root.dailyForecastReport
     root.forecast = bundle.forecast || root.forecast
     root.air = bundle.air || null
     root.autoCoords = bundle.autoCoords || root.autoCoords
+    if (root.autoLocation && bundle.detectedLocationState)
+      root.detectedLocationState = bundle.detectedLocationState
     if (bundle.wttrLocation)
       root.wttrLocation = bundle.wttrLocation
     root.label = bundle.label || root.label
@@ -666,6 +735,27 @@ Panel {
     root.publishedAtMs = bundle.publishedAtMs
     root.nowMs = Date.now()
     root.finishSavingLocation()
+  }
+
+  // Only the launch epoch and effective place may mutate or publish a response.
+  function requestIsCurrent(generation, effectiveQuery) {
+    return generation === root.locationGeneration && effectiveQuery === root.locationQuery && (!root.embedded || root.sectionActive)
+  }
+
+  // Peer adoption replaces the old effective owner; canceled work must settle first.
+  function supersedeWeatherRequests() {
+    root.locationGeneration++
+    root.configuredRefreshPending = false
+    root.canceledWeatherRequests = null
+    root.refreshStarting = false
+    root.fetchClaimMs = 0
+    forecastRetryTimer.stop()
+    dailyForecastRetryTimer.stop()
+    readyTimer.stop()
+    forecastProc.running = false
+    dailyForecastProc.running = false
+    airProc.running = false
+    locationProc.running = false
   }
 
   // Fetches open-meteo's forecast (with the extras) and the air reading for
@@ -677,8 +767,8 @@ Panel {
       return
     if (dailyForecastProc.running)
       return
-    var lat = parseFloat(String(root.configuredLocationState.latitude))
-    var lon = parseFloat(String(root.configuredLocationState.longitude))
+    var lat = parseFloat(String(root.locationState.latitude))
+    var lon = parseFloat(String(root.locationState.longitude))
     if (isNaN(lat) || isNaN(lon)) {
       let coords = sourceCoords || root.autoCoords
       if (!coords)
@@ -692,10 +782,14 @@ Panel {
     if (key === root.forecastDoneKey)
       return
     root.dailyForecastKey = key
+    dailyForecastProc.requestGeneration = root.locationGeneration
+    dailyForecastProc.requestLocationQuery = root.locationQuery
     dailyForecastProc.command = ["curl", "-fsS", "--max-time", "5", WeatherLogic.buildForecastUrl(lat, lon)]
     dailyForecastProc.running = true
     if (key !== root.airKey && !airProc.running) {
       root.airKey = key
+      airProc.requestGeneration = root.locationGeneration
+      airProc.requestLocationQuery = root.locationQuery
       airProc.command = ["curl", "-fsS", "--max-time", "5", WeatherLogic.buildAirUrl(lat, lon)]
       airProc.running = true
     }
@@ -1011,11 +1105,19 @@ Panel {
 
   Process {
     id: forecastProc
+    // Ownership epoch captured when this effective-location request starts.
+    property int requestGeneration: -1
+    // Effective place that launched this request, independent of the shared key.
+    property string requestLocationQuery: ""
+    onRunningChanged: if (running)
+      root.refreshStarting = false
     command: ["curl", "-fsS", "--max-time", "10", "https://wttr.in/" + root.locationQuery + "?format=j1"]
     stdout: StdioCollector {
       id: forecastOut
       waitForEnd: true
       onStreamFinished: {
+        if (!root.requestIsCurrent(forecastProc.requestGeneration, forecastProc.requestLocationQuery))
+          return
         var raw = String(forecastOut.text || "").trim()
         if (!raw) {
           root.scheduleForecastRetry()
@@ -1030,7 +1132,7 @@ Panel {
           let coords = WeatherLogic.wttrCoords(raw)
           if (coords)
             root.autoCoords = coords
-          root.publishShared(Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "wttr"))
+          root.publishShared(Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "wttr"), forecastProc.requestGeneration, forecastProc.requestLocationQuery)
           if (Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "wttr"))
             root.finishSavingLocation()
           // Stored coordinates already drove the fast open-meteo fetch from
@@ -1083,10 +1185,16 @@ Panel {
 
   Process {
     id: dailyForecastProc
+    // Ownership epoch captured when this effective-location request starts.
+    property int requestGeneration: -1
+    // Effective place that launched this request, independent of the shared key.
+    property string requestLocationQuery: ""
     stdout: StdioCollector {
       id: dailyForecastOut
       waitForEnd: true
       onStreamFinished: {
+        if (!root.requestIsCurrent(dailyForecastProc.requestGeneration, dailyForecastProc.requestLocationQuery))
+          return
         var raw = String(dailyForecastOut.text || "").trim()
         if (!raw) {
           root.scheduleDailyForecastRetry()
@@ -1100,7 +1208,7 @@ Panel {
           root.label = Model.currentIcon(parsedCurrent, root.label)
           root.dailyForecastRetries = 0
           root.forecastDoneKey = root.dailyForecastKey
-          root.publishShared(Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "open-meteo"))
+          root.publishShared(Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "open-meteo"), dailyForecastProc.requestGeneration, dailyForecastProc.requestLocationQuery)
           if (Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "open-meteo"))
             root.finishSavingLocation()
         } catch (e) {
@@ -1115,14 +1223,20 @@ Panel {
   // failure hides the chips (no retry; the next refresh asks again).
   Process {
     id: airProc
+    // Ownership epoch captured when this effective-location request starts.
+    property int requestGeneration: -1
+    // Effective place that launched this request, independent of the shared key.
+    property string requestLocationQuery: ""
     stdout: StdioCollector {
       id: airOut
       waitForEnd: true
       onStreamFinished: {
+        if (!root.requestIsCurrent(airProc.requestGeneration, airProc.requestLocationQuery))
+          return
         root.air = WeatherLogic.parseAir(String(airOut.text || ""))
         // Published either way, so the other instances drop a stale
         // reading when this request failed.
-        root.publishShared(false)
+        root.publishShared(false, airProc.requestGeneration, airProc.requestLocationQuery)
       }
     }
   }
@@ -1156,17 +1270,32 @@ Panel {
 
   Process {
     id: locationProc
-    command: ["curl", "-fsS", "--max-time", "4", "https://wttr.in/?format=%l"]
+    onRunningChanged: if (running)
+      root.refreshStarting = false
+    // Generation is captured before spawning, preserving cancellation ownership.
+    property int requestGeneration: -1
+    // Effective place that launched this request, independent of the shared key.
+    property string requestLocationQuery: ""
+    command: ["curl", "-fsS", "--max-time", "4", "--max-filesize", "16384", "https://geo.omarchy.org/"]
     stdout: StdioCollector {
       id: locationOut
       waitForEnd: true
-      onStreamFinished: {
-        var raw = String(locationOut.text || "").trim()
-        if (!raw)
-          return
-        root.wttrLocation = raw.split(",")[0]
-        root.publishShared(false)
+    }
+    onExited: function (exitCode) {
+      if (!root.autoLocation || !root.requestIsCurrent(locationProc.requestGeneration, locationProc.requestLocationQuery)) {
+        // Cancellation may still report running when the configuration changes.
+        Qt.callLater(root.resumeConfiguredRefresh)
+        return
       }
+      if (root.embedded && !root.sectionActive)
+        return
+      var raw = exitCode === 0 ? String(locationOut.text || "").trim() : ""
+      var detected = Model.parseLocationFile(raw.length <= 16384 ? raw : "")
+      if (Model.wttrLocationQuery(detected.name, detected.latitude, detected.longitude) !== "")
+        root.detectedLocationState = detected
+      // Failure keeps the previous detected place, or uses wttr's IP lookup.
+      // Continue once; the periodic refresh owns future discovery attempts.
+      root.startForecastRequests()
     }
   }
 

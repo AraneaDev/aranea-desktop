@@ -1,0 +1,2 @@
+module BarHost
+singleton Hyprland 1.0 Hyprland.qml

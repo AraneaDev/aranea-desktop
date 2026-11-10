@@ -875,6 +875,26 @@ Panel {
     return AgentsLogic.updatedCaption(heroMeta(p), updatedMsFor(p))
   }
 
+  // Explain failed checks beside retained numbers, even when the collector
+  // leaves status empty. Registered accounts keep their own stale identity.
+  function usageNote(p) {
+    if (!p)
+      return ""
+    var notes = []
+    var accounts = p.accounts || []
+    var source = accounts.length > 0 ? accounts : [p]
+    for (let i = 0; i < source.length; i++) {
+      let entry = source[i] || {}
+      let status = String(entry.usageStatusText || "")
+      let help = String(entry.authHelpText || "")
+      if (status === "" && !((entry.limitsStale === true || entry.stale === true) && help !== ""))
+        continue
+      let label = accounts.length > 0 ? String(entry.label || entry.id || "Account") + ": " : ""
+      notes.push(label + (help || status))
+    }
+    return notes.join("\n")
+  }
+
   // Everything the Aranea view draws (AgentsDropdown.view).
   readonly property var agentsView: ({
       hero: {
@@ -882,7 +902,7 @@ Panel {
         glyph: String.fromCodePoint(0xF16A3),
         title: provider ? provider.providerName : "",
         caption: heroCaption(provider),
-        problem: provider && String(provider.usageStatusText || "") !== "" ? String(provider.authHelpText || "") : ""
+        problem: usageNote(provider)
       },
       refresh: {
         busy: !!refreshPending.busy

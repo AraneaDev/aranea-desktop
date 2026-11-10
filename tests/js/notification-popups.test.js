@@ -101,3 +101,78 @@ test("toasts sit top-right, clearing the bar only on its own edge", () => {
     right: 0
   })
 })
+
+test("action hints are validated and refreshed without changing popup identity", () => {
+  const hint =
+    '[{"label":"Open","argv":["xdg-open","/tmp/a b.mp4"]},{"label":"Omacut","argv":["omarchy-launch-omacut","/tmp/a b.mp4"]}]'
+  const row = n.snapshotOf({ id: 3, hints: { "omarchy-actions": hint } }, 10)
+  assert.equal(row.execActions, hint)
+  const next = n.replacementSnapshot({ id: 99, hints: { "omarchy-actions": "invalid" } }, 3, 10)
+  assert.equal(next.execActions, "")
+  assert.equal(next.originalId, 3)
+  assert.equal(next.timestamp, 10)
+  assert.equal(n.popupRowChanged(row, Object.assign({}, row, { execActions: "" })), true)
+})
+
+for (const module of ["NotificationPresentation", "NotificationLogic"]) {
+  test(`${module}: sender buttons exclude default/settings and bound sender data`, () => {
+    const p = loadPragma(`plugins/araneadev.notifications/${module}.js`)
+    const actions = [
+      null,
+      { identifier: "default", text: "Default" },
+      { identifier: "open", text: "Open" },
+      { identifier: "settings", text: "Preferences" },
+      { identifier: "prefs", text: "sEtTiNgS" },
+      { identifier: "SETTINGS", text: "Preferences" },
+      { identifier: "cut", text: "Omacut" },
+      { identifier: "", text: "Empty" },
+      { identifier: "x".repeat(257), text: "Too long" },
+      { identifier: "fallback" }
+    ]
+    assert.deepEqual(JSON.parse(JSON.stringify(p.senderActionButtons(actions))), [
+      { identifier: "open", label: "Open" },
+      { identifier: "cut", label: "Omacut" },
+      { identifier: "fallback", label: "fallback" }
+    ])
+    assert.equal(
+      p.senderActionButtons([{ identifier: "x", text: "a".repeat(257) }])[0].label.length,
+      256
+    )
+    assert.equal(p.senderActionButtons(Array(17).fill({ identifier: "x" })).length, 16)
+    assert.equal(p.senderActionButtons(null).length, 0)
+  })
+}
+
+test("popup restore keeps generations sharing an id and skips torn writes", () => {
+  const rows = n.parsePopupFiles(
+    '\n{"originalId":7,"timestamp":10,"summary":"Older"}\n' +
+      '{"originalId":7,"timestamp":30,"summary":"Newest"}\n' +
+      '{"originalId":8,"timestamp":20,"summary":"Middle"}\n' +
+      '{"originalId":9,\nnull\n42\n',
+    1
+  )
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(rows.map((row) => [row.originalId, row.timestamp, row.summary]))),
+    [
+      [7, 30, "Newest"],
+      [8, 20, "Middle"],
+      [7, 10, "Older"]
+    ]
+  )
+  assert.equal(n.parsePopupFiles(null, 1).length, 0)
+})
+
+test("malformed sender values fail closed without discarding other hints", () => {
+  const hints = {
+    "omarchy-glyph": "ready",
+    get "omarchy-exec-argv"() {
+      throw new Error("sender disconnected")
+    }
+  }
+  assert.equal(n.execArgvFromHints(hints), "")
+  assert.equal(n.glyphFromHints(hints), "ready")
+  const circularArgv = ["open"]
+  circularArgv.push(circularArgv)
+  assert.equal(n.parseExecArgv(circularArgv), null)
+  assert.equal(n.localImageFile("file:///tmp/broken%zz.png"), "/tmp/broken%zz.png")
+})

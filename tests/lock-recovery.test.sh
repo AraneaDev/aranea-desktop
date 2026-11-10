@@ -11,3 +11,7 @@ grep -Fq 'omarchy-hyprland-session-lock-stranded \"$PPID\"' "$service"
 grep -Fq 'if (exitCode === 2)' "$service"
 grep -Fq 'root.strandedLock = exitCode === 0 && !root.locked && !root.lockRequested' "$service"
 echo 'lock recovery checks ownership before reclaiming a lock'
+
+ARANEA_QML_SHELL_DIR="$(sandbox_inherited_value ARANEA_QML_SHELL_DIR)" \
+ARANEA_CHECK_REQUIRE_ALL="$(sandbox_inherited_value ARANEA_CHECK_REQUIRE_ALL)" \
+  "$repo_root/tests/qml-behaviour.test.sh" lock-recovery lock-components
