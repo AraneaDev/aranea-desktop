@@ -130,7 +130,7 @@ PYTOASTBOUNDARY
         ln -s "$source" "$run_dir/cfg/plugins/araneadev.clock/${source##*/}"
       done
       sed 's/visible: false/visible: true/' "$plugin/BarWidget.qml" >"$run_dir/cfg/plugins/araneadev.clock/BarWidget.qml"
-    elif [[ "$plugin" == */araneadev.lock && "$name" == lock-recovery ]]; then
+    elif [[ "$plugin" == */araneadev.lock && ("$name" == lock-recovery || "$name" == lock-poster-pruning) ]]; then
       # Only the native compositor/PAM boundary is replaced; keep real timers,
       # Process/collector ownership, wallpaper selection and failure handling.
       mkdir -p "$run_dir/cfg/plugins/araneadev.lock"
@@ -342,6 +342,31 @@ LOCKACTION
     mkdir -p "$HOME/.local/state/omarchy/current"
     touch "${ARANEA_TEST_SANDBOX:?}/recover.mp4"
     ln -s "$ARANEA_TEST_SANDBOX/recover.mp4" "$HOME/.local/state/omarchy/current/background"
+  fi
+  if [[ "$name" == lock-poster-pruning ]]; then
+    # Run the exact host helper, including cache pruning. Only thumbnail decoding
+    # is controlled, to order extraction B after the wallpaper changes to C.
+    cat >"$run_dir/display-bin/ffmpegthumbnailer" <<'THUMBNAIL'
+#!/usr/bin/python3
+import os, pathlib, shutil, sys, time
+args = sys.argv[1:]
+source = pathlib.Path(args[args.index("-i") + 1])
+root = pathlib.Path(os.environ["ARANEA_TEST_SANDBOX"])
+if source.name == "C.mp4":
+    (root / "failed-C").touch()
+    sys.exit(1)
+if source.name == "B.mp4":
+    (root / "started-B").touch()
+    deadline = time.monotonic() + 4
+    while not (root / "release-B").exists():
+        if time.monotonic() > deadline:
+            sys.exit(2)
+        time.sleep(0.01)
+shutil.copyfile(root / "still.png", args[args.index("-o") + 1])
+THUMBNAIL
+    chmod +x "$run_dir/display-bin/ffmpegthumbnailer"
+    cp "$repo_root/unlock.png" "$ARANEA_TEST_SANDBOX/still.png"
+    touch "$ARANEA_TEST_SANDBOX/A.mp4" "$ARANEA_TEST_SANDBOX/B.mp4" "$ARANEA_TEST_SANDBOX/C.mp4"
   fi
   # Replace the entire native sudo helper; never execute a grant or policy command.
   mkdir -p "$run_dir/sudo-bin" "$run_dir/sudo-state"

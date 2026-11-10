@@ -1,5 +1,6 @@
 // Real Network host lifecycle: telemetry remains public and resets in place.
 import QtQuick
+import QtTest
 import Quickshell
 import Quickshell.Networking
 import "fixtures/network-host" as NetworkBoundary
@@ -9,6 +10,10 @@ import "plugins/araneadev.network" as Network
 ShellRoot {
   QmlTest {
     id: t
+  }
+  TestCase {
+    id: keys
+    when: false
   }
   NetworkFixture {
     id: fixture
@@ -114,12 +119,25 @@ ShellRoot {
     t.equal(network.statsView.ping, "--", "portal hides invented timeout")
     t.equal(network.statsView.loss, "--", "portal hides invented loss")
     t.check(!network.statsView.lossy, "hidden loss is not highlighted")
-    network.headerIndex = network.portalHeaderIndex
-    network.activateHeader()
+    network.open()
+    network.activePage = "network"
+    network.focusSection = "header"
+    network.setHeaderCursor(network.portalHeaderIndex)
+    network.chooseCursorRow("header")
+    network.cursorActive = true
+    network.keyboardCursor = true
+    network.keyCatcher.forceActiveFocus()
+    keys.keyPress(Qt.Key_Return)
     t.waitFor(function () {
       return fixture.state.portalArgv !== undefined
     }, 1500, "portal helper executes", function () {
       t.equal(fixture.state.portalArgv, ["http://ping.omacom.io/nm-check.txt"], "portal helper receives fixed HTTP URL as one argv")
+      NetworkBoundary.Networking.connectivity = NetworkConnectivity.Full
+      t.equal(network.headerCursorKey, "", "vanished selected portal clears its cursor identity")
+      t.check(!network.keyboardCursor, "vanished selected portal hides the outline instead of highlighting another action")
+      t.check(!network.cursorRowConfirmed("header"), "vanished portal never confirms a replacement header action")
+      keys.keyRelease(Qt.Key_Return)
+      t.check(!network.keyboardCursor && network.headerCursorKey === "", "releasing the old portal key cannot adopt or activate another action")
       NetworkBoundary.Networking.connectivity = NetworkConnectivity.Limited
       t.equal(network.statsView.ping, "--", "limited link hides latency")
       t.equal(network.statsView.loss, "--", "limited link hides loss")

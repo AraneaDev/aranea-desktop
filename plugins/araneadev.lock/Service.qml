@@ -499,11 +499,17 @@ Item {
       waitForEnd: true
     }
     onExited: function (exitCode) {
+      var next = String(posterOutput.text || "").trim()
       if (sourcePath !== root.backgroundPath) {
+        // Successful extraction prunes the host's older cache entries, even
+        // when this response is obsolete. Never retain an evicted fallback.
+        if (exitCode === 0 && next.length > 0 && next !== root.videoPosterPath && root.videoPosterPath !== "") {
+          root.videoPosterPath = ""
+          root.backgroundVersion += 1
+        }
         root.refreshPoster()
         return
       }
-      var next = String(posterOutput.text || "").trim()
       if (exitCode === 0 && next.length > 0 && next !== root.videoPosterPath) {
         root.videoPosterPath = next
         root.backgroundVersion += 1

@@ -9,14 +9,18 @@ import "plugins/araneadev.notifications/InboxLogic.js" as InboxLogic
 
 ShellRoot {
   id: root
+  // Actions emitted by the real list during this fixture.
   property var events: []
+  // Native sender action count, separate from persisted argv actions.
   property int senderInvoked: 0
   QtObject {
     id: senderSignals
     signal closed
     signal actionsChanged
   }
+  // Stable epoch for the persisted inbox fixture identity.
   readonly property real now: Date.now()
+  // Persisted entry name passed to the real inbox service.
   readonly property string fileName: String(now - 100) + "-71.json"
   QmlTest {
     id: t
@@ -57,6 +61,7 @@ ShellRoot {
       }
     }
   }
+  // Exercise current sender actions after the persisted-entry checks.
   function checkLiveInbox() {
     var ref = {
       id: 72,
@@ -126,6 +131,7 @@ ShellRoot {
     svc.clearInbox()
   }
 
+  // Find the real action controls belonging to an inbox row.
   function buttons() {
     return t.findChildren(list, "notificationActionButton")
   }

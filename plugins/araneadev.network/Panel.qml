@@ -2195,6 +2195,9 @@ Panel {
       if (root.focusSection === "band")
         root.keyboardCursor = next.keyboard
     }
+    function onHasCaptivePortalChanged() {
+      root.followHeaderCursor()
+    }
     function onCanShareWifiChanged() {
       root.followHeaderCursor()
     }
