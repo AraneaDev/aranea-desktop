@@ -118,6 +118,10 @@ ShellRoot {
       t.equal(clip.pendingSaves, 0, "writes finished")
       t.equal(ranNamed("omarchy-clipboard-paste-text").length, 1, "paste ran after the writes")
       t.equal(clip.history.length, 2, "history keeps the newest state")
+      clip.setFilter("z".repeat(1000))
+      t.equal(clip.displayModel.count, 0, "long no-match query leaves no selected result")
+      clip.setFilter("")
+      t.equal(clip.displayModel.count, 2, "clearing long query restores the saved history")
       t.done()
     })
   }

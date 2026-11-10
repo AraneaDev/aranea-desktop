@@ -197,6 +197,7 @@ Item {
 
     Item {
       id: preview
+      visible: pane.activeRow !== null
       width: parent.width - Math.round(parent.width * 0.48)
       height: parent.height
       clip: true
