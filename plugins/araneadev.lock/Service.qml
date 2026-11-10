@@ -243,8 +243,13 @@ Item {
     runWake()
   }
 
-  // Restarts blanking after ordinary activity (5 s) or a detected resume (15 s).
-  function armBlankTimer(delayMs = 5000): void {
+  // Restarts blanking after ordinary activity (5 s).
+  function armBlankTimer(): void {
+    armBlankTimerWithDelay(5000)
+  }
+
+  // Sets the blanking grace period, including 15 s after a detected resume.
+  function armBlankTimerWithDelay(delayMs: int): void {
     idleBlankTimer.interval = delayMs
     idleBlankTimer.armedAt = Date.now()
     idleBlankTimer.restart()
@@ -571,7 +576,7 @@ Item {
       // blank the freshly woken unlock screen under the user. Wall-clock time
       // exposes the gap: take a fresh run-up instead of blanking.
       if (Date.now() - armedAt > interval + 2000) {
-        root.armBlankTimer(resumeMs)
+        root.armBlankTimerWithDelay(resumeMs)
         return
       }
       // Only a password check in flight should hold the display up. The

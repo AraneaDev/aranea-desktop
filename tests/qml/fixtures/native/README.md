@@ -24,3 +24,11 @@ lifts them above it; the disposable copy uses Overlay stacking to reproduce that
 condition. Its production input mask, geometry, tooltip lifecycle and gesture
 handlers remain unchanged. The tray replaces only external SNI item records.
 No production files or host compositor configuration are changed by the runner.
+
+The notification runner (`tests/native-notifications.test.sh`) uses actual native
+windows and real key input to cover actions, focus handoff, toast timers and
+output loss in the same private compositor. It asserts automatic center focus
+before any pointer input during the unchanged Exclusive prime. It then explicitly
+refocuses the center with the private pointer for subsequent OnDemand key dispatch
+on Sway. This does not establish sustained automatic OnDemand focus retention on
+actual Hyprland; the production focus policy is unchanged.

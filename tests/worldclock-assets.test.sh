@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Contract for the World Clock globe's generated assets: rebuilding them with
 # tools/build-worldclock-globe reproduces the committed land mask and shader
-# pack byte for byte, and the mask is a 2048x1024 equirectangular map (white
-# land, transparent sea) with land and sea where the planet has them.
+# pack (exact decoded pixels and shader bytes), and the mask is a 2048x1024
+# equirectangular map (white land, transparent sea) with land and sea where
+# the planet has them.
 # Skips (exit 0; 1 with ARANEA_CHECK_REQUIRE_ALL=1) without node, qsb or
 # ImageMagick.
 set -euo pipefail
@@ -20,7 +21,29 @@ fi
 
 out="$TMPDIR/worldclock-assets"
 "$repo_root/tools/build-worldclock-globe" --out "$out"
-cmp "$out/land.png" "$plugin/land.png"
+# PNG compression can differ across zlib builds. Compare dimensions and every
+# decoded RGBA byte, including the colour channels of transparent sea pixels.
+magick "$plugin/land.png" -depth 8 "RGBA:$out/expected.rgba"
+# Tests whether a PNG has the exact committed mask dimensions and RGBA pixels.
+same_mask() {
+  [[ "$(magick identify -format '%wx%h' "$1")" == 2048x1024 ]] || return 1
+  magick "$1" -depth 8 "RGBA:$out/actual.rgba" || return 1
+  cmp -s "$out/expected.rgba" "$out/actual.rgba"
+}
+same_mask "$out/land.png"
+
+# Controls: lossless re-encoding must pass, while one changed pixel must fail.
+magick "$out/land.png" -define png:compression-level=0 "PNG32:$out/recompressed.png"
+if cmp -s "$out/land.png" "$out/recompressed.png"; then
+  echo "compression control did not change the PNG encoding" >&2
+  exit 1
+fi
+same_mask "$out/recompressed.png"
+magick "$out/land.png" -fill '#ff0000ff' -draw 'point 0,0' "PNG32:$out/changed.png"
+if same_mask "$out/changed.png"; then
+  echo "mask comparison accepted a changed pixel" >&2
+  exit 1
+fi
 cmp "$out/shaders/globe.frag.qsb" "$plugin/shaders/globe.frag.qsb"
 
 [[ "$(magick identify -format '%wx%h' "$plugin/land.png")" == 2048x1024 ]]

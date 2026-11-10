@@ -8,13 +8,13 @@
 #     equirectangular map, white opaque land on transparent sea, one sample
 #     per pixel centre (no antialiasing; the sampler filters). The PNG is
 #     written by a tiny inline encoder (node:zlib deflate, fixed level, no
-#     timestamps or text chunks), so the same input always gives the same
-#     bytes; no ImageMagick or npm package is needed.
+#     timestamps or text chunks). Decoded pixels are reproducible; compressed
+#     bytes can vary across zlib builds. No ImageMagick or npm package is needed.
 #   plugins/araneadev.worldclock/shaders/globe.frag.qsb
 #     shaders/globe.frag baked by qsb for Qt Quick's RHI backends.
 #
 # tests/worldclock-assets.test.sh rebuilds both into a scratch directory and
-# compares them byte for byte with the committed files.
+# compares exact decoded mask pixels and shader bytes with the committed files.
 #
 # Usage: tools/build-worldclock-globe [--out DIR]
 #

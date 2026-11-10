@@ -52,12 +52,19 @@ sandbox_on_exit cleanup
 # Runs one test file; prints its result and returns non-zero when it failed.
 run_test() {
   local test_file="$1" name plugin waited=0 status=0
-  local state_home="$XDG_STATE_HOME"
+  local state_home="$XDG_STATE_HOME" fixture_home="$HOME"
   name="$(basename "$test_file" .qml)"
   # Short path: the quickshell IPC socket path is limited to 108 bytes.
   run_dir="$(mktemp -d /tmp/aranea-qt.XXXXXX)"
   mkdir -p "$run_dir/cfg/plugins" "$run_dir/run"
   chmod 700 "$run_dir/run"
+  if [[ "$name" == lock-* ]]; then
+    # Lock reads HOME/.local/state directly. Keep each lock's wallpaper and
+    # state private even when an earlier desktop fixture wrote a background.
+    fixture_home="$run_dir/home"
+    state_home="$fixture_home/.local/state"
+    mkdir -p "$state_home/omarchy/current"
+  fi
   ln -s "$shell_dir/Commons" "$run_dir/cfg/Commons"
   ln -s "$shell_dir/Ui" "$run_dir/cfg/Ui"
   ln -s "$repo_root/tests/qml/lib" "$run_dir/cfg/lib"
@@ -339,9 +346,9 @@ LOCKACTION
     for display_command in delayed.mp4 other.webm recover.mp4; do
       cp "$repo_root/unlock.png" "${ARANEA_TEST_SANDBOX:?}/poster-$display_command.png"
     done
-    mkdir -p "$HOME/.local/state/omarchy/current"
+    mkdir -p "$fixture_home/.local/state/omarchy/current"
     touch "${ARANEA_TEST_SANDBOX:?}/recover.mp4"
-    ln -s "$ARANEA_TEST_SANDBOX/recover.mp4" "$HOME/.local/state/omarchy/current/background"
+    ln -s "$ARANEA_TEST_SANDBOX/recover.mp4" "$fixture_home/.local/state/omarchy/current/background"
   fi
   if [[ "$name" == agents-provider-protocol ]]; then
     if ! python3 -c 'from compression import zstd' 2>/dev/null; then
@@ -391,7 +398,7 @@ THUMBNAIL
   (cd "$run_dir" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
     -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE QT_QPA_PLATFORM=offscreen \
     PATH="$run_dir/sudo-bin:$run_dir/display-bin:$PATH" OMARCHY_PATH="${shell_dir%/shell}" ARANEA_SUDO_FIXTURE_ROOT="$run_dir/sudo-state" ARANEA_DISPLAY_FIXTURE_ROOT="$run_dir/display-state" \
-    ARANEA_CLOCK_TEST_PLUGIN_ROOT="$run_dir/external/plugins" XDG_RUNTIME_DIR="$run_dir/run" XDG_CACHE_HOME="$run_dir/cache" XDG_STATE_HOME="$state_home" \
+    HOME="$fixture_home" ARANEA_CLOCK_TEST_PLUGIN_ROOT="$run_dir/external/plugins" XDG_RUNTIME_DIR="$run_dir/run" XDG_CACHE_HOME="$run_dir/cache" XDG_STATE_HOME="$state_home" \
     "$quickshell_bin" -p "$run_dir/cfg") >"$run_dir/log" 2>&1 &
   qs_pid=$!
   while ((waited < timeout_s * 5)); do
