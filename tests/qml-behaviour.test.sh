@@ -82,7 +82,7 @@ source = source.replace('WlrLayershell.', 'nativeLayer.')
 source = re.sub(r'(?m)^(  |        )anchors \{', r'\1nativeAnchors {', source)
 pathlib.Path(sys.argv[2]).write_text(source)
 PYBOUNDARY
-    elif [[ "$plugin" == */araneadev.notifications && "$name" == notifications ]]; then
+    elif [[ "$plugin" == */araneadev.notifications && ("$name" == notifications || "$name" == notification-inbox-focus) ]]; then
       # Only replace native Hyprland records/dispatch; service matching,
       # keyboard identity, activation and inbox lifecycle run unchanged.
       mkdir -p "$run_dir/cfg/plugins/araneadev.notifications"

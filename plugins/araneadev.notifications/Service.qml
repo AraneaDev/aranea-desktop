@@ -662,11 +662,26 @@ Item {
     var entry = inbox.get(fileName)
     if (!entry)
       return
+    var ref = inboxRefs[fileName]
     var argv = NotificationLogic.parseExecArgv(entry.execArgv)
     if (argv)
       Util.execArgv(argv)
-    else if (!invokeDefaultAction(inboxRefs[fileName]))
-      focusApp(entry)
+    else if (!invokeDefaultAction(ref)) {
+      // The persisted/presentation row omits PID claims. Use only this row's
+      // current tracked sender snapshot, never historical or closed metadata.
+      let focusEntry = {
+        app: entry.app,
+        senderPid: 0
+      }
+      try {
+        let live = liveSnapshots[fileName]
+        if (ref && ref.tracked && inboxRefs[fileName] === ref && live && live.originalId === entry.originalId && live.timestamp === entry.timestamp)
+          focusEntry.senderPid = NotificationLogic.senderPid(live.senderPid)
+      } catch (e) {
+        // A sender destroyed during activation contributes no live claim.
+      }
+      focusApp(focusEntry)
+    }
     dismissInbox(fileName)
   }
 
