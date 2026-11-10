@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.39.4...v2.40.0) (2026-11-10)
+
+
+### Features
+
+* support Omarchy 4.5 across Aranea Desktop ([#235](https://github.com/AraneaDev/aranea-desktop/issues/235)) ([cb512ab](https://github.com/AraneaDev/aranea-desktop/commit/cb512ab62655306e750093a171a1c758c51c7a3d))
+
 ## [2.39.4](https://github.com/AraneaDev/aranea-desktop/compare/v2.39.3...v2.39.4) (2026-10-23)
 
 
