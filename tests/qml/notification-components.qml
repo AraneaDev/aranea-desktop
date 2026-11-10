@@ -2,6 +2,7 @@
 import QtQuick
 import QtTest
 import Quickshell
+import qs.Commons as Commons
 import "lib"
 import "plugins/araneadev.notifications/components" as NotificationComponents
 
@@ -45,6 +46,38 @@ ShellRoot {
     app: "Chat"
     count: 3
     collapsed: true
+  }
+
+  // Inspect rendered Text children, preserving the real card presentation.
+  function texts(root) {
+    var result = []
+    t.childrenOf(root).forEach(function (child) {
+      if (child.text !== undefined && child.textFormat !== undefined)
+        result.push(child)
+      result = result.concat(texts(child))
+    })
+    return result
+  }
+
+  // Taildrop filenames, paths and failed previews retain the normal card rendering.
+  function checkTaildrop() {
+    card.app = "Taildrop"
+    card.summary = "File received"
+    card.urgency = 2
+    card.glyph = "󰒊"
+    card.image = "file:///missing/aranea-taildrop-preview.png"
+    for (var body of ["holiday photo.png", "/home/test/Downloads/holiday photo.png", "$(touch nope); file.png"]) {
+      card.body = body
+      var rendered = texts(card)
+      var bodyText = rendered.filter(function (item) {
+        return item.text === body
+      })[0]
+      var title = rendered.filter(function (item) {
+        return item.text === "File received"
+      })[0]
+      t.check(bodyText && bodyText.visible, "Taildrop body renders literal filename/path: " + body)
+      t.check(title && title.color.toString() === Commons.Color.notifications.text.toString(), "critical Taildrop title retains normal text color")
+    }
   }
 
   Component.onCompleted: {
@@ -101,7 +134,14 @@ ShellRoot {
       t.equal(cardClicks, 0, "button removal does not trigger the default click")
       t.step(30, function () {
         t.equal(t.findChildren(card, "notificationActionButton").length, 0, "legacy entries render no buttons")
-        t.done()
+        checkTaildrop()
+        t.step(50, function () {
+          var glyph = texts(card).filter(function (item) {
+            return item.text === "󰒊" && item.visible
+          })
+          t.check(glyph.length > 0, "missing Taildrop preview retains the visible glyph fallback")
+          t.done()
+        })
       })
     })
   }

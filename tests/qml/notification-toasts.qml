@@ -103,6 +103,60 @@ ShellRoot {
       return out.concat(t.findChildren(window, 'notificationToastSlot'))
     }, [])
   }
+  QtObject {
+    id: unnamedSignals
+    signal closed
+  }
+  // Confirm separate unnamed deliveries become separate actual toast delegates.
+  function checkUnnamedCards() {
+    toast = toastComponent.createObject(surfaceHost)
+    toast.outputScreens = [
+      {
+        name: 'left',
+        width: 1000,
+        height: 800
+      }
+    ]
+    for (var id of [91, 92]) {
+      svc.handleNotification({
+        id: id,
+        appName: '',
+        summary: 'unnamed ' + id,
+        urgency: 0,
+        hints: {
+          transient: true
+        },
+        tracked: false,
+        closed: unnamedSignals.closed,
+        dismiss: function () {
+          this.tracked = false
+        }
+      })
+    }
+    t.step(80, function () {
+      windows().forEach(function (window) {
+        window.parent = surfaceHost
+      })
+      t.step(40, function () {
+        var cards = slots()
+        t.equal(cards.map(function (card) {
+          return card.originalId
+        }).sort(), [91, 92], 'unnamed deliveries render two independent card delegates')
+        t.check(cards.length === 2 && cards.every(function (card) {
+          return card.visible && card.width > 0 && card.height > 0
+        }), 'both unnamed cards have visible geometry')
+        svc.dismissPopup(0)
+        t.step(20, function () {
+          t.equal(slots().map(function (card) {
+            return card.originalId
+          }), [91], 'dismissing newest unnamed toast leaves its visible neighbour')
+          svc.clearPopups()
+          toast.destroy()
+          t.done()
+        })
+      })
+    })
+  }
   Component.onCompleted: t.step(200, function () {
     toast = toastComponent.createObject(surfaceHost)
     add(81)
@@ -177,7 +231,7 @@ ShellRoot {
                 t.step(50, function () {
                   t.check(!svc.keyboardMode && !svc.popupHeld('unused'), 'toast teardown releases keyboard and expiry pause')
                   svc.clearPopups()
-                  t.done()
+                  checkUnnamedCards()
                 })
               })
             })

@@ -82,6 +82,15 @@ source = source.replace('WlrLayershell.', 'nativeLayer.')
 source = re.sub(r'(?m)^(  |        )anchors \{', r'\1nativeAnchors {', source)
 pathlib.Path(sys.argv[2]).write_text(source)
 PYBOUNDARY
+    elif [[ "$plugin" == */araneadev.notifications && "$name" == notifications ]]; then
+      # Only replace native Hyprland records/dispatch; service matching,
+      # keyboard identity, activation and inbox lifecycle run unchanged.
+      mkdir -p "$run_dir/cfg/plugins/araneadev.notifications"
+      for source in "$plugin"/*; do
+        [[ "${source##*/}" == Service.qml ]] && continue
+        ln -s "$source" "$run_dir/cfg/plugins/araneadev.notifications/${source##*/}"
+      done
+      sed 's|import Quickshell.Hyprland|import "../../fixtures/notification-hyprland"|' "$plugin/Service.qml" >"$run_dir/cfg/plugins/araneadev.notifications/Service.qml"
     elif [[ "$plugin" == */araneadev.notifications && ("$name" == notification-toasts || "$name" == notification-center-keyboard) ]]; then
       # Only substitute native windows/attached layer state. The production
       # output selector, focus item, cards and countdown timers remain real.

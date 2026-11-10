@@ -26,3 +26,30 @@ test("persisted button argv survives literally and legacy or invalid rows offer 
   assert.equal(n.popupEntry({}, 1).execActions, "")
   assert.equal(n.popupEntry({ execActions: '[{"label":"Open","argv":[]}]' }, 1).execActions, "")
 })
+
+test("Taildrop filenames and paths stay readable data through persistence", () => {
+  const n = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
+  for (const body of [
+    "holiday photo.png",
+    "/home/test/Downloads/holiday photo.png",
+    "$(touch nope); file.png"
+  ]) {
+    const row = n.snapshotOf(
+      {
+        id: 92,
+        appName: "Taildrop",
+        summary: "File received",
+        body: body,
+        image: "/missing/preview.png",
+        urgency: 2
+      },
+      100
+    )
+    const restored = n.parsePopupFiles(n.serializePopup(row, 1), 1)[0]
+    assert.equal(restored.body, body)
+    assert.equal(n.styledBody(restored.body, restored.app, ""), body)
+    assert.equal(n.parseExecArgv(restored.execArgv), null)
+    assert.equal(restored.execActions, "")
+    assert.equal(n.shownImages(restored, row, []).image, "/missing/preview.png")
+  }
+})

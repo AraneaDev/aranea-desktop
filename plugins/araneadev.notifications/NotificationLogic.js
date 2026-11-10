@@ -488,6 +488,43 @@ function normalizedHints(value) {
 }
 
 /**
+ * Validates a protocol sender-pid claim; this is not OS authentication.
+ * @param {*} value - Protocol hint value.
+ * @returns {number} Positive signed 32-bit integer, or zero.
+ */
+function senderPid(value) {
+  return typeof value === "number" &&
+    isFinite(value) &&
+    Math.floor(value) === value &&
+    value > 0 &&
+    value <= 2147483647
+    ? value
+    : 0
+}
+
+/**
+ * Matches exact classes or a literal multi-word class suffix.
+ * @param {*} name - Display name.
+ * @param {*} wmClass - Observed window class.
+ * @returns {boolean} Whether the class matches without regex interpolation.
+ */
+function senderClassMatches(name, wmClass) {
+  var lower = String(wmClass || "").toLowerCase()
+  var source = String(name || "")
+    .trim()
+    .toLowerCase()
+  if (!source || !lower) return false
+  if (source === lower) return true
+  var words = source.split(/[^a-z0-9]+/).filter(function (word) {
+    return word
+  })
+  if (words.length < 2) return false
+  var tail = "." + words.join(".")
+  var dotted = "." + lower.replace(/[^a-z0-9]+/g, ".")
+  return dotted.slice(-tail.length) === tail
+}
+
+/**
  * Normalize the dynamic D-Bus notification object once, before it reaches
  * the QML model and card delegates. The protocol is intentionally dynamic;
  * the rest of the UI should not have to defend every optional field again.
@@ -530,6 +567,7 @@ function snapshotOf(notification, timestamp) {
     id: id,
     originalId: id,
     app: n.appName,
+    senderPid: senderPid(n.hints["sender-pid"]),
     appIcon: n.appIcon,
     summary: n.summary,
     body: n.body,
@@ -546,6 +584,7 @@ function snapshotOf(notification, timestamp) {
 // Everything the popup card draws, and therefore everything an in-place
 // update has to write through to the row and its file.
 var POPUP_ROLES = [
+  "senderPid",
   "app",
   "appIcon",
   "summary",
@@ -852,6 +891,8 @@ if (typeof module !== "undefined") {
     parseExecActions: parseExecActions,
     shouldRenderCompactGlyph: shouldRenderCompactGlyph,
     normalizeNotification: normalizeNotification,
+    senderClassMatches: senderClassMatches,
+    senderPid: senderPid,
     snapshotOf: snapshotOf,
     popupRoles: popupRoles,
     popupRowChanged: popupRowChanged,

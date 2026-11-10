@@ -7,6 +7,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "lib"
+import "fixtures/notification-hyprland"
 import "plugins/araneadev.notifications" as Notif
 import "plugins/araneadev.projects" as Projects
 import "plugins/araneadev.notifications/NotificationLogic.js" as Logic
@@ -165,6 +166,178 @@ ShellRoot {
     })
   }
 
+  // Actual service selection/dispatch with only native compositor IO adapted.
+  function checkSenderWindows() {
+    function windows(records) {
+      Hyprland.toplevels = {
+        values: records.map(function (record) {
+          return {
+            lastIpcObject: record
+          }
+        })
+      }
+    }
+    function row(id, name, pid) {
+      svc.popupModel.insert(0, Logic.snapshotOf({
+        id: id,
+        appName: name,
+        hints: {
+          "sender-pid": pid
+        }
+      }, testRoot.now + id))
+    }
+    var telegram = {
+      class: "org.telegram.desktop",
+      address: "0xabc",
+      pid: 101,
+      title: "Telegram",
+      focusHistoryID: 0
+    }
+    var terminal = {
+      class: "foot",
+      address: "0xdef",
+      pid: 202,
+      title: "Terminal",
+      focusHistoryID: 1
+    }
+    windows([telegram, terminal])
+    row(80, "Telegram Desktop", 202)
+    t.check(svc.popupHasMeaningfulClick(80), "current sender PID window is a meaningful click")
+    svc.startKeyboard(80)
+    svc.keyboardPressed(Qt.Key_Return, "")
+    t.equal(Hyprland.dispatched, ['hl.dsp.focus({window = hl.get_window("address:0xdef")})'], "keyboard focuses PID window before conflicting display class")
+    t.equal(svc.popupModel.count, 0, "verified sender click consumes its own card")
+    row(81, "Telegram Desktop", 202)
+    svc.startKeyboard(81)
+    terminal = {
+      class: "foot",
+      address: "0xbeef",
+      pid: 202,
+      title: "Replacement",
+      focusHistoryID: 1
+    }
+    windows([telegram, terminal])
+    svc.keyboardPressed(Qt.Key_1, "1")
+    t.equal(Hyprland.dispatched.length, 1, "changed address refuses stale keyboard choice")
+    t.check(!svc.keyboardMode && svc.popupModel.count === 1, "target replacement releases keyboard without consuming card")
+    svc.startKeyboard(81)
+    windows([telegram])
+    svc.keyboardPressed(Qt.Key_Return, "")
+    t.equal(Hyprland.dispatched.length, 1, "closed PID window never redirects key to class fallback")
+    svc.clearPopups()
+    row(82, "Telegram Desktop", 0)
+    t.check(!svc.popupHasMeaningfulClick(82), "class fallback never becomes meaningful keyboard click")
+    svc.invokePopupDefault(0)
+    t.equal(Hyprland.dispatched[1], 'hl.dsp.focus({window = hl.get_window("address:0xabc")})', "pointer matches literal multi-word class suffix by address")
+    windows([telegram,
+      {
+        class: "org.telegram.desktop",
+        address: "0xaaa",
+        pid: 303
+      }
+    ])
+    row(83, "Telegram Desktop", 0)
+    svc.invokePopupDefault(0)
+    t.equal(Hyprland.dispatched.length, 2, "ambiguous class fallback leaves focus alone")
+    windows([
+      {
+        class: "anything",
+        address: "0xaaa",
+        pid: 303
+      }
+    ])
+    row(84, ".*", 0)
+    svc.invokePopupDefault(0)
+    t.equal(Hyprland.dispatched.length, 2, "display name never executes as a regex")
+    windows([
+      {
+        class: "foot",
+        address: '0xabc\";bad',
+        pid: 202
+      }
+    ])
+    row(85, "foot", 202)
+    t.check(!svc.popupHasMeaningfulClick(85), "invalid observed address is not meaningful")
+    svc.invokePopupDefault(0)
+    t.equal(Hyprland.dispatched.length, 2, "invalid address never enters dispatch")
+    windows([telegram])
+    row(86, "Telegram Desktop", 101)
+    svc.startKeyboard(86)
+    windows([
+      {
+        class: "org.telegram.desktop",
+        address: "0xabc",
+        pid: 101
+      }
+    ])
+    svc.keyboardPressed(Qt.Key_Return, "")
+    t.equal(Hyprland.dispatched.length, 2, "reused address and PID cannot replace native window identity")
+    svc.clearPopups()
+    windows([telegram,
+      {
+        class: "foot",
+        address: "0xbbb",
+        pid: 101
+      }
+    ])
+    row(87, "unknown-app", 101)
+    t.check(!svc.popupHasMeaningfulClick(87), "multiple windows for one PID do not invent a target")
+    svc.invokePopupDefault(0)
+    t.equal(Hyprland.dispatched.length, 2, "ambiguous PID without unique class leaves focus alone")
+    windows([telegram])
+    var native = keyboardRow(88, ["default"])
+    svc.popupModel.setProperty(0, "senderPid", 101)
+    svc.invokePopupDefault(0)
+    t.equal(invokedActions, ["default"], "native default retains precedence over PID focus")
+    t.equal(Hyprland.dispatched.length, 2, "native default does not also focus sender window")
+    svc.liveRefs[88] = native
+    svc.popupModel.insert(0, Logic.snapshotOf({
+      id: 88,
+      hints: {
+        "sender-pid": 101,
+        "omarchy-exec-argv": '["/usr/bin/true"]'
+      }
+    }, testRoot.now + 88))
+    svc.invokePopupDefault(0)
+    t.equal(invokedActions, ["default"], "literal argv retains precedence over native default")
+    t.equal(Hyprland.dispatched.length, 2, "literal argv does not also focus PID window")
+    invokedActions = []
+    Hyprland.toplevels = {
+      values: []
+    }
+    svc.clearPopups()
+  }
+
+  // Unnamed senders have independent protocol identities, never a shared stack.
+  function checkUnnamed(then) {
+    function notification(id) {
+      return {
+        id: id,
+        appName: "",
+        summary: "unnamed " + id,
+        urgency: 0,
+        hints: {
+          transient: true
+        },
+        tracked: false,
+        closed: senderSignals.closed,
+        dismiss: function () {
+          this.tracked = false
+        }
+      }
+    }
+    svc.handleNotification(notification(89))
+    svc.handleNotification(notification(90))
+    t.step(20, function () {
+      t.equal(svc.popupModel.count, 2, "two unnamed notifications remain separate visible rows")
+      t.equal([svc.popupModel.get(0).originalId, svc.popupModel.get(1).originalId], [90, 89], "unnamed cards retain distinct IDs and newest order")
+      svc.dismissPopup(0)
+      t.equal(svc.popupModel.get(0).originalId, 89, "dismissing unnamed card leaves the other card")
+      svc.clearPopups()
+      then()
+    })
+  }
+
   // Opening the inbox transfers ownership away from the toast shortcuts.
   function checkCenterExit(then) {
     var requests = []
@@ -284,13 +457,18 @@ ShellRoot {
       }), ["Open", "Old"], "hint buttons precede sender buttons")
       var revision = svc.actionsRevision
       first.hints = {
-        "omarchy-actions": '[{"label":"Omacut","argv":["/usr/bin/false"]}]'
+        "omarchy-actions": '[{"label":"Omacut","argv":["/usr/bin/false"]}]',
+        "sender-pid": 505
       }
       senderSignals.hintsChanged()
       t.equal(svc.actionsFor(41).map(function (a) {
         return a.label
       }), ["Omacut", "Old"], "replacement refreshes action hints in the same popup")
       t.equal(svc.popupModel.count, 1, "replacement never duplicates the popup")
+      t.equal(svc.popupModel.get(0).senderPid, 505, "sender-pid hint updates the existing popup role")
+      first.hints["sender-pid"] = "505"
+      senderSignals.hintsChanged()
+      t.equal(svc.popupModel.get(0).senderPid, 0, "malformed replacement sender-pid cannot retain old target")
       t.check(svc.actionsRevision > revision, "replacement invalidates rendered action choices")
       first.actions = [
         {
@@ -472,34 +650,37 @@ ShellRoot {
       t.equal(svc.inbox.count, 0, "old entry pruned")
       t.equal(fakeRef.dismissed, 1, "pruning dismisses the entry at its sender")
 
-      checkActionLifetime(function () {
-        checkActions(function () {
-          checkKeyboard(function () {
-            // DND on, then the service goes before its debounced save fires.
-            var second = serviceComponent.createObject(testRoot)
-            t.waitFor(function () {
-              return second.settingsLoaded
-            }, 10000, "the second service loads its settings", function () {
-              t.check(second.settingsLoaded, "second service loaded its settings")
-              second.setDoNotDisturb(true)
-              second.popupModel.append(Logic.snapshotOf({
-                id: 900
-              }, testRoot.now))
-              second.startKeyboard(900)
-              second.keyboardModeChanged.connect(function () {
-                if (!second.keyboardMode)
-                  testRoot.keyboardReleasedOnTeardown = true
-              })
-              t.check(second.popupHeld('any'), 'service teardown begins with keyboard expiry pause')
-              second.destroy()
-              settingsReader.path = testRoot.stateRoot + "b/notifications.json"
+      checkSenderWindows()
+      checkUnnamed(function () {
+        checkActionLifetime(function () {
+          checkActions(function () {
+            checkKeyboard(function () {
+              // DND on, then the service goes before its debounced save fires.
+              var second = serviceComponent.createObject(testRoot)
               t.waitFor(function () {
-                settingsReader.reload()
-                return testRoot.savedSettings().dnd !== undefined
-              }, 5000, "the settings file is written", function () {
-                t.equal(testRoot.savedSettings().dnd, true, "DND written when the service goes away")
-                t.check(testRoot.keyboardReleasedOnTeardown, 'service teardown explicitly releases keyboard ownership')
-                t.done()
+                return second.settingsLoaded
+              }, 10000, "the second service loads its settings", function () {
+                t.check(second.settingsLoaded, "second service loaded its settings")
+                second.setDoNotDisturb(true)
+                second.popupModel.append(Logic.snapshotOf({
+                  id: 900
+                }, testRoot.now))
+                second.startKeyboard(900)
+                second.keyboardModeChanged.connect(function () {
+                  if (!second.keyboardMode)
+                    testRoot.keyboardReleasedOnTeardown = true
+                })
+                t.check(second.popupHeld('any'), 'service teardown begins with keyboard expiry pause')
+                second.destroy()
+                settingsReader.path = testRoot.stateRoot + "b/notifications.json"
+                t.waitFor(function () {
+                  settingsReader.reload()
+                  return testRoot.savedSettings().dnd !== undefined
+                }, 5000, "the settings file is written", function () {
+                  t.equal(testRoot.savedSettings().dnd, true, "DND written when the service goes away")
+                  t.check(testRoot.keyboardReleasedOnTeardown, 'service teardown explicitly releases keyboard ownership')
+                  t.done()
+                })
               })
             })
           })

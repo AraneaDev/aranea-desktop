@@ -847,3 +847,33 @@ test("newest-card policy counts a real click as a choice", () => {
       throw new Error(`wrong mode for ${buttons}/${click}`)
   }
 })
+
+test("multi-word sender names match full class suffixes", () => {
+  const l = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
+  if (!l.senderClassMatches("Telegram Desktop", "org.telegram.desktop"))
+    throw new Error("sender window was not found")
+  if (l.senderClassMatches("Telegram Desktop", "org.telegram.desktop.fake"))
+    throw new Error("unrelated window matched")
+  if (l.senderClassMatches(".*", "anything")) throw new Error("display name became a regex")
+  for (const [name, cls] of [
+    ["Slack", "slack"],
+    ["Foo.Bar", "foo.bar"],
+    ["Brave Browser", "brave-browser"]
+  ])
+    if (!l.senderClassMatches(name, cls)) throw new Error("literal class lost: " + cls)
+  if (l.senderClassMatches("Slack", "slack-other")) throw new Error("partial class matched")
+})
+
+test("sender-pid claims have bounded integer shape in snapshots and replacements", () => {
+  const assert = require("node:assert/strict")
+  const l = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
+  for (const value of [7, 2147483647])
+    assert.equal(l.snapshotOf({ hints: { "sender-pid": value } }, 1).senderPid, value)
+  for (const value of [undefined, null, true, "7", [], {}, 0, -1, 1.5, Infinity, 2147483648])
+    assert.equal(l.snapshotOf({ hints: { "sender-pid": value } }, 1).senderPid, 0)
+  const updated = l.replacementSnapshot({ id: 99, hints: { "sender-pid": 8 } }, 7, 100)
+  assert.equal(updated.senderPid, 8)
+  assert.equal(updated.originalId, 7)
+  assert.equal(updated.timestamp, 100)
+  assert.equal(l.popupRowChanged({ senderPid: 7 }, { senderPid: 8 }), true)
+})

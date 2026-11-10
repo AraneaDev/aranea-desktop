@@ -6,6 +6,7 @@
 
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Services.Notifications
 import qs.Commons
@@ -31,8 +32,6 @@ Item {
   // The notification server, once created; null in tests.
   property var server: null
 
-  // Omarchy install root ($OMARCHY_PATH), for omarchy-hyprland-focus-app.
-  property string omarchyPath: Quickshell.env("OMARCHY_PATH")
   // The user's home directory ($HOME).
   readonly property string home: Quickshell.env("HOME")
   // History + DND live under XDG_STATE_HOME: they're persistent user state
@@ -118,12 +117,14 @@ Item {
   property double keyboardTimestamp: 0
   // Current sender identity, held outside the popup model.
   property var keyboardRef: null
+  // Native window object identity prevents address reuse redirecting stale keys.
+  property var keyboardWindowRef: null
   // Choice snapshot prevents pending keys invoking changed actions.
   property string keyboardSignature: ""
   // Zero-based selected choice in visible order, including a real card click.
   property int keyboardChoice: 0
 
-  // Meaningful default click boundary: argv and a live default action count.
+  // Meaningful clicks use argv, a live native default or an observed PID window.
   // Display-name app focusing remains a pointer fallback, not a choice.
   function popupHasMeaningfulClick(originalId): bool {
     let at = popupIndexFor(originalId)
@@ -140,7 +141,7 @@ Item {
         }
       }
     } catch (e) {}
-    return false
+    return popupSenderWindow(originalId) !== null
   }
 
   // Snapshot the command/default/button choices for stale-key refusal.
@@ -148,13 +149,15 @@ Item {
     let at = popupIndexFor(originalId)
     if (at < 0)
       return ""
-    return JSON.stringify([popupModelObject.get(at).execArgv, popupHasMeaningfulClick(originalId), popupActionChoices(originalId)])
+    let win = popupSenderWindow(originalId)
+    return JSON.stringify([popupModelObject.get(at).execArgv, popupHasMeaningfulClick(originalId), win ? [win.address, win.pid, win.wmClass] : null, popupActionChoices(originalId)])
   }
 
   // Check the retained row, sender and choice set before dispatching a key.
   function keyboardSelectionValid(): bool {
     let at = popupIndexFor(keyboardOriginalId)
-    return keyboardMode && at >= 0 && popupModelObject.get(at).timestamp === keyboardTimestamp && liveRefs[keyboardOriginalId] === keyboardRef && choiceSignature(keyboardOriginalId) === keyboardSignature
+    let win = popupSenderWindow(keyboardOriginalId)
+    return keyboardMode && (win ? win.toplevel : null) === keyboardWindowRef && at >= 0 && popupModelObject.get(at).timestamp === keyboardTimestamp && liveRefs[keyboardOriginalId] === keyboardRef && choiceSignature(keyboardOriginalId) === keyboardSignature
   }
 
   // End ownership when the selected identity or its choices disappear.
@@ -183,6 +186,8 @@ Item {
     keyboardOriginalId = id
     keyboardTimestamp = popupModelObject.get(at).timestamp
     keyboardRef = liveRefs[id]
+    let win = popupSenderWindow(id)
+    keyboardWindowRef = win ? win.toplevel : null
     keyboardSignature = choiceSignature(id)
     keyboardChoice = 0
     keyboardMode = true
@@ -195,6 +200,7 @@ Item {
     keyboardOriginalId = -1
     keyboardTimestamp = 0
     keyboardRef = null
+    keyboardWindowRef = null
     keyboardSignature = ""
     keyboardChoice = 0
   }
@@ -469,6 +475,16 @@ Item {
     try {
       updated = NotificationLogic.replacementSnapshot(notification, originalId, timestamp)
     } catch (e) {
+      return
+    }
+    // A transient replacement no longer belongs in the persisted inbox.
+    // Unlink without dismissing; the sender uses the normal toast/DND path.
+    if (isTransient(notification)) {
+      delete service.inboxRefs[fileName]
+      delete service.liveSnapshots[fileName]
+      service.actionsRevision += 1
+      inbox.remove(fileName)
+      service.handleNotification(notification)
       return
     }
     // Compare with what the sender sent last time, not with the model: the
@@ -824,25 +840,73 @@ Item {
     // libnotify action — they just expect clicking the notification to
     // focus their window. Fall back to focusing the sending app by class so
     // that click-to-jump actually works.
-    if (!invoked)
+    if (!invoked && !focusWindow(popupSenderWindow(originalId)))
       focusApp(entry)
     var current = popupIndexFor(originalId)
     if (current >= 0 && popupModelObject.get(current).timestamp === timestamp && (!liveRefs[originalId] || liveRefs[originalId] === ref))
       removePopup(current, "invoke")
   }
 
-  // Try to focus an existing Hyprland window matching the notification's
-  // sender. The helper handles case-insensitive class matching.
-  function focusApp(entry) {
-    if (!entry || !entry.app)
-      return
-    focusAppProc.command = [service.omarchyPath + "/bin/omarchy-hyprland-focus-app", String(entry.app)]
-    focusAppProc.running = true
+  // Read current controlled compositor records; no display name enters a command.
+  function openWindows(): var {
+    let list = Hyprland.toplevels ? Hyprland.toplevels.values : []
+    let windows = []
+    for (let i = 0; i < list.length; i++) {
+      let ipc = list[i].lastIpcObject
+      if (!ipc || !/^0x[0-9a-f]+$/i.test(String(ipc.address || "")))
+        continue
+      windows.push({
+        toplevel: list[i],
+        address: String(ipc.address),
+        pid: NotificationLogic.senderPid(ipc.pid),
+        wmClass: String(ipc["class"] || "")
+      })
+    }
+    return windows
   }
 
-  Process {
-    id: focusAppProc
-    running: false
+  // A validated protocol claim matches only a current observed, unique PID window.
+  function windowForPid(pid): var {
+    let want = NotificationLogic.senderPid(pid)
+    if (!want)
+      return null
+    let matches = openWindows().filter(function (win) {
+      return win.pid === want
+    })
+    return matches.length === 1 ? matches[0] : null
+  }
+
+  // Shared meaningful-click and activation target for a popup's current snapshot.
+  function popupSenderWindow(originalId): var {
+    let at = popupIndexFor(originalId)
+    return at < 0 ? null : windowForPid(popupModelObject.get(at).senderPid)
+  }
+
+  // Focus only a currently observed address, retaining native object identity.
+  function focusWindow(win): bool {
+    if (!win)
+      return false
+    let current = openWindows().filter(function (candidate) {
+      return candidate.toplevel === win.toplevel && candidate.address === win.address && candidate.pid === win.pid
+    })
+    if (current.length !== 1)
+      return false
+    Hyprland.dispatch('hl.dsp.focus({window = hl.get_window("address:' + win.address + '")})')
+    return true
+  }
+
+  // PID preference, then a unique literal class match for pointer activation only.
+  function focusApp(entry): bool {
+    if (!entry)
+      return false
+    let win = windowForPid(entry.senderPid)
+    if (!win) {
+      let matches = openWindows().filter(function (candidate) {
+        return NotificationLogic.senderClassMatches(entry.app, candidate.wmClass)
+      })
+      win = matches.length === 1 ? matches[0] : null
+    }
+    return focusWindow(win)
   }
 
   // ---------------------------------------------------- settings persistence
