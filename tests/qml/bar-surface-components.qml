@@ -9,6 +9,22 @@ ShellRoot {
     id: t
   }
 
+  BarComponents.Bar {
+    id: tooltipBar
+    motionEnabled: false
+    barConfig: ({
+        transparent: false
+      })
+  }
+  Item {
+    id: firstTarget
+    property bool tooltipHovered: true
+  }
+  Item {
+    id: secondTarget
+    property bool tooltipHovered: true
+  }
+
   QtObject {
     id: barOwner
     property bool motionEnabled: true
@@ -70,7 +86,18 @@ ShellRoot {
       barOwner.motionEnabled = false
       slot.openIndicatorVisible = true
       t.equal(indicator.opacity, 0.75, "bar indicator changes immediately with motion disabled")
-      t.done()
+      tooltipBar.showTooltip(firstTarget, "First")
+      t.check(!tooltipBar.tooltipShown, "first tooltip waits for initial delay")
+      t.waitFor(function () {
+        return tooltipBar.tooltipShown
+      }, 1000, "first tooltip appears", function () {
+        tooltipBar.hideTooltip(firstTarget)
+        tooltipBar.showTooltip(secondTarget, "Second")
+        t.step(30, function () {
+          t.check(tooltipBar.tooltipShown && tooltipBar.tooltipText === "Second", "tooltip handoff skips the initial delay")
+          t.done()
+        })
+      })
     })
   }
 }

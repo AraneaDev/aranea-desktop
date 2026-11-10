@@ -45,7 +45,28 @@ ShellRoot {
         t.check(!owner.foregroundAnimationEnabled, "foreground animation stays disabled through the first deferred turn")
         Qt.callLater(function () {
           t.check(owner.foregroundAnimationEnabled && api.foregroundAnimationEnabled, "foreground animation returns on the second deferred turn")
-          t.done()
+          owner.setRequestedTransparency(true)
+          t.waitFor(function () {
+            return fixture.state.finished === 2
+          }, 2000, "second transparent probe finishes", function () {
+            owner.barConfig = {
+              transparent: true,
+              unrelatedSetting: "changed"
+            }
+            t.step(350, function () {
+              t.equal(fixture.state.started, 2, "unrelated persisted setting does not probe contrast")
+              fixture.changeWallpaper(function () {
+                t.waitFor(function () {
+                  return fixture.state.finished === 3
+                }, 2000, "wallpaper refresh completes", function () {
+                  t.step(250, function () {
+                    t.equal(fixture.state.started, 3, "wallpaper change schedules one debounced probe")
+                    t.done()
+                  })
+                })
+              })
+            })
+          })
         })
       })
     })

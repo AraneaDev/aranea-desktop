@@ -183,7 +183,7 @@ source = source.replace('WlrLayershell.', 'nativeLayer.')
 source = source.replace('    anchors {', '    nativeAnchors {')
 pathlib.Path(sys.argv[2]).write_text(source)
 PYOSDWINDOW
-    elif [[ "$plugin" == */araneadev.bar && ("$name" == sudo-relay || "$name" == clock-aliases || "$name" == bar-foreground) ]]; then
+    elif [[ "$plugin" == */araneadev.bar && ("$name" == sudo-relay || "$name" == clock-aliases || "$name" == bar-foreground || "$name" == bar-surface-components) ]]; then
       mkdir -p "$run_dir/cfg/plugins/araneadev.bar"
       for source in "$plugin"/*; do
         [[ "${source##*/}" == Bar.qml ]] && continue
