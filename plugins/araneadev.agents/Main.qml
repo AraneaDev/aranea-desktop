@@ -277,7 +277,7 @@ Item {
   // All-time keeps a quiet day from hiding an agent; today's counts admit a
   // machine whose only source is history.jsonl, which knows nothing older.
   function providerHasData(p) {
-    return numberValue(p.totalPrompts) > 0 || numberValue(p.totalSessions) > 0 || numberValue(p.activeDays) > 0 || numberValue(p.todayPrompts) > 0 || numberValue(p.todaySessions) > 0 || (p.limits && p.limits.length > 0) || !!p.balance
+    return numberValue(p.totalPrompts) > 0 || numberValue(p.totalSessions) > 0 || numberValue(p.activeDays) > 0 || numberValue(p.todayPrompts) > 0 || numberValue(p.todaySessions) > 0 || (p.limits && p.limits.length > 0) || !!p.balance || (p.accounts && p.accounts.length > 0) || (p.ready === true && p.tierLabel !== "")
   }
 
   // A prepaid agent's credit ledger. Like rate limits, the balance is
@@ -311,6 +311,8 @@ Item {
       ready: record.ready === true || synced,
       usageStatusText: String(record.usageStatusText || ""),
       authHelpText: String(record.authHelpText || ""),
+      limitsStale: record.limitsStale === true || record.stale === true,
+      accounts: Array.isArray(record.accounts) ? record.accounts : [],
 
       // Rate limits and balances stay per-account and are never merged
       // across devices.

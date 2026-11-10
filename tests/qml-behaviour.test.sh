@@ -64,7 +64,7 @@ run_test() {
   ln -s "$repo_root/tests/qml/fixtures" "$run_dir/cfg/fixtures"
   for plugin in "$repo_root"/plugins/araneadev.*; do
     [[ -d "$plugin" ]] || continue
-    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == network-telemetry-panel || "$name" == weather-location || "$name" == health-alerts || "$name" == clock-civil-dates || "$name" == worldclock-panel || ("$name" == clock-embedded-controllers || "$name" == unified-clock || "$name" == clock-production-loader) || "$name" == updates-production-host || "$name" == production-widget-panels || "$name" == notification-center-keyboard) ]]; then
+    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == agents-provider-protocol || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == network-telemetry-panel || "$name" == weather-location || "$name" == health-alerts || "$name" == clock-civil-dates || "$name" == worldclock-panel || ("$name" == clock-embedded-controllers || "$name" == unified-clock || "$name" == clock-production-loader) || "$name" == updates-production-host || "$name" == production-widget-panels || "$name" == notification-center-keyboard) ]]; then
       # Adapt only native windows/attached layer-shell state. Placement, mask,
       # motion, coordinator, focus timer and production panel content stay real.
       mkdir -p "$run_dir/cfg/plugins/araneadev.shared"
@@ -342,6 +342,14 @@ LOCKACTION
     mkdir -p "$HOME/.local/state/omarchy/current"
     touch "${ARANEA_TEST_SANDBOX:?}/recover.mp4"
     ln -s "$ARANEA_TEST_SANDBOX/recover.mp4" "$HOME/.local/state/omarchy/current/background"
+  fi
+  if [[ "$name" == agents-provider-protocol ]]; then
+    if ! python3 -c 'from compression import zstd' 2>/dev/null; then
+      echo "SKIP: agents-provider-protocol requires Python with zstd for the target Codex collector"
+      [[ "$require_all" == 1 ]] && return 1
+      return 0
+    fi
+    python3 "$repo_root/tests/lib/agent-provider-fixtures.py" "${shell_dir%/shell}" "$ARANEA_TEST_SANDBOX/provider-fixtures.json"
   fi
   if [[ "$name" == lock-poster-pruning ]]; then
     # Run the exact host helper, including cache pruning. Only thumbnail decoding
