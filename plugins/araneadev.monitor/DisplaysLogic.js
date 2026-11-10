@@ -360,8 +360,8 @@ function mayToggleDisplay(state) {
 /**
  * The argv that switches display `name` on or off through `hyprctl eval`
  * (`hyprctl keyword` is rejected under Hyprland's Lua config), Omarchy's own
- * `hl.monitor` pattern; an enable keeps stock's preferred mode, auto
- * position and auto scale. The name lands inside a Lua string, so anything
+ * `hl.monitor` pattern; an enable only clears disabled, retaining the saved mode,
+ * position and scale. The name lands inside a Lua string, so anything
  * but `[A-Za-z0-9._-]` is refused.
  * @param {string|null|undefined} name - the monitor name
  * @param {boolean} enable - true to switch it on, false to switch it off
@@ -371,7 +371,7 @@ function displayCommand(name, enable) {
   var n = typeof name === "string" ? name : ""
   if (!/^[A-Za-z0-9._-]+$/.test(n)) return null
   var lua = enable
-    ? 'hl.monitor({ output = "' + n + '", mode = "preferred", position = "auto", scale = "auto" })'
+    ? 'hl.monitor({ output = "' + n + '", disabled = false })'
     : 'hl.monitor({ output = "' + n + '", disabled = true })'
   return ["hyprctl", "eval", lua]
 }

@@ -859,11 +859,11 @@ test("displayCommand: a disable is an hl.monitor eval with disabled = true", () 
   ])
 })
 
-test("displayCommand: an enable keeps stock's preferred/auto/auto", () => {
+test("displayCommand: an enable preserves saved mode, position and scale", () => {
   assert.deepEqual(logic.displayCommand("HDMI-A-1", true), [
     "hyprctl",
     "eval",
-    'hl.monitor({ output = "HDMI-A-1", mode = "preferred", position = "auto", scale = "auto" })'
+    'hl.monitor({ output = "HDMI-A-1", disabled = false })'
   ])
 })
 
