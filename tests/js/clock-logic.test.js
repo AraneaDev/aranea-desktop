@@ -12,6 +12,7 @@ process.env.TZ = "Europe/Amsterdam"
 const assert = require("node:assert/strict")
 const path = require("node:path")
 const { test } = require("node:test")
+const { loadPragma } = require("./lib/load-pragma.js")
 
 const logic = require(path.join(__dirname, "..", "..", "plugins/araneadev.clock/ClockLogic.js"))
 
@@ -574,4 +575,27 @@ test("firstOpen: the first item whose dropdown is open, else null", () => {
 
 test("keyHint names no Enter: the calendar has no cursor", () => {
   assert.equal(logic.keyHint(), "←→ month · ↑↓ year · t today")
+})
+
+test("clock tick delays align to epoch boundaries across DST changes", () => {
+  const model = loadPragma("plugins/araneadev.clock/Model.js")
+  for (const [epoch, want] of [
+    [0, 60000],
+    [59999, 1],
+    [60000, 60000]
+  ])
+    assert.equal(model.msUntilNextTick(epoch, 60000), want)
+  for (const instant of [
+    "2026-10-25T00:59:59Z",
+    "2026-10-25T01:00:00Z",
+    "2026-03-29T00:59:59.999Z",
+    "2026-03-29T01:00:00Z"
+  ]) {
+    const epoch = Date.parse(instant)
+    for (const period of [1000, 60000]) {
+      const delay = model.msUntilNextTick(epoch, period)
+      assert.ok(delay >= 1 && delay <= period)
+      assert.equal((epoch + delay) % period, 0)
+    }
+  }
 })

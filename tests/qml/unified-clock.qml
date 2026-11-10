@@ -100,6 +100,14 @@ ShellRoot {
     }
   }
   Component.onCompleted: t.step(1800, function () {
+    var minuteClock = t.childrenOf(clock).filter(function (child) {
+      return child.step === 60000
+    })[0]
+    t.check(!!minuteClock, "bar uses the epoch-aligned minute clock")
+    minuteClock.date = new Date(2026, 9, 25, 2, 59)
+    t.equal(clock.displayText, "02:59", "minute clock keeps the configured bar format")
+    clock.refresh()
+    t.check(Math.abs(clock.displayDate.getTime() - Date.now()) < 1000, "explicit bar refresh restores the current epoch")
     var p = clock.clockPanel
     t.check(p !== null, "default production panel loads")
     t.check(p && typeof p.openSection === "function", "default panel exposes unified sections")

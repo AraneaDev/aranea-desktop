@@ -402,6 +402,16 @@ function monthGrid(year, month, weekStart, todayKey) {
 }
 
 /**
+ * Epoch-aligned delay to the next tick, unaffected by repeated local DST hours.
+ * @param {number} epochMs - current epoch milliseconds
+ * @param {number} periodMs - tick period in milliseconds
+ * @returns {number} delay in (0, periodMs]
+ */
+function msUntilNextTick(epochMs, periodMs) {
+  return periodMs - (epochMs % periodMs)
+}
+
+/**
  * The year and month `delta` months away from (year, month), using UTC
  * so a missing local midnight cannot shift the first into another month.
  * @param {number} year - the starting year
@@ -416,6 +426,7 @@ function stepMonth(year, month, delta) {
 
 if (typeof module !== "undefined") {
   module.exports = {
+    msUntilNextTick: msUntilNextTick,
     dateKey: dateKey,
     keyForDate: keyForDate,
     normalizedWeekStart: normalizedWeekStart,

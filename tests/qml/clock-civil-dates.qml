@@ -13,6 +13,11 @@ ShellRoot {
     viewMonth: 3
   }
 
+  Clock.WallClock {
+    id: wallClock
+    step: 1000
+  }
+
   QmlTest {
     id: t
   }
@@ -36,6 +41,25 @@ ShellRoot {
     t.equal(target.month, 8, "month navigation reaches September")
     t.equal(clock.viewDate.getMonth(), 3, "a missing first midnight still labels April")
     t.equal(clock.viewDate.getDate(), 1, "month label retains the first day")
+    var minuteClock = t.childrenOf(clock).filter(function (child) {
+      return child.step === 60000
+    })[0]
+    t.check(!!minuteClock, "calendar uses the epoch-aligned minute clock")
+    clock.today = new Date(2026, 8, 30, 23, 59)
+    clock.goToToday()
+    minuteClock.date = new Date(2026, 9, 1, 0, 0)
+    t.equal(clock.todayKey, "2026-10-01", "minute consumer rolls over midnight")
+    t.equal(clock.viewMonth, 9, "following today rolls to the new month")
+    clock.moveMonth(-3)
+    minuteClock.date = new Date(2026, 9, 2, 0, 0)
+    t.equal(clock.todayKey, "2026-10-02", "browsing another month still updates today")
+    t.equal(clock.viewMonth, 6, "midnight preserves the browsed month")
+    clock.refresh()
+    t.equal(clock.todayKey, Model.keyForDate(new Date()), "explicit panel refresh rereads the current day")
+    wallClock.date = new Date(0)
+    wallClock.refresh()
+    t.check(Math.abs(wallClock.date.getTime() - Date.now()) < 1000, "explicit refresh reads the current epoch")
+    t.check(wallClock.running && wallClock.interval >= 1 && wallClock.interval <= 1000, "wall clock rearms within its epoch step")
     t.done()
   }
 }

@@ -99,6 +99,14 @@ Item {
     inputField.forcePasswordFocus()
   }
 
+  // Restores focus after a VT/window focus change only when PAM permits input.
+  function restorePasswordFocus() {
+    if (inputEnabled && inputField.passwordInputEnabled && !inputField.passwordInputFocused)
+      forcePasswordFocus()
+  }
+
+  Window.onActiveFocusItemChanged: Qt.callLater(restorePasswordFocus)
+
   // Copies passwordText into the field if they differ, flagging the write so it is not re-emitted.
   function syncPasswordText() {
     inputField.syncPasswordText()

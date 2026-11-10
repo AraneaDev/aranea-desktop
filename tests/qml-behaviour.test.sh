@@ -116,6 +116,26 @@ PYTOASTBOUNDARY
         ln -s "$source" "$run_dir/cfg/plugins/araneadev.clock/${source##*/}"
       done
       sed 's/visible: false/visible: true/' "$plugin/BarWidget.qml" >"$run_dir/cfg/plugins/araneadev.clock/BarWidget.qml"
+    elif [[ "$plugin" == */araneadev.lock && "$name" == lock-recovery ]]; then
+      # Only the native compositor/PAM boundary is replaced; keep real timers,
+      # Process/collector ownership, wallpaper selection and failure handling.
+      mkdir -p "$run_dir/cfg/plugins/araneadev.lock"
+      for source in "$plugin"/*; do
+        [[ "${source##*/}" == Service.qml ]] && continue
+        ln -s "$source" "$run_dir/cfg/plugins/araneadev.lock/${source##*/}"
+      done
+      python - "$plugin/Service.qml" "$run_dir/cfg/plugins/araneadev.lock/Service.qml" <<'PYLOCKBOUNDARY'
+import pathlib, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+source = source.replace('import QtQuick', 'import QtQuick\nimport "../../fixtures/lock-host"\nimport "../../fixtures/agent-panel-host"', 1)
+source = source.replace('WlSessionLock {', 'NativeSessionLock {')
+source = source.replace('WlSessionLockSurface {', 'Rectangle {')
+source = source.replace('PamContext {', 'NativePamContext {')
+source = source.replace('PanelWindow {', 'NativePanelWindow {')
+source = source.replace('WlrLayershell.', 'nativeLayer.')
+source = source.replace('    anchors {', '    nativeAnchors {')
+pathlib.Path(sys.argv[2]).write_text(source)
+PYLOCKBOUNDARY
     elif [[ "$plugin" == */araneadev.settings && "$name" == settings-window-geometry ]]; then
       # Keep the production window's geometry/content bindings; only replace
       # its compositor boundary with the same inert host used by panel tests.
@@ -269,6 +289,39 @@ IDLEACTION
     for display_command in omarchy-shell omarchy-launch-screensaver omarchy-system-lock omarchy-system-wake; do
       ln -s "$run_dir/display-bin/idle-action" "$run_dir/display-bin/$display_command"
     done
+  fi
+  if [[ "$name" == lock-recovery ]]; then
+    # Fake only the host poster helper output and display commands; no real
+    # wallpaper, cache, brightness, PAM or session lock is touched.
+    cat >"$run_dir/display-bin/bash" <<'LOCKBASH'
+#!/usr/bin/python3
+import os, pathlib, sys, time
+args = sys.argv[1:]
+if args and args[0].endswith("/shell/plugins/lock/poster.sh"):
+    if "bad" in args[1] or ("recover" in args[1] and not pathlib.Path(os.environ["ARANEA_TEST_SANDBOX"], "poster-ready").exists()):
+        sys.exit(1)
+    if "delayed" in args[1]:
+        time.sleep(0.3)
+    print(os.environ["ARANEA_TEST_SANDBOX"] + "/poster-" + pathlib.Path(args[1]).name + ".png")
+    sys.exit(0)
+os.execv("/usr/bin/bash", ["bash", *args])
+LOCKBASH
+    cat >"$run_dir/display-bin/lock-action" <<'LOCKACTION'
+#!/usr/bin/python3
+import pathlib, sys
+if pathlib.Path(sys.argv[0]).name == "omarchy-hyprland-session-lock-stranded":
+    sys.exit(2)
+LOCKACTION
+    chmod +x "$run_dir/display-bin/bash" "$run_dir/display-bin/lock-action"
+    for display_command in omarchy-system-wake omarchy-brightness-keyboard omarchy-brightness-display omarchy-hyprland-session-lock-stranded; do
+      ln -sf "$run_dir/display-bin/lock-action" "$run_dir/display-bin/$display_command"
+    done
+    for display_command in delayed.mp4 other.webm recover.mp4; do
+      cp "$repo_root/unlock.png" "${ARANEA_TEST_SANDBOX:?}/poster-$display_command.png"
+    done
+    mkdir -p "$HOME/.local/state/omarchy/current"
+    touch "${ARANEA_TEST_SANDBOX:?}/recover.mp4"
+    ln -s "$ARANEA_TEST_SANDBOX/recover.mp4" "$HOME/.local/state/omarchy/current/background"
   fi
   # Replace the entire native sudo helper; never execute a grant or policy command.
   mkdir -p "$run_dir/sudo-bin" "$run_dir/sudo-state"
