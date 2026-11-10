@@ -178,6 +178,10 @@ Item {
     if (payload.fontFamily)
       root.style.fontFamily = payload.fontFamily
 
+    // A startup read caught mid-write may never have produced default rows.
+    if (sources.defaultMenuItems.length === 0)
+      sources.reload()
+
     if (payload.mode === "select" || payload.mode === "input") {
       root.openDmenu(payload)
     } else {
