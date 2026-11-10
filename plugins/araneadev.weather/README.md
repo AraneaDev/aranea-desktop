@@ -60,6 +60,12 @@ detected place on failure, or wttr.in's IP fallback when no place is known.
 Failures retain last-good forecasts and wait for the next refresh to discover
 again. Process startup, cancellation, refresh generations and per-coordinate
 daily/air ownership prevent overlapping work.
+When a peer supplies a different detected city, adoption invalidates and cancels
+all requests for the old effective place, including pending discovery. Each
+collector and publication checks its launch epoch and effective query, so late
+responses cannot overwrite the peer's data or label old readings as the new city.
+Automatic peers still share the stable configured query rather than the detected
+coordinates.
 
 The pure rules live in `Model.js` and `WeatherLogic.js` (tested under Node).
 

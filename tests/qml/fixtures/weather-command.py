@@ -59,17 +59,22 @@ elif name == "curl":
     url = args[-1]
     kind = "geo" if url == "https://geo.omarchy.org/" else "air" if "air-quality-api" in url else "daily" if "api.open-meteo.com" in url else "forecast"
     def accept(state):
-        state.setdefault("calls", []).append({"kind": kind, "argv": args})
+        state.setdefault("calls", []).append({"kind": kind, "argv": args, "tag": state.get("requestTag", "")})
         state[kind + "Started"] = state.get(kind + "Started", 0) + 1
-        return state.get(kind + "Delay", 0), state.get(kind + "Body", ""), state.get(kind + "Exit", 0), state.get("cancelDelays", {}).get(kind, 0)
-    delay, response, code, cancel_delay = update(accept)
+        return state.get(kind + "Delay", 0), state.get(kind + "Body", ""), state.get(kind + "Exit", 0), state.get("cancelDelays", {}).get(kind, 0), state.get("ignoreCancel", False), state.get("requestTag", "")
+    delay, response, code, cancel_delay, ignore_cancel, tag = update(accept)
     def canceled(_signal, _frame):
+        if ignore_cancel:
+            return
         time.sleep(cancel_delay)
         sys.exit(143)
     signal.signal(signal.SIGTERM, canceled)
     time.sleep(delay)
     print(response, flush=True)
-    update(lambda state: state.update({kind + "Finished": state.get(kind + "Finished", 0) + 1}))
+    def finish(state):
+        state[kind + "Finished"] = state.get(kind + "Finished", 0) + 1
+        state.setdefault("completed", []).append({"kind": kind, "tag": tag})
+    update(finish)
     sys.exit(code)
 elif name == "omarchy-weather-location":
     update(lambda state: state.setdefault("saved", []).append(args))

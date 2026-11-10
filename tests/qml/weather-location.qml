@@ -124,6 +124,8 @@ ShellRoot {
   function testSavedWins() {
     weather.deactivateEmbedded()
     host.opened = false
+    // Earlier failure retries are not part of this fresh cancellation scenario.
+    weather.canceledWeatherRequests = null
     // A pending automatic lookup is superseded by an explicit user location.
     fixture.configure({
       geoBody: '{"name":"Wrong city","latitude":1,"longitude":2}',
@@ -219,7 +221,162 @@ ShellRoot {
             t.equal(weather.report, staleReport, "IP fallback failure keeps stale forecast")
             weather.deactivateEmbedded()
             host.opened = false
-            t.done()
+            testPeerOwnership()
+          })
+        })
+      })
+    })
+  }
+  // Real response bodies identify which city's delayed collector won.
+  function reportFor(city, temp, latitude, longitude) {
+    return {
+      current_condition: [
+        {
+          temp_C: String(temp)
+        }
+      ],
+      weather: [],
+      nearest_area: [
+        {
+          latitude: String(latitude),
+          longitude: String(longitude),
+          areaName: [
+            {
+              value: city
+            }
+          ]
+        }
+      ]
+    }
+  }
+  // A compact but valid current/daily response for the production parser.
+  function dailyFor(temp) {
+    return {
+      current: {
+        temperature_2m: temp,
+        weather_code: 2,
+        is_day: 1
+      },
+      daily: {
+        time: [],
+        weather_code: [],
+        temperature_2m_max: [],
+        temperature_2m_min: []
+      }
+    }
+  }
+  // Check each old collector before a later geo reply could mask its stale update.
+  function verifyOldPeerReply(index, callback) {
+    var kinds = ["forecast", "daily", "air", "geo"]
+    var kind = kinds[index]
+    t.waitFor(function () {
+      return (fixture.state.completed || []).some(function (call) {
+        return call.tag === "old-Amsterdam" && call.kind === kind
+      })
+    }, 3000, "delayed old " + kind + " command finishes after adoption", function () {
+      if (kind === "forecast")
+        t.equal(weather.report.current_condition[0].temp_C, "29", "late old primary collector cannot change peer data")
+      else if (kind === "daily")
+        t.equal(weather.dailyForecastReport.current.temperature_2m, 29, "late old daily collector cannot change peer data")
+      else if (kind === "air")
+        t.equal(weather.air.aqi, 41, "late old air collector cannot change peer data")
+      else
+        t.equal(weather.detectedLocationState.name, "Lisbon", "late old geo collector cannot change peer data")
+      if (index + 1 < kinds.length)
+        verifyOldPeerReply(index + 1, callback)
+      else
+        callback()
+    })
+  }
+  // Two live automatic owners: late old-city responses cannot replace a newer peer.
+  function testPeerOwnership() {
+    // Earlier fallback retries do not belong to the simultaneous-owner scenario.
+    weather.canceledWeatherRequests = null
+    weather.detectedLocationState = {
+      name: "Amsterdam",
+      latitude: 52.37,
+      longitude: 4.9
+    }
+    fixture.configure({
+      requestTag: "old-Amsterdam",
+      ignoreCancel: true,
+      cancelDelays: {},
+      geoExit: 0,
+      forecastExit: 0,
+      dailyExit: 0,
+      airExit: 0,
+      geoDelay: 2.8,
+      forecastDelay: 1.4,
+      dailyDelay: 1.8,
+      airDelay: 2.2,
+      geoBody: '{"name":"Amsterdam","latitude":52.37,"longitude":4.9}',
+      forecastBody: JSON.stringify(reportFor("Amsterdam", 17, 52.37, 4.9)),
+      dailyBody: JSON.stringify(dailyFor(17)),
+      airBody: '{"current":{"european_aqi":21,"uv_index":1}}'
+    }, function () {
+      host.opened = true
+      weather.activateEmbedded()
+      weather.refresh()
+      // A last-known place can still have secondary/primary work while geo resolves.
+      weather.startForecastRequests()
+      t.waitFor(function () {
+        return ["geo", "forecast", "daily", "air"].every(function (kind) {
+          return fixture.state.calls.some(function (call) {
+            return call.tag === "old-Amsterdam" && call.kind === kind
+          })
+        })
+      }, 1500, "old automatic owner has geo, primary, daily and air commands live", function () {
+        fixture.configure({
+          requestTag: "new-Lisbon",
+          ignoreCancel: false,
+          geoDelay: 0.05,
+          forecastDelay: 0.05,
+          dailyDelay: 0.05,
+          airDelay: 0.05,
+          geoBody: '{"name":"Lisbon","latitude":38.72,"longitude":-9.14}',
+          forecastBody: JSON.stringify(reportFor("Lisbon", 29, 38.72, -9.14)),
+          dailyBody: JSON.stringify(dailyFor(29)),
+          airBody: '{"current":{"european_aqi":41,"uv_index":3}}'
+        }, function () {
+          peer.readyDefers = 6
+          peerHost.activePage = "weather"
+          peerHost.opened = true
+          peer.activateEmbedded()
+          peer.refresh()
+          t.waitFor(function () {
+            return peer.detectedLocationState.name === "Lisbon" && peer.report && peer.report.current_condition[0].temp_C === "29" && peer.dailyForecastReport && peer.dailyForecastReport.current.temperature_2m === 29 && peer.air && peer.air.aqi === 41 && !peer.fetchInFlight
+          }, 1500, "new automatic peer completes a different-city bundle", function () {
+            var generation = weather.locationGeneration
+            weather.offerShared(peer.sharedWeather)
+            var published = weather.publishedAtMs
+            var callCount = fixture.state.calls.length
+            t.equal(weather.locationQuery, "38.72,-9.14", "active owner adopts peer effective location")
+            t.equal(weather.configuredLocationQuery, "", "automatic sharing identity remains configured query")
+            t.check(weather.locationGeneration > generation, "different effective location invalidates old request epoch")
+            weather.publishShared(true, generation, "52.37,4.9")
+            t.equal(weather.publishedAtMs, published, "publication rejects a superseded launch epoch and effective query")
+            t.equal(peer.sharedWeather.effectiveLocationQuery, "38.72,-9.14", "bundle records launch effective provenance separately from sharing identity")
+            weather.publishShared(true, weather.locationGeneration, "52.37,4.9")
+            t.equal(weather.publishedAtMs, published, "current epoch still rejects another effective place's publication")
+            var cycle = weather.refreshCycle
+            weather.refresh()
+            t.equal(weather.refreshCycle, cycle, "explicit refresh waits for superseded processes to settle")
+            verifyOldPeerReply(0, function () {
+              t.step(250, function () {
+                t.equal(weather.detectedLocationState.name, "Lisbon", "old geo cannot replace adopted detected city")
+                t.equal(weather.report.current_condition[0].temp_C, "29", "old primary cannot replace adopted forecast")
+                t.equal(weather.dailyForecastReport.current.temperature_2m, 29, "old daily cannot replace adopted forecast")
+                t.equal(weather.air.aqi, 41, "old air cannot replace adopted reading")
+                t.equal(weather.publishedAtMs, published, "superseded collectors cannot republish under the peer city")
+                t.equal(fixture.state.calls.length, callCount, "old geo completion cannot start more forecasts")
+                t.check(!weather.fetchInFlight && !weather.isFetching(), "superseded request cancellation settles without a new claim")
+                weather.deactivateEmbedded()
+                host.opened = false
+                peer.deactivateEmbedded()
+                peerHost.opened = false
+                t.done()
+              })
+            })
           })
         })
       })
@@ -227,6 +384,7 @@ ShellRoot {
   }
   Component.onCompleted: {
     weather.locationFile.path = Quickshell.env("ARANEA_TEST_SANDBOX") + "/weather-fixture/weather.json"
+    peer.locationFile.path = Quickshell.env("ARANEA_TEST_SANDBOX") + "/weather-fixture/peer-weather.json"
     fixture.configure({
       geoBody: '{"name":"Amsterdam","latitude":52.37,"longitude":4.9}',
       geoDelay: 0.3,

@@ -283,7 +283,7 @@ Panel {
   readonly property string configuredLocationQuery: Model.wttrLocationQuery(configuredLocationState.name, configuredLocationState.latitude, configuredLocationState.longitude)
   // A saved-location change waits until every canceled process has settled.
   property bool configuredRefreshPending: false
-  // Superseded discovery responses cannot alter the current location.
+  // Request ownership epoch; saved changes and adopted effective places invalidate it.
   property int locationGeneration: 0
   // Whether the bounded automatic lookup is still resolving.
   readonly property bool detectingLocation: locationProc.running
@@ -575,6 +575,7 @@ Panel {
     dailyForecastRetries = 0
     if (root.autoLocation) {
       locationProc.requestGeneration = root.locationGeneration
+      locationProc.requestLocationQuery = root.locationQuery
       locationProc.running = true
       return
     }
@@ -588,6 +589,7 @@ Panel {
     if (!forecastProc.running) {
       root.refreshStarting = true
       forecastProc.requestGeneration = root.locationGeneration
+      forecastProc.requestLocationQuery = root.locationQuery
       forecastProc.running = true
     }
     refreshDailyForecast(null)
@@ -669,14 +671,18 @@ Panel {
   // Publishes this instance's report after one of its own responses landed,
   // and hands it to the other instances (offerShared). PRIMARY (the
   // response that makes a refresh, see fetchedAtMs) also stamps the
-  // fetch time.
-  function publishShared(primary) {
+  // fetch time. Collector publications must carry their captured launch epoch
+  // and effective query; explicit snapshot callers may omit those arguments.
+  function publishShared(primary, generation, effectiveQuery) {
+    if (generation !== undefined && !root.requestIsCurrent(generation, effectiveQuery))
+      return
     root.publishedAtMs = Date.now()
     if (primary === true)
       root.fetchedAtMs = root.publishedAtMs
     root.nowMs = root.publishedAtMs
     root.sharedWeather = {
       locationQuery: root.configuredLocationQuery,
+      effectiveLocationQuery: root.locationQuery,
       fetchedAtMs: root.fetchedAtMs,
       publishedAtMs: root.publishedAtMs,
       report: root.report,
@@ -709,6 +715,11 @@ Panel {
     peerWaitTimer.stop()
     if (!bundle || !(bundle.publishedAtMs > root.publishedAtMs))
       return
+    var detected = root.autoLocation && bundle.detectedLocationState ? bundle.detectedLocationState : root.detectedLocationState
+    var nextLocation = Model.effectiveLocation(root.configuredLocationState, detected)
+    var nextQuery = Model.wttrLocationQuery(nextLocation.name, nextLocation.latitude, nextLocation.longitude)
+    if (nextQuery !== root.locationQuery)
+      root.supersedeWeatherRequests()
     root.configuredRefreshPending = false
     root.report = bundle.report || root.report
     root.dailyForecastReport = bundle.daily || root.dailyForecastReport
@@ -724,6 +735,27 @@ Panel {
     root.publishedAtMs = bundle.publishedAtMs
     root.nowMs = Date.now()
     root.finishSavingLocation()
+  }
+
+  // Only the launch epoch and effective place may mutate or publish a response.
+  function requestIsCurrent(generation, effectiveQuery) {
+    return generation === root.locationGeneration && effectiveQuery === root.locationQuery && (!root.embedded || root.sectionActive)
+  }
+
+  // Peer adoption replaces the old effective owner; canceled work must settle first.
+  function supersedeWeatherRequests() {
+    root.locationGeneration++
+    root.configuredRefreshPending = false
+    root.canceledWeatherRequests = null
+    root.refreshStarting = false
+    root.fetchClaimMs = 0
+    forecastRetryTimer.stop()
+    dailyForecastRetryTimer.stop()
+    readyTimer.stop()
+    forecastProc.running = false
+    dailyForecastProc.running = false
+    airProc.running = false
+    locationProc.running = false
   }
 
   // Fetches open-meteo's forecast (with the extras) and the air reading for
@@ -751,11 +783,13 @@ Panel {
       return
     root.dailyForecastKey = key
     dailyForecastProc.requestGeneration = root.locationGeneration
+    dailyForecastProc.requestLocationQuery = root.locationQuery
     dailyForecastProc.command = ["curl", "-fsS", "--max-time", "5", WeatherLogic.buildForecastUrl(lat, lon)]
     dailyForecastProc.running = true
     if (key !== root.airKey && !airProc.running) {
       root.airKey = key
       airProc.requestGeneration = root.locationGeneration
+      airProc.requestLocationQuery = root.locationQuery
       airProc.command = ["curl", "-fsS", "--max-time", "5", WeatherLogic.buildAirUrl(lat, lon)]
       airProc.running = true
     }
@@ -1071,8 +1105,10 @@ Panel {
 
   Process {
     id: forecastProc
-    // Ignore canceled responses belonging to a superseded saved location.
+    // Ownership epoch captured when this effective-location request starts.
     property int requestGeneration: -1
+    // Effective place that launched this request, independent of the shared key.
+    property string requestLocationQuery: ""
     onRunningChanged: if (running)
       root.refreshStarting = false
     command: ["curl", "-fsS", "--max-time", "10", "https://wttr.in/" + root.locationQuery + "?format=j1"]
@@ -1080,7 +1116,7 @@ Panel {
       id: forecastOut
       waitForEnd: true
       onStreamFinished: {
-        if (forecastProc.requestGeneration !== root.locationGeneration || (root.embedded && !root.sectionActive))
+        if (!root.requestIsCurrent(forecastProc.requestGeneration, forecastProc.requestLocationQuery))
           return
         var raw = String(forecastOut.text || "").trim()
         if (!raw) {
@@ -1096,7 +1132,7 @@ Panel {
           let coords = WeatherLogic.wttrCoords(raw)
           if (coords)
             root.autoCoords = coords
-          root.publishShared(Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "wttr"))
+          root.publishShared(Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "wttr"), forecastProc.requestGeneration, forecastProc.requestLocationQuery)
           if (Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "wttr"))
             root.finishSavingLocation()
           // Stored coordinates already drove the fast open-meteo fetch from
@@ -1149,13 +1185,15 @@ Panel {
 
   Process {
     id: dailyForecastProc
-    // Ignore canceled responses belonging to a superseded saved location.
+    // Ownership epoch captured when this effective-location request starts.
     property int requestGeneration: -1
+    // Effective place that launched this request, independent of the shared key.
+    property string requestLocationQuery: ""
     stdout: StdioCollector {
       id: dailyForecastOut
       waitForEnd: true
       onStreamFinished: {
-        if (dailyForecastProc.requestGeneration !== root.locationGeneration || (root.embedded && !root.sectionActive))
+        if (!root.requestIsCurrent(dailyForecastProc.requestGeneration, dailyForecastProc.requestLocationQuery))
           return
         var raw = String(dailyForecastOut.text || "").trim()
         if (!raw) {
@@ -1170,7 +1208,7 @@ Panel {
           root.label = Model.currentIcon(parsedCurrent, root.label)
           root.dailyForecastRetries = 0
           root.forecastDoneKey = root.dailyForecastKey
-          root.publishShared(Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "open-meteo"))
+          root.publishShared(Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "open-meteo"), dailyForecastProc.requestGeneration, dailyForecastProc.requestLocationQuery)
           if (Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "open-meteo"))
             root.finishSavingLocation()
         } catch (e) {
@@ -1185,18 +1223,20 @@ Panel {
   // failure hides the chips (no retry; the next refresh asks again).
   Process {
     id: airProc
-    // Ignore canceled responses belonging to a superseded saved location.
+    // Ownership epoch captured when this effective-location request starts.
     property int requestGeneration: -1
+    // Effective place that launched this request, independent of the shared key.
+    property string requestLocationQuery: ""
     stdout: StdioCollector {
       id: airOut
       waitForEnd: true
       onStreamFinished: {
-        if (airProc.requestGeneration !== root.locationGeneration || (root.embedded && !root.sectionActive))
+        if (!root.requestIsCurrent(airProc.requestGeneration, airProc.requestLocationQuery))
           return
         root.air = WeatherLogic.parseAir(String(airOut.text || ""))
         // Published either way, so the other instances drop a stale
         // reading when this request failed.
-        root.publishShared(false)
+        root.publishShared(false, airProc.requestGeneration, airProc.requestLocationQuery)
       }
     }
   }
@@ -1234,13 +1274,15 @@ Panel {
       root.refreshStarting = false
     // Generation is captured before spawning, preserving cancellation ownership.
     property int requestGeneration: -1
+    // Effective place that launched this request, independent of the shared key.
+    property string requestLocationQuery: ""
     command: ["curl", "-fsS", "--max-time", "4", "--max-filesize", "16384", "https://geo.omarchy.org/"]
     stdout: StdioCollector {
       id: locationOut
       waitForEnd: true
     }
     onExited: function (exitCode) {
-      if (locationProc.requestGeneration !== root.locationGeneration || !root.autoLocation) {
+      if (!root.autoLocation || !root.requestIsCurrent(locationProc.requestGeneration, locationProc.requestLocationQuery)) {
         // Cancellation may still report running when the configuration changes.
         Qt.callLater(root.resumeConfiguredRefresh)
         return
