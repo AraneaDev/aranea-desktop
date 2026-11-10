@@ -9,8 +9,13 @@ helper="$repo_root/scripts/aranea-agent-identity"
   exit 1
 }
 mkdir -p "$ARANEA_TEST_SANDBOX/bin"
-cp /usr/bin/sleep "$ARANEA_TEST_SANDBOX/bin/claude"
-"$ARANEA_TEST_SANDBOX/bin/claude" 30 &
+# Ubuntu's multicall coreutils dispatches by argv[0], so a sleep binary
+# renamed to claude/codex exits immediately. Bash accepts either basename
+# and keeps a real native process alive for the kernel-evidence checks.
+cp /bin/bash "$ARANEA_TEST_SANDBOX/bin/claude"
+# Expanded by the copied Bash process, not the test shell.
+# shellcheck disable=SC2016
+"$ARANEA_TEST_SANDBOX/bin/claude" -c 'sleep 30 & child=$!; trap '\''kill "$child" 2>/dev/null || true'\'' EXIT TERM; wait "$child"' &
 pid=$!
 sandbox_on_exit "kill $pid 2>/dev/null || true"
 script_dir="$repo_root/scripts"
@@ -40,8 +45,9 @@ echo 'PASS native boot/PID/start/executable/hash/ancestry and terminal-parent di
 
 # A Codex claim must never borrow a Claude executable's proof.
 jq '.provider="codex"' <<<"$query" | "$helper" | jq -e '.verified==false' >/dev/null
-cp /usr/bin/sleep "$ARANEA_TEST_SANDBOX/bin/codex"
-"$ARANEA_TEST_SANDBOX/bin/codex" 30 &
+cp /bin/bash "$ARANEA_TEST_SANDBOX/bin/codex"
+# shellcheck disable=SC2016
+"$ARANEA_TEST_SANDBOX/bin/codex" -c 'sleep 30 & child=$!; trap '\''kill "$child" 2>/dev/null || true'\'' EXIT TERM; wait "$child"' &
 codex_pid=$!
 sandbox_on_exit "kill $codex_pid 2>/dev/null || true"
 agent_hooks_provider_process "$codex_pid" codex || {
