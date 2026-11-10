@@ -227,6 +227,19 @@ for (const [name, model] of [
   ["module", parsing],
   ["facade", facade]
 ]) {
+  test(`${name} reads invalid menu sources without losing previous rows`, () => {
+    const previous = [{ id: "existing", label: "Existing" }]
+    for (const raw of ['{"fresh":', "[]", "null", "42", '"menu"', "false"]) {
+      assert.equal(model.readMenuJsonc(raw), null, `invalid source: ${raw}`)
+      assert.equal(model.keepMenuRows(previous, raw, false), previous)
+    }
+    assert.equal(model.keepMenuRows(previous, "// interrupted required source", true), previous)
+    assert.deepEqual(plain(model.keepMenuRows(previous, "// user cleared source", false)), [])
+    const replacement = model.keepMenuRows(previous, '{"items":{"fresh":{"label":7}}}', true)
+    assert.deepEqual(plain(replacement.map((item) => [item.id, item.label])), [["fresh", "7"]])
+    assert.deepEqual(previous, [{ id: "existing", label: "Existing" }])
+  })
+
   test(`${name} merges partial overrides without changing first-seen order or input items`, () => {
     const defaults = [
       { id: "apps", parent: "root", label: "Apps", provider: "apps", aliases: ["launch"] },
