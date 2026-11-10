@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.40.0...v2.40.1) (2026-11-10)
+
+
+### Fixes
+
+* **menu:** restore consolidated menus and centered submenus ([#237](https://github.com/AraneaDev/aranea-desktop/issues/237)) ([8ade0be](https://github.com/AraneaDev/aranea-desktop/commit/8ade0be9ca218d255dea26d6ef1308af06479223))
+
 ## [2.40.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.39.4...v2.40.0) (2026-11-10)
 
 
