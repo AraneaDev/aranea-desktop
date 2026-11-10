@@ -303,6 +303,9 @@ Panel {
     root.lastStop = -1
     root.pendingRemovalKey = ""
     if (opened) {
+      // Bell, direct shell and service IPC routes share this open boundary.
+      if (root.service)
+        root.service.stopKeyboard()
       root.now = Date.now()
       root.confirmingClear = false
     }
