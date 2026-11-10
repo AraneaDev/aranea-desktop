@@ -82,6 +82,23 @@ source = source.replace('WlrLayershell.', 'nativeLayer.')
 source = re.sub(r'(?m)^(  |        )anchors \{', r'\1nativeAnchors {', source)
 pathlib.Path(sys.argv[2]).write_text(source)
 PYBOUNDARY
+    elif [[ "$plugin" == */araneadev.notifications && "$name" == notification-toasts ]]; then
+      # Only substitute native windows/attached layer state. The production
+      # output selector, focus item, cards and countdown timers remain real.
+      mkdir -p "$run_dir/cfg/plugins/araneadev.notifications"
+      for source in "$plugin"/*; do
+        [[ "${source##*/}" == Toasts.qml ]] && continue
+        ln -s "$source" "$run_dir/cfg/plugins/araneadev.notifications/${source##*/}"
+      done
+      python - "$plugin/Toasts.qml" "$run_dir/cfg/plugins/araneadev.notifications/Toasts.qml" <<'PYTOASTBOUNDARY'
+import pathlib, re, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+source = source.replace('import QtQuick\n', 'import QtQuick\nimport "../../fixtures/agent-panel-host"\n', 1)
+source = re.sub(r'\bPanelWindow\s*\{', 'NativePanelWindow {', source)
+source = source.replace('WlrLayershell.', 'nativeLayer.')
+source = re.sub(r'(?m)^      anchors \{', '      nativeAnchors {', source)
+pathlib.Path(sys.argv[2]).write_text(source)
+PYTOASTBOUNDARY
     elif [[ "$plugin" == */araneadev.clock && ("$name" == unified-clock || "$name" == clock-production-loader) ]]; then
       # Native windows ignore ancestor Item visibility; the Item boundary must too.
       mkdir -p "$run_dir/cfg/plugins/araneadev.clock"

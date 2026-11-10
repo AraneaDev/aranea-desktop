@@ -102,8 +102,21 @@ function senderActionButtons(actions) {
   return out
 }
 
+/**
+ * Choose the newest toast's shortcut behavior from meaningful choices.
+ * @param {number} buttonCount - Number of visible buttons.
+ * @param {boolean} clickable - Whether the card has a real default action.
+ * @returns {string} Dismiss, click, button or keyboard mode.
+ */
+function newestActionMode(buttonCount, clickable) {
+  if (buttonCount + (clickable ? 1 : 0) > 1) return "keyboard"
+  if (clickable) return "click"
+  return buttonCount > 0 ? "button" : "dismiss"
+}
+
 if (typeof module !== "undefined")
   module.exports = {
+    newestActionMode: newestActionMode,
     senderActionButtons: senderActionButtons,
     clampTimestamp: clampTimestamp,
     holdPopup: holdPopup,

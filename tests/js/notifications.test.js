@@ -833,3 +833,17 @@ test("notification actions fail closed at upstream bounds", () => {
   )
   assert.equal(n.parseExecArgv('["open","a\\u0000b"]'), null)
 })
+
+test("newest-card policy counts a real click as a choice", () => {
+  const logic = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
+  for (const [buttons, click, want] of [
+    [0, false, "dismiss"],
+    [0, true, "click"],
+    [1, false, "button"],
+    [1, true, "keyboard"],
+    [2, false, "keyboard"]
+  ]) {
+    if (logic.newestActionMode(buttons, click) !== want)
+      throw new Error(`wrong mode for ${buttons}/${click}`)
+  }
+})

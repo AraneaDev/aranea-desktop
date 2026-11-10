@@ -109,7 +109,7 @@ fi
 grep -Fq 'service.toasts = service.createPart("Toasts.qml")' "$svc"
 grep -Fq 'service.server = service.createPart("NotificationDaemon.qml")' "$svc"
 grep -Fq 'server.root.handleNotification(notification)' "$repo_root/plugins/araneadev.notifications/NotificationDaemon.qml"
-grep -Fq 'WlrLayershell.keyboardFocus: WlrKeyboardFocus.None' "$toasts_qml"
+# Passive/explicit keyboard ownership: tests/qml/notification-toasts.qml.
 
 # --- 4c: a hold on any screen pauses every copy of a toast (the window wiring)
 grep -Fq '!cardSlot.svc.popupHeld(cardSlot.holdKey)' "$toasts_qml"

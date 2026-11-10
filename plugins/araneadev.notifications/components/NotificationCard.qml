@@ -45,6 +45,12 @@ BorderSurface {
   property string glyph: ""
   // Plain label objects in the service's visible choice order.
   property var actions: []
+  // Toast keyboard choices: a meaningful click is first, then visible buttons.
+  property bool keyboardChoices: false
+  // Whether the keyboard choices include a meaningful card click first.
+  property bool keyboardClick: false
+  // Selected zero-based keyboard choice in the displayed order.
+  property int keyboardChoice: 0
   // NotificationUrgency: Low=0, Normal=1, Critical=2 (upstream).
   property int urgency: 1
   // Card corner radius.
@@ -135,7 +141,9 @@ BorderSurface {
 
   // Shared typed tokens also keep the action row consistent with the card.
   readonly property color textColor: Commons.Color.notifications.text
+  // Shared accent for action buttons and selected keyboard choices.
   readonly property color actionColor: Commons.Color.notifications.countdown
+  // Shared caption size used by action labels and relative time.
   readonly property real captionFontSize: Style.font.caption
 
   // Muted text color: time label, close button, low-urgency accent.
@@ -465,7 +473,20 @@ BorderSurface {
         }
       }
     }
+    Text {
+      objectName: "notificationClickChoice"
+      Layout.leftMargin: Style.space(12)
+      Layout.rightMargin: Style.space(12)
+      Layout.fillWidth: true
+      visible: root.keyboardChoices && root.keyboardClick
+      text: "1 Open notification"
+      textFormat: Text.PlainText
+      color: root.keyboardChoice === 0 ? root.actionColor : root.textColor
+      font.family: root.fontFamily
+      font.pixelSize: root.captionFontSize
+    }
     Flow {
+      id: actionFlow
       Layout.fillWidth: true
       Layout.leftMargin: Style.space(12)
       Layout.rightMargin: Style.space(12)
@@ -480,15 +501,17 @@ BorderSurface {
           required property int index
           required property var modelData
           readonly property string label: String(modelData.label || "")
-          width: Math.min(actionLabel.implicitWidth + Style.space(20), parent.width)
+          width: Math.min(actionLabel.implicitWidth + Style.space(20), actionFlow.width)
           height: Style.space(28)
           radius: Style.space(4)
-          color: Util.alpha(root.actionColor, actionArea.containsMouse ? 0.18 : 0.08)
+          readonly property int choiceIndex: actionButton.index + (root.keyboardClick ? 1 : 0)
+          color: Util.alpha(root.actionColor, (actionArea.containsMouse || (root.keyboardChoices && root.keyboardChoice === choiceIndex)) ? 0.18 : 0.08)
           Text {
             id: actionLabel
+            objectName: "notificationActionLabel"
             anchors.fill: parent
             anchors.margins: Style.space(5)
-            text: actionButton.label
+            text: (root.keyboardChoices ? String(actionButton.choiceIndex + 1) + " " : "") + actionButton.label
             textFormat: Text.PlainText
             elide: Text.ElideRight
             horizontalAlignment: Text.AlignHCenter

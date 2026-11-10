@@ -8,6 +8,7 @@ import Quickshell
 import Quickshell.Io
 import "lib"
 import "plugins/araneadev.notifications" as Notif
+import "plugins/araneadev.projects" as Projects
 import "plugins/araneadev.notifications/NotificationLogic.js" as Logic
 
 ShellRoot {
@@ -28,6 +29,159 @@ ShellRoot {
     windowEnabled: false
     serverEnabled: false
     stateDir: testRoot.stateRoot + "a/"
+  }
+
+  Projects.ProjectRuntime {
+    id: ipcTransport
+  }
+
+  // Call the real isolated notification IPC endpoint and inspect its reply.
+  function ipc(method, want, then) {
+    var config = decodeURIComponent(Qt.resolvedUrl('.').toString().replace(/^file:\/\//, ''))
+    ipcTransport.run(['/usr/bin/qs', 'ipc', '-p', config, 'call', 'notifications', method], '', function (code, output, error) {
+      t.equal(String(output || '').trim(), want, method + ' IPC reply')
+      then()
+    })
+  }
+
+  // Create a plain row and a controlled sender with distinct callable choices.
+  function keyboardRow(id, names) {
+    var ref = {
+      tracked: true,
+      actions: names.map(function (name) {
+        return {
+          identifier: name,
+          text: name,
+          invoke: function () {
+            invokedActions.push(name)
+          }
+        }
+      }),
+      dismiss: function () {
+        this.tracked = false
+      }
+    }
+    svc.liveRefs[id] = ref
+    var row = Logic.snapshotOf({
+      id: id,
+      appName: 'guessed-app'
+    }, testRoot.now + id)
+    svc.popupModel.insert(0, row)
+    return ref
+  }
+
+  // Exercise shortcut policy, stable selection, exits and inbox preservation.
+  function checkKeyboard(then) {
+    invokedActions = []
+    svc.inbox.upsert({
+      timestamp: testRoot.now,
+      originalId: 999,
+      app: 'retained',
+      summary: 'keep me'
+    })
+    var inboxBefore = svc.inbox.count
+    t.equal(inboxBefore, 1, 'shortcut test starts with a retained inbox entry')
+    ipc('act', 'none', function () {
+      ipc('keyboard', 'none', function () {
+        keyboardRow(61, [])
+        ipc('act', 'ok', function () {
+          t.equal(svc.popupModel.count, 0, 'guessed display name alone dismisses')
+          keyboardRow(62, ['default'])
+          ipc('act', 'ok', function () {
+            t.equal(invokedActions, ['default'], 'only default click invokes')
+            keyboardRow(63, ['button'])
+            ipc('act', 'ok', function () {
+              t.equal(invokedActions, ['default', 'button'], 'only button invokes')
+              keyboardRow(64, ['default', 'button'])
+              ipc('act', 'ok', function () {
+                t.check(svc.keyboardMode, 'default plus button enters keyboard mode')
+                t.equal(svc.keyboardOriginalId, 64, 'keyboard retains original card identity')
+                t.check(svc.popupHeld(String(testRoot.now + 64) + '-64'), 'keyboard pauses expiry')
+                keyboardRow(65, ['other'])
+                svc.keyboardPressed(Qt.Key_9, '9')
+                t.check(svc.keyboardMode, 'out-of-range number keeps the selected card')
+                svc.popupModel.move(1, 0, 1)
+                svc.keyboardPressed(Qt.Key_2, '2')
+                t.equal(invokedActions, ['default', 'button', 'button'], 'number two invokes button after visible click')
+                t.equal(svc.popupModel.get(0).originalId, 65, 'insertion never redirects selection')
+                t.check(!svc.keyboardMode, 'choice releases keyboard')
+                t.check(!svc.popupHeld(String(testRoot.now + 65) + '-65'), 'choice resumes expiry')
+                svc.clearPopups()
+                keyboardRow(66, ['left', 'right'])
+                ipc('act', 'ok', function () {
+                  t.check(svc.keyboardMode, 'two buttons enter keyboard mode')
+                  svc.keyboardPressed(Qt.Key_Down, '')
+                  svc.keyboardPressed(Qt.Key_Return, '')
+                  t.equal(invokedActions, ['default', 'button', 'button', 'right'], 'Enter invokes selected visible choice')
+                  keyboardRow(67, ['stale', 'never'])
+                  ipc('keyboard', 'on', function () {
+                    svc.expirePopup(0)
+                    keyboardRow(68, ['neighbour'])
+                    svc.keyboardPressed(Qt.Key_1, '1')
+                    t.equal(invokedActions, ['default', 'button', 'button', 'right'], 'expired selection never falls through')
+                    t.check(!svc.keyboardMode, 'expiry releases keyboard')
+                    svc.clearPopups()
+                    keyboardRow(69, ['before', 'second'])
+                    svc.startKeyboard(69)
+                    svc.removePopupsByOriginalId(69)
+                    keyboardRow(69, ['after', 'second'])
+                    svc.keyboardPressed(Qt.Key_1, '1')
+                    t.equal(invokedActions, ['default', 'button', 'button', 'right'], 'same-ID replacement refuses stale key')
+                    svc.clearPopups()
+                    keyboardRow(70, ['escape', 'unused'])
+                    ipc('keyboard', 'on', function () {
+                      svc.keyboardPressed(Qt.Key_Escape, '')
+                      t.check(!svc.keyboardMode && !svc.popupHeld('any'), 'Escape releases focus and timer pause')
+                      ipc('keyboard', 'on', function () {
+                        ipc('keyboard', 'off', function () {
+                          t.check(!svc.keyboardMode, 'IPC toggles ownership off')
+                          svc.startKeyboard(70)
+                          svc.clearPopups()
+                          t.check(!svc.keyboardMode, 'clear releases keyboard')
+                          t.equal(svc.inbox.count, inboxBefore, 'shortcuts leave persistent inbox unchanged')
+                          t.equal(svc.inbox.model.get(0).summary, 'keep me', 'shortcuts preserve retained inbox content')
+                          var closingDefault = keyboardRow(71, ['default', 'unused'])
+                          closingDefault.actions[0].invoke = function () {
+                            invokedActions.push('closing-default')
+                            svc.removePopupsByOriginalId(71)
+                            keyboardRow(72, ['survivor'])
+                          }
+                          svc.startKeyboard(71)
+                          svc.keyboardPressed(Qt.Key_Return, '')
+                          t.equal(invokedActions[invokedActions.length - 1], 'closing-default', 'Enter invokes meaningful card click before its buttons')
+                          t.equal(svc.popupModel.get(0).originalId, 72, 'synchronous default callback cannot consume a replacement card')
+                          svc.clearPopups()
+                          checkCenterExit(then)
+                        })
+                      })
+                    })
+                  })
+                })
+              })
+            })
+          })
+        })
+      })
+    })
+  }
+
+  // Opening the inbox transfers ownership away from the toast shortcuts.
+  function checkCenterExit(then) {
+    var requests = []
+    svc.shell = {
+      toggle: function (plugin) {
+        requests.push(plugin)
+      }
+    }
+    keyboardRow(74, ['first', 'second'])
+    svc.startKeyboard(74)
+    ipc('showHistory', 'ok', function () {
+      t.check(!svc.keyboardMode && !svc.popupHeld('any'), 'opening notification center releases toast keyboard and timers')
+      t.equal(requests, ['araneadev.notifications'], 'history shortcut routes to Aranea center')
+      svc.shell = null
+      svc.clearPopups()
+      then()
+    })
   }
 
   // A second service, created and destroyed by the DND check.
@@ -52,6 +206,9 @@ ShellRoot {
     }
   }
 
+  // Observed release signal from the service being destroyed.
+  property bool keyboardReleasedOnTeardown: false
+  // Records native sender invocations independently from model removals.
   property var invokedActions: []
   QtObject {
     id: actionRef
@@ -148,8 +305,24 @@ ShellRoot {
       t.equal(svc.actionsFor(41).map(function (a) {
         return a.label
       }), ["Omacut", "New"], "sender action updates are observed")
+      svc.startKeyboard(41)
+      first.actions = [
+        {
+          identifier: "new",
+          text: "New",
+          invoke: function () {
+            invokedActions.push("replacement-new")
+          }
+        }
+      ]
+      senderSignals.actionsChanged()
+      t.check(!svc.keyboardMode, "same-label sender replacement ends keyboard ownership")
+      svc.keyboardPressed(Qt.Key_2, "2")
+      t.equal(invokedActions, [], "same-label replacement refuses stale numbered choice")
+      svc.startKeyboard(41)
       first.tracked = false
       senderSignals.closed()
+      t.check(!svc.keyboardMode, "sender close releases keyboard ownership")
       t.equal(svc.actionsFor(41).map(function (a) {
         return a.label
       }), ["Omacut"], "sender close removes only live libnotify buttons")
@@ -183,6 +356,7 @@ ShellRoot {
     path: testRoot.stateRoot + "actions.json"
   }
 
+  // Exercise the production button protocol and literal argv process boundary.
   function checkActions(then) {
     var row = Logic.snapshotOf({
       id: 31,
@@ -300,21 +474,33 @@ ShellRoot {
 
       checkActionLifetime(function () {
         checkActions(function () {
-          // DND on, then the service goes before its debounced save fires.
-          var second = serviceComponent.createObject(testRoot)
-          t.waitFor(function () {
-            return second.settingsLoaded
-          }, 10000, "the second service loads its settings", function () {
-            t.check(second.settingsLoaded, "second service loaded its settings")
-            second.setDoNotDisturb(true)
-            second.destroy()
-            settingsReader.path = testRoot.stateRoot + "b/notifications.json"
+          checkKeyboard(function () {
+            // DND on, then the service goes before its debounced save fires.
+            var second = serviceComponent.createObject(testRoot)
             t.waitFor(function () {
-              settingsReader.reload()
-              return testRoot.savedSettings().dnd !== undefined
-            }, 5000, "the settings file is written", function () {
-              t.equal(testRoot.savedSettings().dnd, true, "DND written when the service goes away")
-              t.done()
+              return second.settingsLoaded
+            }, 10000, "the second service loads its settings", function () {
+              t.check(second.settingsLoaded, "second service loaded its settings")
+              second.setDoNotDisturb(true)
+              second.popupModel.append(Logic.snapshotOf({
+                id: 900
+              }, testRoot.now))
+              second.startKeyboard(900)
+              second.keyboardModeChanged.connect(function () {
+                if (!second.keyboardMode)
+                  testRoot.keyboardReleasedOnTeardown = true
+              })
+              t.check(second.popupHeld('any'), 'service teardown begins with keyboard expiry pause')
+              second.destroy()
+              settingsReader.path = testRoot.stateRoot + "b/notifications.json"
+              t.waitFor(function () {
+                settingsReader.reload()
+                return testRoot.savedSettings().dnd !== undefined
+              }, 5000, "the settings file is written", function () {
+                t.equal(testRoot.savedSettings().dnd, true, "DND written when the service goes away")
+                t.check(testRoot.keyboardReleasedOnTeardown, 'service teardown explicitly releases keyboard ownership')
+                t.done()
+              })
             })
           })
         })

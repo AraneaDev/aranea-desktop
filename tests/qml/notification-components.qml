@@ -6,7 +6,9 @@ import "lib"
 import "plugins/araneadev.notifications/components" as NotificationComponents
 
 ShellRoot {
+  // Records the visible button indices emitted by the real card.
   property var invoked: []
+  // Counts default card activations independently of button activations.
   property int cardClicks: 0
   TestCase {
     id: pointer
@@ -55,6 +57,25 @@ ShellRoot {
       t.equal(buttons.map(function (b) {
         return b.label
       }), ["Open", "Omacut"], "visible order follows sender")
+      card.keyboardChoices = true
+      card.keyboardClick = true
+      card.keyboardChoice = 1
+      var labels = t.findChildren(card, "notificationActionLabel")
+      t.equal(labels.map(function (label) {
+        return label.text
+      }), ["2 Open", "3 Omacut"], "numbered buttons follow meaningful card click")
+      var clickLabel = t.findChildren(card, "notificationClickChoice")[0]
+      t.equal(clickLabel.text, "1 Open notification", "meaningful default click appears before buttons")
+      t.check(clickLabel.visible, "default choice is visible in keyboard mode")
+      card.keyboardClick = false
+      t.equal(labels.map(function (label) {
+        return label.text
+      }), ["1 Open", "2 Omacut"], "button-only numbering starts at one")
+      t.check(!clickLabel.visible, "no guessed click choice is offered")
+      card.keyboardChoices = false
+      t.equal(labels.map(function (label) {
+        return label.text
+      }), ["Open", "Omacut"], "leaving keyboard mode removes numbering")
       pointer.mouseClick(buttons[1])
       t.equal(invoked, [1], "exactly the selected action emits once")
       t.equal(cardClicks, 0, "button click never invokes the card click")

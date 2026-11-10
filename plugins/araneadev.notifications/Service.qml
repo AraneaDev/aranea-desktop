@@ -83,6 +83,7 @@ Item {
   // Changes when sender actions or their lifetime change; refreshes card bindings.
   property int actionsRevision: 0
   onLiveRefsChanged: actionsRevision += 1
+  onActionsRevisionChanged: validateKeyboard()
 
   // Live Notification objects of inbox entries, by inbox file name. A stored
   // notification stays tracked while it waits in the center, so a sender's
@@ -106,7 +107,160 @@ Item {
 
   // Whether any screen holds the toast with this key.
   function popupHeld(key: string): bool {
-    return (service.popupHolds[key] || 0) > 0
+    return service.keyboardMode || (service.popupHolds[key] || 0) > 0
+  }
+
+  // Keyboard ownership belongs to a single retained toast, never its index.
+  property bool keyboardMode: false
+  // Original sender ID retained for the keyboard session.
+  property int keyboardOriginalId: -1
+  // Timestamp distinguishes a reused sender ID from the selected card.
+  property double keyboardTimestamp: 0
+  // Current sender identity, held outside the popup model.
+  property var keyboardRef: null
+  // Choice snapshot prevents pending keys invoking changed actions.
+  property string keyboardSignature: ""
+  // Zero-based selected choice in visible order, including a real card click.
+  property int keyboardChoice: 0
+
+  // Meaningful default click boundary: argv and a live default action count.
+  // Display-name app focusing remains a pointer fallback, not a choice.
+  function popupHasMeaningfulClick(originalId): bool {
+    let at = popupIndexFor(originalId)
+    if (at < 0)
+      return false
+    if (NotificationLogic.parseExecArgv(popupModelObject.get(at).execArgv))
+      return true
+    try {
+      let ref = liveRefs[originalId]
+      if (ref && ref.tracked) {
+        for (let i = 0; ref.actions && i < Math.min(ref.actions.length, 16); i++) {
+          if (ref.actions[i] && ref.actions[i].identifier === "default")
+            return true
+        }
+      }
+    } catch (e) {}
+    return false
+  }
+
+  // Snapshot the command/default/button choices for stale-key refusal.
+  function choiceSignature(originalId): string {
+    let at = popupIndexFor(originalId)
+    if (at < 0)
+      return ""
+    return JSON.stringify([popupModelObject.get(at).execArgv, popupHasMeaningfulClick(originalId), popupActionChoices(originalId)])
+  }
+
+  // Check the retained row, sender and choice set before dispatching a key.
+  function keyboardSelectionValid(): bool {
+    let at = popupIndexFor(keyboardOriginalId)
+    return keyboardMode && at >= 0 && popupModelObject.get(at).timestamp === keyboardTimestamp && liveRefs[keyboardOriginalId] === keyboardRef && choiceSignature(keyboardOriginalId) === keyboardSignature
+  }
+
+  // End ownership when the selected identity or its choices disappear.
+  function validateKeyboard(): void {
+    if (keyboardMode && !keyboardSelectionValid())
+      stopKeyboard()
+  }
+
+  Connections {
+    target: popupModelObject
+    function onCountChanged() {
+      service.validateKeyboard()
+    }
+    function onDataChanged() {
+      service.validateKeyboard()
+    }
+  }
+
+  // Select a stable card identity, defaulting to the newest live popup.
+  function startKeyboard(originalId): bool {
+    let id = originalId === undefined ? (popupModelObject.count > 0 ? popupModelObject.get(0).originalId : -1) : originalId
+    let at = popupIndexFor(id)
+    if (at < 0)
+      return false
+    stopKeyboard()
+    keyboardOriginalId = id
+    keyboardTimestamp = popupModelObject.get(at).timestamp
+    keyboardRef = liveRefs[id]
+    keyboardSignature = choiceSignature(id)
+    keyboardChoice = 0
+    keyboardMode = true
+    return keyboardMode
+  }
+
+  // Release focus ownership and the shared expiry pause on every exit.
+  function stopKeyboard(): void {
+    keyboardMode = false
+    keyboardOriginalId = -1
+    keyboardTimestamp = 0
+    keyboardRef = null
+    keyboardSignature = ""
+    keyboardChoice = 0
+  }
+
+  // Number of visible choices on the selected card.
+  function keyboardChoiceCount(): int {
+    return actionsFor(keyboardOriginalId).length + (popupHasMeaningfulClick(keyboardOriginalId) ? 1 : 0)
+  }
+
+  // Invoke a choice only while the original card and choices still match.
+  function invokeKeyboardChoice(index): bool {
+    if (!keyboardSelectionValid()) {
+      stopKeyboard()
+      return false
+    }
+    let id = keyboardOriginalId
+    let click = popupHasMeaningfulClick(id)
+    if (index < 0 || index >= keyboardChoiceCount())
+      return false
+    stopKeyboard()
+    if (click && index === 0) {
+      invokePopupDefault(popupIndexFor(id))
+      return true
+    }
+    return invokePopupAction(id, index - (click ? 1 : 0))
+  }
+
+  // Handle Escape, selection movement, Enter and numbered choices.
+  function keyboardPressed(key, text): bool {
+    if (!keyboardSelectionValid()) {
+      stopKeyboard()
+      return false
+    }
+    if (key === Qt.Key_Escape) {
+      stopKeyboard()
+      return true
+    }
+    if (key === Qt.Key_Return || key === Qt.Key_Enter) {
+      invokeKeyboardChoice(keyboardChoice)
+      return true
+    }
+    let count = keyboardChoiceCount()
+    if (count > 0 && (key === Qt.Key_Down || key === Qt.Key_Right || key === Qt.Key_Tab))
+      keyboardChoice = (keyboardChoice + 1) % count
+    else if (count > 0 && (key === Qt.Key_Up || key === Qt.Key_Left || key === Qt.Key_Backtab))
+      keyboardChoice = (keyboardChoice + count - 1) % count
+    else if (/^[1-9]$/.test(text || ""))
+      invokeKeyboardChoice(Number(text) - 1)
+    return true
+  }
+
+  // Dismiss, invoke or enter keyboard mode according to meaningful choices.
+  function actOnNewest(): bool {
+    if (popupModelObject.count === 0)
+      return false
+    let id = popupModelObject.get(0).originalId
+    let mode = NotificationLogic.newestActionMode(actionsFor(id).length, popupHasMeaningfulClick(id))
+    if (mode === "keyboard")
+      startKeyboard(id)
+    else if (mode === "click")
+      invokePopupDefault(popupIndexFor(id))
+    else if (mode === "button")
+      invokePopupAction(id, 0)
+    else
+      dismissPopup(popupIndexFor(id))
+    return true
   }
 
   // PersistentProperties handles in-process QML reloads. The on-disk
@@ -357,6 +511,9 @@ Item {
     // outlive its popup — in both cases there is nothing here to refresh.
     if (service.liveRefs[originalId] !== notification)
       return
+    // Even unchanged labels may now refer to a replacement sender action.
+    if (service.keyboardMode && service.keyboardOriginalId === originalId)
+      service.stopKeyboard()
     var updated
     try {
       updated = NotificationLogic.replacementSnapshot(notification, originalId, timestamp)
@@ -431,12 +588,14 @@ Item {
 
   // Opens or closes the notification center through the host shell.
   function toggleCenter(): void {
+    service.stopKeyboard()
     if (service.shell && typeof service.shell.toggle === "function")
       service.shell.toggle("araneadev.notifications")
   }
 
   // Opens the notification center through the host shell.
   function openCenter(): void {
+    service.stopKeyboard()
     if (service.shell && typeof service.shell.summon === "function")
       service.shell.summon("araneadev.notifications", "")
   }
@@ -551,6 +710,7 @@ Item {
     return choices
   }
 
+  // Resolve plain choices for the current popup and its live sender.
   function popupActionChoices(originalId): var {
     let at = popupIndexFor(originalId)
     return at < 0 ? [] : notificationActionChoices(popupModelObject.get(at), liveRefs[originalId])
@@ -568,6 +728,7 @@ Item {
     })
   }
 
+  // Invoke one current inbox button by stable filename and visible index.
   function invokeInboxAction(fileName, index): bool {
     if (typeof index !== "number" || !isFinite(index) || Math.floor(index) !== index || index < 0)
       return false
@@ -619,6 +780,7 @@ Item {
 
   // Execute exactly one selected button, then consume only its own popup.
   function invokePopupAction(originalId, index): bool {
+    service.stopKeyboard()
     if (typeof index !== "number" || !isFinite(index) || Math.floor(index) !== index || index < 0)
       return false
     let at = popupIndexFor(originalId)
@@ -641,9 +803,13 @@ Item {
   // Third-party clients register a libnotify action under the canonical
   // identifier "default" instead; that one only works while the sender is live.
   function invokePopupDefault(index) {
+    service.stopKeyboard()
     if (index < 0 || index >= popupModelObject.count)
       return
     var entry = popupModelObject.get(index)
+    var originalId = entry.originalId
+    var timestamp = entry.timestamp
+    var ref = liveRefs[originalId]
 
     // Run the argv (via Util.execArgv, no shell interpretation). Detached so it
     // outlives the shell, which installer toasts depend on: they restart it.
@@ -653,7 +819,6 @@ Item {
       removePopup(index, "invoke")
       return
     }
-    var ref = entry ? liveRefs[entry.originalId] : null
     var invoked = invokeDefaultAction(ref)
     // Chat apps (Slack, Discord, Vesktop, etc.) rarely register a "default"
     // libnotify action — they just expect clicking the notification to
@@ -661,7 +826,9 @@ Item {
     // that click-to-jump actually works.
     if (!invoked)
       focusApp(entry)
-    removePopup(index, "invoke")
+    var current = popupIndexFor(originalId)
+    if (current >= 0 && popupModelObject.get(current).timestamp === timestamp && (!liveRefs[originalId] || liveRefs[originalId] === ref))
+      removePopup(current, "invoke")
   }
 
   // Try to focus an existing Hyprland window matching the notification's
@@ -746,6 +913,7 @@ Item {
   }
 
   Component.onDestruction: {
+    service.stopKeyboard()
     // A toggle less than 200 ms old would otherwise be lost with the timer.
     if (settingsSaveTimer.running) {
       // Write synchronously: this object is about to go.
@@ -786,6 +954,18 @@ Item {
 
   IpcHandler {
     target: "notifications"
+
+    function act(): string {
+      return service.actOnNewest() ? "ok" : "none"
+    }
+
+    function keyboard(): string {
+      if (service.keyboardMode) {
+        service.stopKeyboard()
+        return "off"
+      }
+      return service.startKeyboard() ? "on" : "none"
+    }
 
     function dndState(): string {
       return service.doNotDisturb ? "on" : "off"
