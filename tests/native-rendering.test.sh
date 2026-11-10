@@ -10,6 +10,10 @@ fi
 source "$repo_root/tests/lib/sandbox.sh"
 source "$repo_root/tests/lib/qml-host.sh"
 require_qml_host
+# Menu sources and host helpers must come from the selected host checkout,
+# including on CI where no desktop login exports OMARCHY_PATH.
+OMARCHY_PATH="$(cd "$qml_shell_dir/.." && pwd)"
+export OMARCHY_PATH
 for dep in sway swaymsg setpriv dbus-run-session python3 magick; do
   if ! command -v "$dep" >/dev/null; then
     echo "SKIP: native rendering needs $dep"

@@ -41,11 +41,16 @@ ShellRoot {
   }
 
   // Wait for layer configuration, then observe completed layout/render work.
-  function centered(label, next) {
+  function centered(destination, label, next) {
     t.waitFor(function () {
       return menu.view && menu.view.visible && menu.view.height === menu.screenHeight
     }, 8000, label + " surface configured", function () {
       host.afterFrame(function () {
+        t.equal(menu.activeMenu, destination, label + " destination selected")
+        if (menu.activeMenu !== destination) {
+          t.done()
+          return
+        }
         var surface = host.card()
         t.check(!!surface, label + " production card is present")
         if (!surface) {
@@ -74,25 +79,25 @@ ShellRoot {
   }
 
   Component.onCompleted: t.waitFor(function () {
-    return menu.menuSourcesReady
-  }, 8000, "shipped menu sources loaded", function () {
+    return menu.menuSourcesReady && !!menu.item("appearance") && !!menu.item("settings")
+  }, 8000, "shipped Appearance and consolidated Settings loaded", function () {
     console.log("NATIVE READY")
     menu.open('{"menu":"root"}')
-    centered("root", function () {
+    centered("root", "root", function () {
       menu.setActiveMenu("settings", true)
-      centered("root to Settings", function () {
+      centered("settings", "root to Settings", function () {
         menu.setActiveMenu("appearance", true)
-        centered("Settings to Appearance", function () {
+        centered("appearance", "Settings to Appearance", function () {
           var top = host.card().y
           menu.setFilter("font")
           host.afterFrame(function () {
             t.equal(host.card().y, top, "typing preserves the search field position")
             menu.goBack()
-            centered("back from filtered Appearance", function () {
+            centered("settings", "back from filtered Appearance", function () {
               menu.open('{"menu":"appearance"}')
-              centered("summon Appearance while already open", function () {
+              centered("appearance", "summon Appearance while already open", function () {
                 menu.open('{"mode":"input","prompt":"Name"}')
-                centered("replace open menu with input modal", function () {
+                centered("root", "replace open menu with input modal", function () {
                   menu.close()
                   t.done()
                 })
