@@ -1510,7 +1510,7 @@ Item {
   // Keep adjacent tooltip targets warm across their leave/enter event gap.
   Timer {
     id: tooltipWarmTimer
-    interval: 300
+    interval: 400
   }
 
   Timer {

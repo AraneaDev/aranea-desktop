@@ -94,7 +94,7 @@ ShellRoot {
       })
     }
     function checkPeek(expected: bool): void {
-      t.equal(bar.centerSectionRevealHeld, expected, expected ? "leading bar region reveals peek" : "entering past the clock keeps peek closed")
+      t.equal(bar.centerSectionRevealHeld, expected, expected ? "leading bar region reveals peek" : "entering the clock or trailing region keeps peek closed")
     }
     function fullscreen(value: bool): void {
       Hyprland.fullscreen = value

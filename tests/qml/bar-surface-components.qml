@@ -92,10 +92,12 @@ ShellRoot {
         return tooltipBar.tooltipShown
       }, 1000, "first tooltip appears", function () {
         tooltipBar.hideTooltip(firstTarget)
-        tooltipBar.showTooltip(secondTarget, "Second")
-        t.step(30, function () {
-          t.check(tooltipBar.tooltipShown && tooltipBar.tooltipText === "Second", "tooltip handoff skips the initial delay")
-          t.done()
+        t.step(350, function () {
+          tooltipBar.showTooltip(secondTarget, "Second")
+          t.step(30, function () {
+            t.check(tooltipBar.tooltipShown && tooltipBar.tooltipText === "Second", "tooltip handoff across the icon gap skips the initial delay")
+            t.done()
+          })
         })
       })
     })

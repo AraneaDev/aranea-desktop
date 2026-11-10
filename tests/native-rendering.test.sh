@@ -119,13 +119,15 @@ ipc() { "$quickshell_bin" ipc --any-display -p "$stage/cfg" call native.fixture 
 wait_log 'NATIVE READY'
 if [[ $mode == bar ]]; then
   # This is a private virtual pointer, never uinput or a physical seat.
-  python3 "$repo_root/tests/lib/private-pointer.py" 700 10 &
-  pointer_pid=$!
-  sleep .2
-  ipc checkPeek false
-  wait "$pointer_pid"
-  pointer_pid=''
-  sleep .2
+  for pointer_x in 400 700; do
+    python3 "$repo_root/tests/lib/private-pointer.py" "$pointer_x" 10 &
+    pointer_pid=$!
+    sleep .2
+    ipc checkPeek false
+    wait "$pointer_pid"
+    pointer_pid=''
+    sleep .2
+  done
   python3 "$repo_root/tests/lib/private-pointer.py" 100 10 &
   pointer_pid=$!
   sleep .2
