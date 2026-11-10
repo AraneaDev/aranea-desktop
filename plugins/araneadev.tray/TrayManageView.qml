@@ -212,8 +212,8 @@ Column {
           id: iconSlot
           width: Style.space(16)
           height: Style.space(16)
-          x: Style.space(6)
-          anchors.verticalCenter: parent.verticalCenter
+          x: Math.round(Style.space(6))
+          y: Math.round((parent.height - height) / 2)
           opacity: row.hidden ? 0.4 : 1
           // Whether the icon is tinted to the foreground.
           readonly property bool symbolic: manage.iconIsSymbolic(row.entry.icon)
@@ -231,12 +231,17 @@ Column {
             visible: !iconSlot.symbolic
             layer.enabled: iconSlot.symbolic
           }
-          MultiEffect {
+          Rectangle {
             anchors.fill: iconImage
-            source: iconImage
+            color: Aranea.DesignTokens.foreground
             visible: iconSlot.symbolic
-            colorization: 1.0
-            colorizationColor: Aranea.DesignTokens.foreground
+            layer.enabled: iconSlot.symbolic
+            layer.effect: MultiEffect {
+              maskEnabled: true
+              maskSource: iconImage
+              maskThresholdMin: 0.5
+              maskSpreadAtMin: 1.0
+            }
           }
         }
         Text {

@@ -1,0 +1,2 @@
+module TrayHost
+singleton SystemTray 1.0 SystemTray.qml

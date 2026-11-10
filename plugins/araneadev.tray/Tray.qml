@@ -1143,12 +1143,17 @@ BarWidget {
       layer.enabled: trayIconRoot.symbolic
     }
 
-    MultiEffect {
+    Rectangle {
       anchors.fill: trayIconImage
-      source: trayIconImage
+      color: root.foreground
       visible: trayIconRoot.symbolic
-      colorization: 1.0
-      colorizationColor: root.foreground
+      layer.enabled: trayIconRoot.symbolic
+      layer.effect: MultiEffect {
+        maskEnabled: true
+        maskSource: trayIconImage
+        maskThresholdMin: 0.5
+        maskSpreadAtMin: 1.0
+      }
     }
   }
 
@@ -1192,7 +1197,8 @@ BarWidget {
     }
     Aranea.HoverTint {}
     TrayIcon {
-      anchors.centerIn: parent
+      x: Math.round((parent.width - width) / 2)
+      y: Math.round((parent.height - height) / 2)
       width: Style.space(12)
       height: Style.space(12)
       icon: trayItemRoot.modelData.icon
