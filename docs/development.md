@@ -213,6 +213,21 @@ observation, and compositor checks separately from offscreen verification.
 `.omarchy-version` pins the Omarchy release last reviewed. Plugins declaring
 `omarchy.clonedFrom` are forks, and all plugins depend on Omarchy shell modules.
 
+The supported host is **Omarchy v4.5.0**, tested from dereferenced commit
+`ac2690cd7be4f47e4a255f5e2e78d904d436b068`. Its annotated tag object is
+`97e664bd971fa5a8691d89440d3738143499c438`; compare checkout HEAD with the
+commit, not the tag object. Keep Qt 6.12 and CI's reviewed Quickshell build.
+Point `ARANEA_QML_SHELL_DIR` at that checkout's `shell` for compatibility
+checks, rather than the live desktop. The clock now uses the final host's
+`WidgetButton.pressFeedbackButtons` API, so rc1 is no longer supported.
+
+Usage collectors remain host-owned. Usage providers are discovered from their
+records and enabled by default unless disabled in settings; native activity
+producers remain restricted to the existing Claude/Codex ownership contract.
+Aranea retains its provider tabs and fleet aggregation. Registered-account
+refresh failures are named in the existing status area, while limit meters
+continue to describe the active account; account switching stays host-owned.
+
 ```bash
 tools/upstream-drift
 tools/upstream-drift --diff

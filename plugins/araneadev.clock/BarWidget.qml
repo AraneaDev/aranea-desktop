@@ -271,6 +271,7 @@ BarWidget {
 
   WidgetButton {
     id: button
+    pressFeedbackButtons: Qt.NoButton
     fontFamily: Aranea.Typography.technicalFamily
     anchors.fill: parent
     bar: root.bar
