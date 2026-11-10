@@ -66,6 +66,14 @@ Item {
       root.view.freezeCardTop()
   }
 
+  // A new destination starts centered, with room based on its own contents.
+  function resetCardPosition(): void {
+    if (!root.view)
+      return
+    root.view.cardTop = -1
+    root.view.maxRowsHeight = -1
+  }
+
   // Gives the window's key handler the keyboard focus (no-op offscreen).
   function focusKeys(): void {
     if (root.view)
@@ -442,7 +450,7 @@ Item {
   // refresh) does not stamp the layout.
   property string displayKeys: ""
   // Card width: depends on mode and menu, capped to the screen.
-  property int cardWidth: Math.min(root.dmenuActive ? Math.max(Style.space(dmenuRequest.requestedWidth), Style.space(420)) : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font") ? Style.space(560) : Style.space(540)), root.screenWidth - Style.gapsOut * 2)
+  property int cardWidth: Math.min(root.dmenuActive ? Math.max(Style.space(dmenuRequest.requestedWidth), Style.space(420)) : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font" || root.activeMenu === "appearance.font") ? Style.space(560) : Style.space(540)), root.screenWidth - Style.gapsOut * 2)
   // Height given to the row list for the current rows.
   property int visibleRowsHeight: root.dmenuActive ? dmenuRowListHeight(layoutSerial, displayModel.count, filterText) : rowListHeight(layoutSerial, displayModel.count, filterText, searchDivider)
   // Total card height: borders, padding, chrome, one section gap and the rows
@@ -892,7 +900,7 @@ Item {
   // onto navStack. The pointer is disarmed either way: the new rows under a
   // still pointer take neither hover nor a click until it really moves.
   function setActiveMenu(id: string, pushHistory: bool): void {
-    root.freezeCardTop()
+    root.resetCardPosition()
     if (!root.item(id))
       id = "root"
     if (pushHistory && id !== root.activeMenu)
@@ -1037,6 +1045,7 @@ Item {
 
   // Opens the menu at `initialMenu` (root if unknown) and starts its provider.
   function openExistingMenu(initialMenu) {
+    root.resetCardPosition()
     requestSerial += 1
     mode = "menu"
     dmenuRequest.reset()
@@ -1063,6 +1072,7 @@ Item {
 
   // Opens a dmenu select/input request from the payload's prompt, options and result files.
   function openDmenu(payload) {
+    root.resetCardPosition()
     root.pendingInitialMenu = ""
     requestSerial += 1
     mode = dmenuRequest.begin(payload)

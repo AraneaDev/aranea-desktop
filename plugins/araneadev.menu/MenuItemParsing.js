@@ -279,7 +279,7 @@ function foldStockCommandCenter(nextItems, nextOrder, customIds, settingsAvailab
     "apps",
     "learn",
     "trigger",
-    "style",
+    nextItems.appearance ? "appearance" : "style",
     "setup",
     "install",
     "remove",
@@ -311,6 +311,7 @@ function foldStockCommandCenter(nextItems, nextOrder, customIds, settingsAvailab
       remove: "software",
       update: "software",
       style: "settings",
+      appearance: "settings",
       setup: "settings",
       "aranea.settings": "settings"
     }

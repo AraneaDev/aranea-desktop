@@ -90,12 +90,10 @@ PanelWindow {
   }
   exclusionMode: ExclusionMode.Ignore
 
-  // The card opens centered exactly as always. The first search keystroke
-  // or submenu move freezes the top line where it currently sits; from
-  // then on the card grows and shrinks downward instead of re-centering
-  // on every resize, which made the menu jump around. The rows height is
-  // frozen at the same moment, so the starting menu also caps how tall the
-  // card may grow from there. Closing unfreezes both.
+  // Each destination starts centered. The first search keystroke freezes
+  // the top line and rows ceiling so typing never moves the search field.
+  // Navigation and new requests release both constraints; a smaller submenu
+  // must not inherit the taller root menu's top edge or rows ceiling.
   property int cardTop: -1
   // Rows height frozen with cardTop (the starting menu's height), or -1.
   property int maxRowsHeight: -1

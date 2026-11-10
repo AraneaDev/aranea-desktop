@@ -5,6 +5,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons
 import "lib"
 import "plugins/araneadev.menu" as Menu
 
@@ -115,6 +116,15 @@ ShellRoot {
       t.waitFor(function () {
         return fixture.commandMenu.menuSourcesReady
       }, 10000, "target shipped menu loads", function () {
+        var roots = fixture.commandMenu.itemOrder.filter(function (id) {
+          return fixture.commandMenu.items[id].parent === "root" && id !== "aranea.projects"
+        })
+        t.equal(roots.join(","), "apps,trigger,software,settings,learn,system", "shipped command center retains the consolidated root groups")
+        t.equal(fixture.commandMenu.items.appearance.parent, "settings", "shipped Appearance belongs under Settings")
+        t.equal(fixture.commandMenu.items.setup.parent, "settings", "shipped Devices belongs under Settings")
+        t.equal(fixture.commandMenu.items.install.parent, "software", "shipped Install belongs under Software")
+        t.equal(fixture.commandMenu.items.trigger.label, "Actions", "shipped Trigger retains the Actions label")
+        t.equal(fixture.commandMenu.items.learn.label, "Help", "shipped Learn retains the Help label")
         fixture.commandMenu.open(JSON.stringify({
           menu: "appearance"
         }))
@@ -125,6 +135,7 @@ ShellRoot {
           return rowIndex("appearance.font.fira-code") >= 0
         }, 10000, "shipped Appearance font provider is populated", function () {
           t.equal(fixture.commandMenu.displayModel.count, 2, "fonts enumerate through the production provider")
+          t.equal(fixture.commandMenu.cardWidth, Math.min(Style.space(560), fixture.commandMenu.screenWidth - Style.gapsOut * 2), "shipped font picker retains its wider card layout")
           fixture.commandMenu.open(JSON.stringify({
             menu: "update"
           }))

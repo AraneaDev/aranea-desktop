@@ -4,12 +4,16 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Each mode owns a fresh sandbox and must complete; none can be replaced by a skip.
 if (($# == 0)); then
-  for fixture in bar tray picker; do bash "$0" "$fixture"; done
+  for fixture in bar tray picker menu; do bash "$0" "$fixture"; done
   exit 0
 fi
 source "$repo_root/tests/lib/sandbox.sh"
 source "$repo_root/tests/lib/qml-host.sh"
 require_qml_host
+# Menu sources and host helpers must come from the selected host checkout,
+# including on CI where no desktop login exports OMARCHY_PATH.
+OMARCHY_PATH="$(cd "$qml_shell_dir/.." && pwd)"
+export OMARCHY_PATH
 for dep in sway swaymsg setpriv dbus-run-session python3 magick; do
   if ! command -v "$dep" >/dev/null; then
     echo "SKIP: native rendering needs $dep"
@@ -18,7 +22,7 @@ for dep in sway swaymsg setpriv dbus-run-session python3 magick; do
   fi
 done
 mode=${1:-bar}
-[[ $mode == bar || $mode == tray || $mode == picker ]] || exit 2
+[[ $mode == bar || $mode == tray || $mode == picker || $mode == menu ]] || exit 2
 # Reject a non-fixture runtime before any pointer socket can be opened.
 if XDG_RUNTIME_DIR="$ARANEA_TEST_SANDBOX" WAYLAND_DISPLAY=wayland-0 python3 "$repo_root/tests/lib/private-pointer.py" 1 1 >/dev/null 2>&1; then
   echo "FAIL: virtual pointer accepted a non-fixture runtime"
