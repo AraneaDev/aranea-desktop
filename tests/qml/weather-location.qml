@@ -288,6 +288,22 @@ ShellRoot {
         callback()
     })
   }
+  // Direct controller responses are independent of the separately sampled ledger.
+  function peerResponsesComplete() {
+    return peer.detectedLocationState.name === "Lisbon" && peer.report && peer.report.current_condition[0].temp_C === "29" && peer.dailyForecastReport && peer.dailyForecastReport.current.temperature_2m === 29 && peer.air && peer.air.aqi === 41 && !peer.fetchInFlight
+  }
+  // Each tagged completion transaction includes its earlier accepted call record.
+  function peerLedgerComplete() {
+    return ["geo", "forecast", "daily", "air"].every(function (kind) {
+      return (fixture.state.completed || []).some(function (call) {
+        return call.tag === "new-Lisbon" && call.kind === kind
+      })
+    })
+  }
+  // Adoption and the exact baseline must use the same observer readiness contract.
+  function peerBaselineReady() {
+    return peerResponsesComplete() && peerLedgerComplete()
+  }
   // Two live automatic owners: late old-city responses cannot replace a newer peer.
   function testPeerOwnership() {
     // Earlier fallback retries do not belong to the simultaneous-owner scenario.
@@ -338,13 +354,22 @@ ShellRoot {
           dailyBody: JSON.stringify(dailyFor(29)),
           airBody: '{"current":{"european_aqi":41,"uv_index":3}}'
         }, function () {
+          // Hold an intentionally stale ledger while the real peer finishes.
+          fixture.snapshotPaused = true
           peer.readyDefers = 6
           peerHost.activePage = "weather"
           peerHost.opened = true
           peer.activateEmbedded()
           peer.refresh()
           t.waitFor(function () {
-            return peer.detectedLocationState.name === "Lisbon" && peer.report && peer.report.current_condition[0].temp_C === "29" && peer.dailyForecastReport && peer.dailyForecastReport.current.temperature_2m === 29 && peer.air && peer.air.aqi === 41 && !peer.fetchInFlight
+            if (!peerResponsesComplete())
+              return false
+            if (fixture.snapshotPaused) {
+              t.check(!peerLedgerComplete(), "paused observer still lacks the completed peer ledger")
+              t.check(!peerBaselineReady(), "adoption baseline waits for observed peer completions")
+              fixture.snapshotPaused = false
+            }
+            return peerBaselineReady()
           }, 1500, "new automatic peer completes a different-city bundle", function () {
             var generation = weather.locationGeneration
             weather.offerShared(peer.sharedWeather)
