@@ -72,6 +72,7 @@ Item {
 
   // Emitted for every user action, NAME with its ARG:
   //   open ({index, key}): an entry card or a "+N more" row was clicked;
+  //   invokeAction ({index, key, actionIndex}): an entry button was clicked;
   //   dismiss ({index, key}): an entry's close was clicked or it was swiped
   //     away;
   //   toggle ({index, key}): a group header was clicked (collapse/expand);
@@ -262,6 +263,21 @@ Item {
           body: String(rowLoader.entry.body || "")
           image: String(rowLoader.entry.image || "")
           glyph: String(rowLoader.entry.glyph || "")
+          // Both entry replacements and sender lifetime invalidate old presses.
+          readonly property var actionView: ({
+              hint: rowLoader.entry.execActions || "",
+              revision: root.service ? root.service.actionsRevision : 0,
+              buttons: root.service && typeof root.service.inboxActionsFor === "function" ? root.service.inboxActionsFor(String(rowLoader.entry.fileName || "")) : []
+            })
+          actions: actionView.buttons
+          onActionRequested: function (actionIndex) {
+            if (clickSettled() && pressedKey === rowLoader.key)
+              root.action("invokeAction", {
+                index: rowLoader.index,
+                key: pressedKey,
+                actionIndex: actionIndex
+              })
+          }
           urgency: typeof rowLoader.entry.urgency === "number" ? rowLoader.entry.urgency : 1
           timeLabel: InboxLogic.relativeTime(rowLoader.entry.timestamp, root.now)
           cornerRadius: root.service ? root.service.cornerRadius : root.cornerRadius

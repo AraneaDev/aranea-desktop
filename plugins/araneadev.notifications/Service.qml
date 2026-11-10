@@ -80,6 +80,9 @@ Item {
   // and the next read of that role segfaults in QQmlListModel::data. A JS
   // map only holds a wrapper, which degrades to a catchable error instead.
   property var liveRefs: ({})
+  // Changes when sender actions or their lifetime change; refreshes card bindings.
+  property int actionsRevision: 0
+  onLiveRefsChanged: actionsRevision += 1
 
   // Live Notification objects of inbox entries, by inbox file name. A stored
   // notification stays tracked while it waits in the center, so a sender's
@@ -87,6 +90,7 @@ Item {
   // sender's own action. Empty after a shell restart: those entries fall back
   // to execArgv / focusing the app.
   property var inboxRefs: ({})
+  onInboxRefsChanged: actionsRevision += 1
   // The last snapshot each live sender gave for its inbox entry (by file
   // name), so refreshInbox can tell a real update from a repeat signal.
   property var liveSnapshots: ({})
@@ -254,11 +258,13 @@ Item {
     }
 
     liveRefs[snapshot.originalId] = notification
+    actionsRevision += 1
     // Guard the delete: a newer notification may have reused this originalId
     // (freedesktop replaces_id) and taken over the map slot.
     notification.closed.connect(function () {
       if (service.liveRefs[snapshot.originalId] === notification)
         delete service.liveRefs[snapshot.originalId]
+      service.actionsRevision += 1
     })
     watchForUpdates(notification, snapshot)
     // Qt.callLater avoids "QV4::Object::insertMember" crashes when a
@@ -278,6 +284,7 @@ Item {
   function storeInInbox(notification, snapshot) {
     var fileName = NotificationLogic.popupFileName(snapshot)
     inboxRefs[fileName] = notification
+    actionsRevision += 1
     liveSnapshots[fileName] = snapshot
     // The sender closing its notification (it was read elsewhere, the app
     // quit) only ends the live link; the entry waits until the user clears it.
@@ -285,6 +292,7 @@ Item {
       if (service.inboxRefs[fileName] === notification) {
         delete service.inboxRefs[fileName]
         delete service.liveSnapshots[fileName]
+        service.actionsRevision += 1
       }
     })
     inbox.upsert(snapshot)
@@ -312,6 +320,7 @@ Item {
     // Compare with what the sender sent last time, not with the model: the
     // model shows persisted copies, which reuse one path per entry, so a
     // change of image alone would look like no change.
+    service.actionsRevision += 1
     var previous = service.liveSnapshots[fileName]
     if (previous && !NotificationLogic.popupRowChanged(previous, updated))
       return
@@ -322,7 +331,7 @@ Item {
   // Everything the card draws. A change to any of these is a client updating
   // the notification in place, which is the only kind of update we ever hear
   // about after the popup exists.
-  readonly property var updateSignals: ["summaryChanged", "bodyChanged", "appNameChanged", "appIconChanged", "imageChanged", "urgencyChanged", "expireTimeoutChanged", "hintsChanged"]
+  readonly property var updateSignals: ["summaryChanged", "bodyChanged", "appNameChanged", "appIconChanged", "imageChanged", "urgencyChanged", "expireTimeoutChanged", "hintsChanged", "actionsChanged"]
 
   // A client that updates a notification through replaces_id does not produce
   // a second onNotification: the server writes the new content onto the object
@@ -356,6 +365,7 @@ Item {
       return
     }
 
+    service.actionsRevision += 1
     var roles = NotificationLogic.popupRoles()
     for (let i = 0; i < popupModelObject.count; i++) {
       let row = popupModelObject.get(i)
@@ -508,6 +518,122 @@ Item {
       console.warn("invoke default failed:", e)
     }
     return false
+  }
+
+  // Resolve the stable identity at the time an action is used, never a slot.
+  function popupIndexFor(originalId): int {
+    for (let i = 0; i < popupModelObject.count; i++) {
+      if (popupModelObject.get(i).originalId === originalId)
+        return i
+    }
+    return -1
+  }
+
+  // Exec hints are persistent data. Sender actions exist only while the
+  // current tracked object lives, and are copied as plain descriptors.
+  function notificationActionChoices(row, ref): var {
+    let choices = []
+    let exec = NotificationLogic.parseExecActions(row ? row.execActions : "") || []
+    for (let i = 0; i < exec.length; i++)
+      choices.push({
+        label: exec[i].label,
+        argv: exec[i].argv
+      })
+    try {
+      if (ref && ref.tracked) {
+        let sender = NotificationLogic.senderActionButtons(ref.actions)
+        for (let j = 0; j < sender.length; j++)
+          choices.push(sender[j])
+      }
+    } catch (e) {
+      // Sender already destroyed; its actions must not survive it.
+    }
+    return choices
+  }
+
+  function popupActionChoices(originalId): var {
+    let at = popupIndexFor(originalId)
+    return at < 0 ? [] : notificationActionChoices(popupModelObject.get(at), liveRefs[originalId])
+  }
+
+  // Retained cards keep argv data, but sender objects never survive restore.
+  function inboxActionsFor(fileName): var {
+    let row = inbox.get(fileName)
+    if (!row)
+      return []
+    return notificationActionChoices(row, inboxRefs[fileName]).map(function (choice) {
+      return {
+        label: choice.label
+      }
+    })
+  }
+
+  function invokeInboxAction(fileName, index): bool {
+    if (typeof index !== "number" || !isFinite(index) || Math.floor(index) !== index || index < 0)
+      return false
+    let row = inbox.get(fileName)
+    if (!row)
+      return false
+    let ref = inboxRefs[fileName]
+    let choice = notificationActionChoices(row, ref)[index]
+    if (!invokeNotificationChoice(choice, ref))
+      return false
+    if (inbox.has(fileName) && (!inboxRefs[fileName] || inboxRefs[fileName] === ref))
+      dismissInbox(fileName)
+    return true
+  }
+
+  // Resolves a native action only on the object that is still tracked now.
+  function invokeNotificationChoice(choice, ref): bool {
+    if (!choice)
+      return false
+    if (choice.argv) {
+      Util.execArgv(choice.argv)
+      return true
+    }
+    try {
+      if (!ref || !ref.tracked)
+        return false
+      for (let i = 0; i < Math.min(ref.actions.length, 16); i++) {
+        let action = ref.actions[i]
+        if (action && String(action.identifier) === choice.identifier) {
+          action.invoke()
+          return true
+        }
+      }
+    } catch (e) {
+      // Destroyed sender actions cannot be invoked.
+    }
+    return false
+  }
+
+  // Public presentation contract: no commands or live objects enter the card.
+  function actionsFor(originalId): var {
+    let choices = popupActionChoices(originalId)
+    return choices.map(function (choice) {
+      return {
+        label: choice.label
+      }
+    })
+  }
+
+  // Execute exactly one selected button, then consume only its own popup.
+  function invokePopupAction(originalId, index): bool {
+    if (typeof index !== "number" || !isFinite(index) || Math.floor(index) !== index || index < 0)
+      return false
+    let at = popupIndexFor(originalId)
+    if (at < 0)
+      return false
+    let timestamp = popupModelObject.get(at).timestamp
+    let choices = popupActionChoices(originalId)
+    let ref = liveRefs[originalId]
+    if (!invokeNotificationChoice(choices[index], ref))
+      return false
+    // The callback may synchronously remove the popup or deliver another one.
+    at = popupIndexFor(originalId)
+    if (at >= 0 && popupModelObject.get(at).timestamp === timestamp && (!liveRefs[originalId] || liveRefs[originalId] === ref))
+      removePopup(at, "invoke")
+    return true
   }
 
   // Run the popup's click action, then dismiss. Omarchy's own toasts carry the

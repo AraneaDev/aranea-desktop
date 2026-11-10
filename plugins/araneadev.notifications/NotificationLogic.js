@@ -87,8 +87,29 @@ function isWithinQuietHours(window, date) {
   return start < end ? current >= start && current < end : current >= start || current < end
 }
 
+/**
+ * Copy bounded non-default sender actions without retaining QObject handles.
+ * The default belongs to the card click; settings is suppressed upstream.
+ * @param {*} actions - Live sender actions.
+ * @returns {Array<{identifier: string, label: string}>} Visible buttons.
+ */
+function senderActionButtons(actions) {
+  var out = []
+  for (var i = 0; actions && i < Math.min(actions.length, 16); i++) {
+    var action = actions[i]
+    if (!action) continue
+    var identifier = String(action.identifier || "")
+    if (!identifier || identifier.length > 256 || identifier === "default") continue
+    var label = String(action.text || identifier).slice(0, 256)
+    if (/^settings$/i.test(label) || /^settings$/i.test(identifier)) continue
+    out.push({ identifier: identifier, label: label })
+  }
+  return out
+}
+
 if (typeof module !== "undefined")
   module.exports = {
+    senderActionButtons: senderActionButtons,
     clampTimestamp: clampTimestamp,
     holdPopup: holdPopup,
     popupPlacement: popupPlacement,
@@ -339,8 +360,15 @@ function execArgvFromHints(hints) {
  * @returns {?Array<string>} the argv, or null when the hint is malformed or empty
  */
 function parseExecArgv(value) {
+  if (Array.isArray(value)) {
+    try {
+      value = JSON.stringify(value)
+    } catch (e) {
+      return null
+    }
+  }
   var text = String(value || "")
-  if (!text) return null
+  if (!text || text.length > 32768) return null
 
   var parsed
   try {
@@ -349,12 +377,56 @@ function parseExecArgv(value) {
     return null
   }
 
-  if (!Array.isArray(parsed) || parsed.length === 0) return null
+  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 32) return null
   for (var i = 0; i < parsed.length; i++) {
-    if (typeof parsed[i] !== "string") return null
+    if (
+      typeof parsed[i] !== "string" ||
+      parsed[i].length > 4096 ||
+      parsed[i].indexOf("\u0000") >= 0
+    )
+      return null
   }
   if (!parsed[0] || parsed[0].charAt(0) === "-") return null
   return parsed
+}
+
+/**
+ * Validate the omarchy-actions JSON hint as one complete set of buttons.
+ * Uses the upstream bounds: three buttons, 256-character labels and the
+ * same bounded argv as the card click. No partial array can run.
+ * @param {*} value - JSON action array.
+ * @returns {?Array<{label: string, argv: Array<string>}>} Valid actions or null.
+ */
+function parseExecActions(value) {
+  var text = String(value || "")
+  if (!text || text.length > 32768) return null
+  var parsed
+  try {
+    parsed = JSON.parse(text)
+  } catch (e) {
+    return null
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 3) return null
+  var out = []
+  for (var i = 0; i < parsed.length; i++) {
+    var entry = parsed[i]
+    if (!entry || typeof entry !== "object" || typeof entry.label !== "string") return null
+    var label = entry.label.slice(0, 256)
+    var argv = parseExecArgv(entry.argv)
+    if (!label.trim() || !argv) return null
+    out.push({ label: label, argv: argv })
+  }
+  return out
+}
+
+/**
+ * Canonical validated JSON for snapshots; old or malformed entries have none.
+ * @param {*} value - JSON action array.
+ * @returns {string} Validated JSON or an empty string.
+ */
+function serializedExecActions(value) {
+  var actions = parseExecActions(value)
+  return actions ? JSON.stringify(actions) : ""
 }
 
 /**
@@ -451,6 +523,7 @@ function snapshotOf(notification, timestamp) {
     image: n.image,
     glyph: glyphFromHints(n.hints),
     execArgv: execArgvFromHints(n.hints),
+    execActions: serializedExecActions(stringHint(n.hints, "omarchy-actions")),
     urgency: n.urgency,
     expireTimeout: n.expireTimeout,
     timestamp: normalizedTimestamp
@@ -467,6 +540,7 @@ var POPUP_ROLES = [
   "image",
   "glyph",
   "execArgv",
+  "execActions",
   "urgency",
   "expireTimeout"
 ]
@@ -561,6 +635,7 @@ function historyEntry(value, normalUrgency) {
     image: e.image || "",
     glyph: e.glyph || "",
     execArgv: e.execArgv || "",
+    execActions: serializedExecActions(e.execActions),
     urgency: typeof e.urgency === "number" ? e.urgency : normalUrgency,
     expireTimeout: 0,
     timestamp: e.timestamp || 0,
@@ -760,6 +835,7 @@ if (typeof module !== "undefined") {
     glyphFromHints: glyphFromHints,
     execArgvFromHints: execArgvFromHints,
     parseExecArgv: parseExecArgv,
+    parseExecActions: parseExecActions,
     shouldRenderCompactGlyph: shouldRenderCompactGlyph,
     normalizeNotification: normalizeNotification,
     snapshotOf: snapshotOf,

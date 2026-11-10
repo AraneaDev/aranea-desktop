@@ -786,3 +786,50 @@ test("DND switch: pending, echo and queued clicks", () => {
   })
   assert.deepEqual(inbox.dndEcho({ target: true, queued: undefined }, true).state, idle)
 })
+
+test("notification actions retain argv and reject empty commands", () => {
+  const assert = require("node:assert/strict")
+  const actions = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
+  assert.deepEqual(
+    JSON.parse(
+      JSON.stringify(
+        actions.parseExecActions('[{"label":"Open","argv":["xdg-open","/tmp/a b.mp4"]}]')
+      )
+    ),
+    [{ label: "Open", argv: ["xdg-open", "/tmp/a b.mp4"] }]
+  )
+  assert.equal(actions.parseExecActions('[{"label":"Open","argv":[]}]'), null)
+  assert.equal(actions.parseExecActions('{"label":"Open"}'), null)
+})
+
+test("notification actions fail closed at upstream bounds", () => {
+  const assert = require("node:assert/strict")
+  const n = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
+  const encode = (argv) => JSON.stringify([{ label: "Open", argv }])
+  for (const value of [
+    "",
+    "broken",
+    "[]",
+    "null",
+    '[{"label":"  ","argv":["open"]}]',
+    '[{"label":1,"argv":["open"]}]',
+    '[{"label":"Open","argv":["open"]},null]',
+    encode(["-open"]),
+    encode(["open", 1]),
+    encode(["open", "a\u0000b"]),
+    encode(["open", "a".repeat(4097)]),
+    encode(Array(33).fill("open")),
+    JSON.stringify(Array(4).fill({ label: "Open", argv: ["open"] })),
+    encode(Array(9).fill("a".repeat(4096))),
+    " ".repeat(32769)
+  ])
+    assert.equal(n.parseExecActions(value), null, value.slice(0, 80))
+  assert.equal(n.parseExecActions(encode(["open", "a".repeat(4096)]))[0].argv[1].length, 4096)
+  assert.equal(n.parseExecActions(encode(Array(32).fill("open")))[0].argv.length, 32)
+  assert.equal(
+    n.parseExecActions(JSON.stringify([{ label: "a".repeat(257), argv: ["open"] }]))[0].label
+      .length,
+    256
+  )
+  assert.equal(n.parseExecArgv('["open","a\\u0000b"]'), null)
+})

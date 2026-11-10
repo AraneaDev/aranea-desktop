@@ -78,12 +78,19 @@ Scope {
             required property string body
             required property string image
             required property string glyph
+            required property string execActions
             required property int urgency
             required property double expireTimeout
             required property double timestamp
             required property int originalId
             // The notification service, read once so the delegate's calls stay short.
             readonly property var svc: toasts.root
+            // Hint updates and sender lifetime both invalidate an old press.
+            readonly property var actionView: ({
+                hint: cardSlot.execActions,
+                revision: cardSlot.svc.actionsRevision,
+                buttons: cardSlot.svc.actionsFor(cardSlot.originalId)
+              })
 
             // Each card sizes itself based on mode (text vs media); the slot
             // tracks the card so the column auto-fits to whichever is widest.
@@ -147,11 +154,15 @@ Scope {
               cornerRadius: cardSlot.svc.cornerRadius
               fontFamily: Aranea.Typography.uiFamily
               glyph: cardSlot.glyph
+              actions: cardSlot.actionView.buttons
 
               motionEnabled: cardSlot.svc.motionEnabled
 
               onCloseRequested: cardSlot.svc.dismissPopup(cardSlot.index)
               onSwipeDismissed: cardSlot.svc.dismissPopup(cardSlot.index)
+              onActionRequested: function (actionIndex) {
+                cardSlot.svc.invokePopupAction(cardSlot.originalId, actionIndex)
+              }
               onCardClicked: cardSlot.svc.invokePopupDefault(cardSlot.index)
             }
           }

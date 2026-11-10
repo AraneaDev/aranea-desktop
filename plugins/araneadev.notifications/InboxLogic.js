@@ -242,6 +242,7 @@ var ROW_FIELDS = [
   "image",
   "glyph",
   "execArgv",
+  "execActions",
   "urgency",
   "expireTimeout",
   "timestamp",

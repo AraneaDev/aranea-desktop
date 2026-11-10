@@ -12,6 +12,8 @@
 // under each press and offers clickSettled() so NotificationList can refuse
 // a click whose row changed or moved under a still pointer.
 
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
@@ -41,6 +43,8 @@ BorderSurface {
   // notifications` etc.) show their bell/lock/etc. glyph without leaking
   // into the summary text.
   property string glyph: ""
+  // Plain label objects in the service's visible choice order.
+  property var actions: []
   // NotificationUrgency: Low=0, Normal=1, Critical=2 (upstream).
   property int urgency: 1
   // Card corner radius.
@@ -80,6 +84,8 @@ BorderSurface {
 
   // Emitted on right-click or on the compact close button.
   signal closeRequested
+  // Emitted for a button, in the visible action order.
+  signal actionRequested(int index)
   // Emitted on a left click that was not part of a swipe.
   signal cardClicked
   // Emitted once a swipe has carried the card off to the right.
@@ -127,12 +133,17 @@ BorderSurface {
   // The body as rendered: sanitized StyledText with `<br/>` line breaks.
   readonly property string styledBody: NotificationLogic.styledBody(body, app, appIcon)
 
+  // Shared typed tokens also keep the action row consistent with the card.
+  readonly property color textColor: Commons.Color.notifications.text
+  readonly property color actionColor: Commons.Color.notifications.countdown
+  readonly property real captionFontSize: Style.font.caption
+
   // Muted text color: time label, close button, low-urgency accent.
-  readonly property color dimColor: Qt.darker(Commons.Color.notifications.text, 1.4)
+  readonly property color dimColor: Qt.darker(root.textColor, 1.4)
   // Body text color, slightly darker than the summary.
   readonly property color bodyColor: Qt.darker(Commons.Color.notifications.text, 1.15)
   // Color of the urgency rail on the card's left edge.
-  readonly property color railColor: urgency === 2 ? Commons.Color.urgent : (urgency === 0 ? Commons.Color.notifications.border : Commons.Color.notifications.countdown)
+  readonly property color railColor: urgency === 2 ? Commons.Color.urgent : (urgency === 0 ? Commons.Color.notifications.border : root.actionColor)
   // Card fill: red-tinted for critical; a light tint on hover for toasts
   // only (center rows draw no hover fill); else the theme's.
   readonly property color cardBackground: urgency === 2 ? Util.alpha(Commons.Color.urgent, 0.08) : (hovered && !compact ? Util.alpha(Commons.Color.notifications.countdown, 0.045) : Commons.Color.notifications.background)
@@ -421,7 +432,7 @@ BorderSurface {
           text: root.timeLabel
           color: root.dimColor
           font.family: Aranea.Typography.technicalFamily
-          font.pixelSize: Style.font.caption
+          font.pixelSize: root.captionFontSize
         }
 
         Text {
@@ -449,6 +460,69 @@ BorderSurface {
             onClicked: {
               root.closeRequested()
               root.pressedKey = ""
+            }
+          }
+        }
+      }
+    }
+    Flow {
+      Layout.fillWidth: true
+      Layout.leftMargin: Style.space(12)
+      Layout.rightMargin: Style.space(12)
+      Layout.bottomMargin: visible ? Style.space(8) : 0
+      visible: root.actions.length > 0
+      spacing: Style.space(6)
+      Repeater {
+        model: root.actions
+        delegate: Rectangle {
+          id: actionButton
+          objectName: "notificationActionButton"
+          required property int index
+          required property var modelData
+          readonly property string label: String(modelData.label || "")
+          width: Math.min(actionLabel.implicitWidth + Style.space(20), parent.width)
+          height: Style.space(28)
+          radius: Style.space(4)
+          color: Util.alpha(root.actionColor, actionArea.containsMouse ? 0.18 : 0.08)
+          Text {
+            id: actionLabel
+            anchors.fill: parent
+            anchors.margins: Style.space(5)
+            text: actionButton.label
+            textFormat: Text.PlainText
+            elide: Text.ElideRight
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            color: root.textColor
+            font.family: root.fontFamily
+            font.pixelSize: root.captionFontSize
+          }
+          MouseArea {
+            id: actionArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            property var pressedActions: null
+            onPressed: {
+              root.dragMoved = false
+              root.pressedKey = root.rowKey
+              pressedActions = root.actions
+            }
+            onCanceled: pressedActions = null
+            onPositionChanged: function (mouse) {
+              if (root.pointerGate && root.pointerGate.moved(actionArea, mouse)) {
+                root.pointerMovedAt = Date.now()
+                root.pointerMoved()
+              }
+            }
+            onClicked: {
+              // A replacement or sender close between press and release must
+              // never redirect the old press to a new command at this index.
+              let valid = pressedActions === root.actions && !root.dragMoved
+              pressedActions = null
+              // The receiver may synchronously destroy this card.
+              if (valid)
+                root.actionRequested(actionButton.index)
             }
           }
         }

@@ -95,6 +95,7 @@ Item {
       image: e.image,
       glyph: e.glyph,
       execArgv: e.execArgv,
+      execActions: e.execActions,
       urgency: e.urgency,
       expireTimeout: e.expireTimeout,
       timestamp: NotificationLogic.clampTimestamp(e.timestamp, Date.now()),

@@ -286,6 +286,8 @@ Panel {
     root.keyboardCursor = false
     if (name === "open")
       root.activate(arg.index)
+    else if (name === "invokeAction" && row.kind === "entry")
+      root.service.invokeInboxAction(row.entry.fileName, arg.actionIndex)
     else if (name === "dismiss")
       root.dismissAt(arg.index, false)
     else if (name === "toggle")

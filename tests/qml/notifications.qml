@@ -8,6 +8,7 @@ import Quickshell
 import Quickshell.Io
 import "lib"
 import "plugins/araneadev.notifications" as Notif
+import "plugins/araneadev.notifications/NotificationLogic.js" as Logic
 
 ShellRoot {
   // Not `shell`: the service has a `shell` property that would shadow it.
@@ -49,6 +50,199 @@ ShellRoot {
     function dismiss() {
       dismissed += 1
     }
+  }
+
+  property var invokedActions: []
+  QtObject {
+    id: actionRef
+    property bool tracked: true
+    property var actions: [
+      {
+        identifier: "default",
+        text: "Default",
+        invoke: function () {
+          invokedActions.push("default")
+        }
+      },
+      {
+        identifier: "open",
+        text: "Open",
+        invoke: function () {
+          invokedActions.push("open")
+        }
+      },
+      {
+        identifier: "cut",
+        text: "Omacut",
+        invoke: function () {
+          invokedActions.push("cut")
+        }
+      }
+    ]
+    function dismiss() {
+      tracked = false
+    }
+  }
+
+  QtObject {
+    id: senderSignals
+    signal closed
+    signal hintsChanged
+    signal actionsChanged
+  }
+
+  // Only the native Notification boundary is replaced: production delivery,
+  // watchers, replacement and sender-close handling all run unchanged.
+  function checkActionLifetime(then) {
+    var first = {
+      id: 41,
+      appName: "omarchy-action",
+      urgency: 0,
+      tracked: false,
+      hints: {
+        "omarchy-actions": '[{"label":"Open","argv":["/usr/bin/false"]}]'
+      },
+      actions: [
+        {
+          identifier: "old",
+          text: "Old",
+          invoke: function () {
+            invokedActions.push("old")
+          }
+        }
+      ],
+      closed: senderSignals.closed,
+      hintsChanged: senderSignals.hintsChanged,
+      actionsChanged: senderSignals.actionsChanged,
+      dismiss: function () {
+        this.tracked = false
+        senderSignals.closed()
+      }
+    }
+    svc.handleNotification(first)
+    t.step(20, function () {
+      t.check(first.tracked, "delivery keeps sender alive for actions")
+      t.equal(svc.actionsFor(41).map(function (a) {
+        return a.label
+      }), ["Open", "Old"], "hint buttons precede sender buttons")
+      var revision = svc.actionsRevision
+      first.hints = {
+        "omarchy-actions": '[{"label":"Omacut","argv":["/usr/bin/false"]}]'
+      }
+      senderSignals.hintsChanged()
+      t.equal(svc.actionsFor(41).map(function (a) {
+        return a.label
+      }), ["Omacut", "Old"], "replacement refreshes action hints in the same popup")
+      t.equal(svc.popupModel.count, 1, "replacement never duplicates the popup")
+      t.check(svc.actionsRevision > revision, "replacement invalidates rendered action choices")
+      first.actions = [
+        {
+          identifier: "new",
+          text: "New",
+          invoke: function () {
+            invokedActions.push("new")
+          }
+        }
+      ]
+      senderSignals.actionsChanged()
+      t.equal(svc.actionsFor(41).map(function (a) {
+        return a.label
+      }), ["Omacut", "New"], "sender action updates are observed")
+      first.tracked = false
+      senderSignals.closed()
+      t.equal(svc.actionsFor(41).map(function (a) {
+        return a.label
+      }), ["Omacut"], "sender close removes only live libnotify buttons")
+      t.equal(svc.invokePopupAction(41, 1), false, "closed sender choice cannot run")
+      t.equal(invokedActions, [], "replacement and close never invoke stale actions")
+      svc.clearPopups()
+      first.hints = {}
+      first.actions = [
+        {
+          identifier: "close",
+          text: "Close",
+          invoke: function () {
+            first.tracked = false
+            senderSignals.closed()
+          }
+        }
+      ]
+      svc.handleNotification(first)
+      t.step(20, function () {
+        t.equal(svc.invokePopupAction(41, 0), true, "a sender may close synchronously while its action runs")
+        t.equal(svc.popupModel.count, 0, "a synchronously closed sender still consumes its own card")
+        svc.clearPopups()
+        then()
+      })
+    })
+  }
+
+  FileView {
+    id: actionReader
+    blockLoading: true
+    path: testRoot.stateRoot + "actions.json"
+  }
+
+  function checkActions(then) {
+    var row = Logic.snapshotOf({
+      id: 31,
+      appName: "omarchy-action"
+    }, testRoot.now)
+    svc.popupModel.append(row)
+    svc.liveRefs = ({
+        31: actionRef
+      })
+    t.equal(svc.actionsFor(31).map(function (a) {
+      return a.label
+    }), ["Open", "Omacut"], "default click is separate from sender buttons")
+    // Another card took visual slot zero after the first card was rendered.
+    svc.popupModel.insert(0, Logic.snapshotOf({
+      id: 32
+    }, testRoot.now + 1))
+    t.equal(svc.invokePopupAction(31, 1), true, "action targets stable original identity after insertion")
+    t.equal(invokedActions, ["cut"], "selected live sender action invoked exactly once")
+    t.equal(svc.popupModel.get(0).originalId, 32, "newer card was not invoked or removed")
+    t.equal(svc.invokePopupAction(31, 0), false, "removed card cannot fall through to its neighbour")
+    svc.clearPopups()
+    svc.liveRefs = ({})
+    svc.popupModel.append(row)
+    t.equal(svc.actionsFor(31), [], "restored entries never revive sender actions")
+    t.equal(svc.invokePopupAction(31, 0), false, "a dead sender action cannot run")
+    svc.clearPopups()
+
+    // Exercise real Util.execArgv at the process boundary, recording literals.
+    var argv = ["/usr/bin/python3", "-c", "import json,sys;json.dump(sys.argv[2:],open(sys.argv[1], 'w'))", actionReader.path, "/tmp/a b.mp4", "a\"b", "$(touch nope)", "a;b"]
+    var hint = JSON.stringify([
+      {
+        label: "Open",
+        argv: ["/usr/bin/false"]
+      },
+      {
+        label: "Omacut",
+        argv: argv
+      }
+    ])
+    var execRow = Logic.snapshotOf({
+      id: 33,
+      hints: {
+        "omarchy-actions": hint
+      }
+    }, testRoot.now)
+    svc.popupModel.append(execRow)
+    t.equal(svc.actionsFor(33).map(function (a) {
+      return a.label
+    }), ["Open", "Omacut"], "argv buttons preserve visible order")
+    t.equal(svc.invokePopupAction(33, -1), false, "negative choice refused")
+    t.equal(svc.invokePopupAction(33, 2), false, "out-of-range choice refused")
+    t.equal(svc.invokePopupAction(33, 1), true, "selected argv action launches")
+    t.equal(svc.invokePopupAction(33, 1), false, "consumed action cannot launch twice")
+    t.waitFor(function () {
+      actionReader.reload()
+      return actionReader.text().length > 0
+    }, 5000, "argv action recorder finishes", function () {
+      t.equal(JSON.parse(actionReader.text()), ["/tmp/a b.mp4", "a\"b", "$(touch nope)", "a;b"], "argv metacharacters survive process execution literally")
+      then()
+    })
   }
 
   // Reads the second service's settings file.
@@ -104,21 +298,25 @@ ShellRoot {
       t.equal(svc.inbox.count, 0, "old entry pruned")
       t.equal(fakeRef.dismissed, 1, "pruning dismisses the entry at its sender")
 
-      // DND on, then the service goes before its debounced save fires.
-      var second = serviceComponent.createObject(testRoot)
-      t.waitFor(function () {
-        return second.settingsLoaded
-      }, 10000, "the second service loads its settings", function () {
-        t.check(second.settingsLoaded, "second service loaded its settings")
-        second.setDoNotDisturb(true)
-        second.destroy()
-        settingsReader.path = testRoot.stateRoot + "b/notifications.json"
-        t.waitFor(function () {
-          settingsReader.reload()
-          return testRoot.savedSettings().dnd !== undefined
-        }, 5000, "the settings file is written", function () {
-          t.equal(testRoot.savedSettings().dnd, true, "DND written when the service goes away")
-          t.done()
+      checkActionLifetime(function () {
+        checkActions(function () {
+          // DND on, then the service goes before its debounced save fires.
+          var second = serviceComponent.createObject(testRoot)
+          t.waitFor(function () {
+            return second.settingsLoaded
+          }, 10000, "the second service loads its settings", function () {
+            t.check(second.settingsLoaded, "second service loaded its settings")
+            second.setDoNotDisturb(true)
+            second.destroy()
+            settingsReader.path = testRoot.stateRoot + "b/notifications.json"
+            t.waitFor(function () {
+              settingsReader.reload()
+              return testRoot.savedSettings().dnd !== undefined
+            }, 5000, "the settings file is written", function () {
+              t.equal(testRoot.savedSettings().dnd, true, "DND written when the service goes away")
+              t.done()
+            })
+          })
         })
       })
     })
