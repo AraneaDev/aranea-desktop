@@ -825,3 +825,53 @@ test("cursorSections always keeps the place stop, so the outline and Enter agree
     "↑↓ move · enter edit place · r refresh"
   )
 })
+
+test("automatic weather location is ephemeral and configured coordinates or names win", () => {
+  const model = require("../../plugins/araneadev.weather/Model.js")
+  const unset = model.parseLocationFile("")
+  const detected = model.parseLocationFile('{"name":"Amsterdam","latitude":52.37,"longitude":4.9}')
+  assert.equal(model.isAutoLocation(unset), true)
+  assert.deepEqual(model.effectiveLocation(unset, detected), detected)
+  for (const saved of [
+    { name: "London", latitude: 51.5, longitude: -0.12 },
+    { name: "London", latitude: null, longitude: null },
+    { name: "", latitude: 0, longitude: 0 }
+  ]) {
+    assert.equal(model.isAutoLocation(saved), false)
+    assert.deepEqual(model.effectiveLocation(saved, detected), saved)
+  }
+  assert.deepEqual(unset, { name: "", latitude: null, longitude: null })
+})
+
+test("weather location parser rejects non-finite, out-of-range and partial coordinates", () => {
+  const model = require("../../plugins/araneadev.weather/Model.js")
+  for (const raw of ["", "{}", "[]", "null", "not JSON"])
+    assert.deepEqual(model.parseLocationFile(raw), { name: "", latitude: null, longitude: null })
+  for (const [latitude, longitude] of [
+    [91, 0],
+    [0, 181],
+    ["Infinity", 0],
+    ["52evil", 4],
+    [52, null],
+    ["", 4],
+    [true, 4],
+    [[52], 4]
+  ]) {
+    assert.deepEqual(
+      model.parseLocationFile(JSON.stringify({ name: "City", latitude, longitude })),
+      {
+        name: "City",
+        latitude: null,
+        longitude: null
+      }
+    )
+  }
+  assert.deepEqual(
+    model.parseLocationFile('{"name":"  City  ","latitude":"-90","longitude":"180"}'),
+    {
+      name: "City",
+      latitude: -90,
+      longitude: 180
+    }
+  )
+})

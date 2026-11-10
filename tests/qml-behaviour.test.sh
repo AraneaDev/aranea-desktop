@@ -64,7 +64,7 @@ run_test() {
   ln -s "$repo_root/tests/qml/fixtures" "$run_dir/cfg/fixtures"
   for plugin in "$repo_root"/plugins/araneadev.*; do
     [[ -d "$plugin" ]] || continue
-    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == network-telemetry-panel || "$name" == health-alerts || "$name" == clock-civil-dates || "$name" == worldclock-panel || ("$name" == clock-embedded-controllers || "$name" == unified-clock || "$name" == clock-production-loader) || "$name" == updates-production-host || "$name" == production-widget-panels || "$name" == notification-center-keyboard) ]]; then
+    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == network-telemetry-panel || "$name" == weather-location || "$name" == health-alerts || "$name" == clock-civil-dates || "$name" == worldclock-panel || ("$name" == clock-embedded-controllers || "$name" == unified-clock || "$name" == clock-production-loader) || "$name" == updates-production-host || "$name" == production-widget-panels || "$name" == notification-center-keyboard) ]]; then
       # Adapt only native windows/attached layer-shell state. Placement, mask,
       # motion, coordinator, focus timer and production panel content stay real.
       mkdir -p "$run_dir/cfg/plugins/araneadev.shared"
@@ -262,6 +262,12 @@ CLOCKCOMMAND
     chmod +x "$run_dir/display-bin/clock-command"
     for display_command in curl omarchy-weather-location timedatectl; do
       ln -s "$run_dir/display-bin/clock-command" "$run_dir/display-bin/$display_command"
+    done
+  fi
+  if [[ "$name" == weather-location ]]; then
+    # Only process I/O is fake; all weather collectors and cancellation stay real.
+    for display_command in weather-fixture curl omarchy-weather-location; do
+      ln -s "$repo_root/tests/qml/fixtures/weather-command.py" "$run_dir/display-bin/$display_command"
     done
   fi
   if [[ "$name" == network-telemetry-panel || "$name" == network-telemetry ]]; then

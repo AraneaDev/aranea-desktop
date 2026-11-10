@@ -16,11 +16,23 @@ function parseLocationFile(raw) {
   var unset = { name: "", latitude: null, longitude: null }
   try {
     var data = JSON.parse(String(raw || ""))
-    if (!data || typeof data !== "object") return unset
+    if (!data || typeof data !== "object" || Array.isArray(data)) return unset
 
-    var latitude = parseFloat(data.latitude)
-    var longitude = parseFloat(data.longitude)
-    var hasCoordinates = !isNaN(latitude) && !isNaN(longitude)
+    var latitude =
+      typeof data.latitude === "number" ||
+      (typeof data.latitude === "string" && data.latitude.trim() !== "")
+        ? Number(data.latitude)
+        : NaN
+    var longitude =
+      typeof data.longitude === "number" ||
+      (typeof data.longitude === "string" && data.longitude.trim() !== "")
+        ? Number(data.longitude)
+        : NaN
+    var hasCoordinates =
+      isFinite(latitude) &&
+      isFinite(longitude) &&
+      Math.abs(latitude) <= 90 &&
+      Math.abs(longitude) <= 180
     return {
       name: typeof data.name === "string" ? data.name.replace(/^\s+|\s+$/g, "") : "",
       latitude: hasCoordinates ? latitude : null,
@@ -29,6 +41,26 @@ function parseLocationFile(raw) {
   } catch (e) {
     return unset
   }
+}
+
+/**
+ * Whether neither a place name nor coordinates were configured.
+ * @param {{name?: string, latitude?: ?number}|null|undefined} state - a parsed weather location
+ * @returns {boolean} true for automatic discovery
+ */
+function isAutoLocation(state) {
+  var s = state || {}
+  return !s.name && (s.latitude === null || s.latitude === undefined)
+}
+
+/**
+ * Resolves a location without modifying saved settings or detected state.
+ * @param {{name: string, latitude: ?number, longitude: ?number}} configured - the parsed saved location
+ * @param {{name: string, latitude: ?number, longitude: ?number}|null|undefined} detected - the ephemeral network location
+ * @returns {{name: string, latitude: ?number, longitude: ?number}} the saved location, or the detected one in automatic mode
+ */
+function effectiveLocation(configured, detected) {
+  return isAutoLocation(configured) && detected ? detected : configured
 }
 
 /**
@@ -503,6 +535,8 @@ function iconForCode(code, night) {
 if (typeof module !== "undefined") {
   module.exports = {
     parseLocationFile: parseLocationFile,
+    isAutoLocation: isAutoLocation,
+    effectiveLocation: effectiveLocation,
     wttrLocationQuery: wttrLocationQuery,
     parseGeocodingResults: parseGeocodingResults,
     locationCommit: locationCommit,
