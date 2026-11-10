@@ -177,6 +177,24 @@ Panel {
   readonly property string connectionPhrase: connectionPhrases[connectionPhraseIndex % connectionPhrases.length]
   // Whether the active Quickshell.Networking backend is NetworkManager.
   readonly property bool networkManagerAvailable: Networking.backend === NetworkBackendType.NetworkManager
+  // NM owns connectivity checks; never infer a portal from untrusted headers.
+  readonly property bool connectivityChecksEnabled: networkManagerAvailable && Networking.canCheckConnectivity && Networking.connectivityCheckEnabled
+  // Normalized reachability for sign-in and Internet probe presentation.
+  readonly property string connectivity: Model.connectivityState(kind, Networking.connectivity, {
+    Portal: NetworkConnectivity.Portal,
+    Limited: NetworkConnectivity.Limited,
+    Full: NetworkConnectivity.Full,
+    None: NetworkConnectivity.None
+  }, connectivityChecksEnabled)
+  // A fixed helper opens the browser only after an explicit sign-in action.
+  readonly property bool hasCaptivePortal: connectivity === "portal"
+
+  // Launch sign-in only on an explicit action while a portal is present.
+  function openCaptivePortal() {
+    if (root.hasCaptivePortal)
+      Quickshell.execDetached(["omarchy-network-captive-portal", Model.captivePortalUrl])
+  }
+
   // All network devices NetworkManager reports, or [] before it's ready.
   readonly property var networkDevices: Networking.devices ? Networking.devices.values : []
   // The Wi-Fi device to drive, preferring one that's actually connected.
@@ -286,8 +304,10 @@ Panel {
   readonly property int speedHeaderIndex: canRunSpeedTest ? (canShareWifi ? 1 : 0) : -1
   // Header action slot for the Wi-Fi power switch, or -1 when it isn't shown.
   readonly property int toggleHeaderIndex: canToggleWifi ? (canShareWifi ? 1 : 0) + (canRunSpeedTest ? 1 : 0) : -1
+  // Sign-in follows the existing header controls in keyboard order.
+  readonly property int portalHeaderIndex: hasCaptivePortal ? (canShareWifi ? 1 : 0) + (canRunSpeedTest ? 1 : 0) + (canToggleWifi ? 1 : 0) : -1
   // How many header actions are currently shown.
-  readonly property int headerActionCount: (canShareWifi ? 1 : 0) + (canRunSpeedTest ? 1 : 0) + (canToggleWifi ? 1 : 0)
+  readonly property int headerActionCount: (canShareWifi ? 1 : 0) + (canRunSpeedTest ? 1 : 0) + (canToggleWifi ? 1 : 0) + (hasCaptivePortal ? 1 : 0)
   // Whether the keyboard cursor is on the QR header action.
   readonly property bool qrHeaderHasCursor: cursorActive && focusSection === "header" && headerIndex === qrHeaderIndex
   // Whether the keyboard cursor is on the speed test header action.
@@ -433,6 +453,8 @@ Panel {
       summonSpeedTest()
     else if (headerIndex === toggleHeaderIndex)
       toggleNetwork()
+    else if (headerIndex === portalHeaderIndex)
+      openCaptivePortal()
   }
 
   // Moves the keyboard cursor to a header action, from a mouse hover.
@@ -1113,6 +1135,7 @@ Panel {
   NetworkTelemetry {
     id: telemetry
     pollingEnabled: root.opened
+    connectivity: root.connectivity
     bandBusy: root.bandBusy
   }
 
@@ -1373,6 +1396,10 @@ Panel {
     if (canToggleWifi)
       rows.push({
         key: "toggle"
+      })
+    if (hasCaptivePortal)
+      rows.push({
+        key: "portal"
       })
     return rows
   }
@@ -1815,6 +1842,7 @@ Panel {
         glyph: icon,
         title: heroTitle,
         caption: heroCaption,
+        canPortal: hasCaptivePortal,
         canQr: canShareWifi,
         canSpeed: canRunSpeedTest,
         canToggle: canToggleWifi,
@@ -1865,7 +1893,7 @@ Panel {
       sending: hasTransferStats ? formatRate(uploadRate) : "--",
       ping: formatPingLatency(internetPingLatency),
       loss: formatPacketLoss(internetPingPacketLoss),
-      lossy: internetPingPacketLoss > 0,
+      lossy: hasInternetPing && internetPingPacketLoss > 0,
       downloaded: hasTransferStats ? formatBytes(parseFloat(info.rx_bytes || "0")) : "--",
       uploaded: hasTransferStats ? formatBytes(parseFloat(info.tx_bytes || "0")) : "--",
       ip: info.ip || "--",
@@ -2039,7 +2067,9 @@ Panel {
     var promptKey = name === "promptSubmit" || name === "promptCancel" || name === "passphraseEdited" || name === "identityEdited"
     if (!promptKey)
       keyboardCursor = false
-    if (name === "qr")
+    if (name === "portal")
+      openCaptivePortal()
+    else if (name === "qr")
       summonWifiQr()
     else if (name === "speed")
       summonSpeedTest()

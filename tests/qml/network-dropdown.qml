@@ -870,6 +870,18 @@ ShellRoot {
           key: wifiRows[2].key
         }) && nonHover().length === 1, "a click 300 ms after the shift is accepted, on the row now under it")
         full.view = withCursor(cur(false, "wifi", 0))
+        t.check(!t.findChild(full, "portalAction").visible, "sign-in is absent on a normal link")
+        var portalView = fullView(cur(true, "header", 3), wifiRows)
+        portalView.header.canPortal = true
+        full.view = portalView
+      }], [350, function () {
+        var portal = t.findChild(full, "portalAction")
+        t.check(portal.visible && portal.hasCursor, "portal header action follows the existing controls and keyboard index")
+        actions = []
+        pointer.mouseClick(portal)
+        t.check(reported("portal", null), "sign-in click reports the explicit portal action")
+        full.view = fullView(cur(false, "wifi", 0), wifiRows)
+        t.check(!portal.visible, "sign-in disappears when portal state clears")
       }]])
 
   // A Wi-Fi row's position before the VPN line hid.

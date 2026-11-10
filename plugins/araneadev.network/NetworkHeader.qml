@@ -18,6 +18,8 @@ Column {
   property string caption: ""
   // Opacity of the caption alone, for the phrase fade.
   property real captionOpacity: 1
+  // Whether NM requests a captive portal sign-in.
+  property bool canPortal: false
   // Whether the QR share action applies (a connected non-enterprise Wi-Fi).
   property bool canQr: false
   // Whether the speed test action applies (there is an interface).
@@ -43,6 +45,11 @@ Column {
   // The switch's index among the visible actions, or -1 when hidden.
   readonly property int toggleIndex: canToggle ? (canQr ? 1 : 0) + (canSpeed ? 1 : 0) : -1
 
+  // Sign-in follows the existing controls in keyboard order.
+  readonly property int portalIndex: canPortal ? (canQr ? 1 : 0) + (canSpeed ? 1 : 0) + (canToggle ? 1 : 0) : -1
+
+  // Emitted when sign-in is clicked.
+  signal portal
   // Emitted when the QR action is clicked.
   signal qr
   // Emitted when the speed test action is clicked.
@@ -185,6 +192,26 @@ Column {
           objectName: "toggleTip"
           visible: switchHover.hovered && header.toggleHint !== ""
           text: header.toggleHint
+        }
+      }
+      GlyphAction {
+        id: portalAction
+        objectName: "portalAction"
+        pointerGate: header.pointerGate
+        anchors.verticalCenter: parent.verticalCenter
+        visible: header.canPortal
+        glyph: String.fromCodePoint(0xf0306)
+        hasCursor: header.cursorIndex >= 0 && header.cursorIndex === header.portalIndex
+        onClicked: header.portal()
+        onPointerMoved: function (handler) {
+          header.pointerOver(handler, header.portalIndex)
+        }
+        onPointerEntered: if (!header.pointerGate)
+          header.hoverAction(header.portalIndex)
+        PanelToolTip {
+          fontFamily: Aranea.Typography.uiFamily
+          visible: portalAction.hovered
+          text: "Sign in to network"
         }
       }
     }

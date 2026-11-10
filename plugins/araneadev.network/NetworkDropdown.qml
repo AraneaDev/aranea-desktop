@@ -188,6 +188,7 @@ Column {
     title: dropdown.view.header ? dropdown.view.header.title || "" : ""
     caption: dropdown.view.header ? dropdown.view.header.caption || "" : ""
     captionOpacity: dropdown.captionOpacity
+    canPortal: !!(dropdown.view.header && dropdown.view.header.canPortal)
     canQr: !!(dropdown.view.header && dropdown.view.header.canQr)
     canSpeed: !!(dropdown.view.header && dropdown.view.header.canSpeed)
     canToggle: !!(dropdown.view.header && dropdown.view.header.canToggle)
@@ -196,6 +197,7 @@ Column {
     scanning: !!(dropdown.view.header && dropdown.view.header.scanning)
     cursorIndex: dropdown.cursorIn("header")
     pointerGate: dropdown.pointerGate
+    onPortal: dropdown.action("portal", null)
     onQr: dropdown.action("qr", null)
     onSpeed: dropdown.action("speed", null)
     onToggleWifi: dropdown.action("toggleWifi", null)

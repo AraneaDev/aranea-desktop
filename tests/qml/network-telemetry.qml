@@ -20,6 +20,12 @@ ShellRoot {
     finished: 0,
     response: "iface\twlan0\nrx_bytes\t100\ntx_bytes\t50\ninternet_ping_ms\t12"
   }, function () {
+    telemetry.connectivity = "limited"
+    telemetry.updateDetails("iface\twlan0\ninternet_ping_ms\t")
+    t.check(!telemetry.hasInternetPing, "limited Internet probe is unreadable")
+    t.equal(telemetry.internetPingSamples, [null], "restricted telemetry retains latency history")
+    telemetry.resetMeasurements()
+    telemetry.connectivity = "unknown"
     telemetry.refresh()
     telemetry.refresh()
     telemetry.pollingEnabled = true

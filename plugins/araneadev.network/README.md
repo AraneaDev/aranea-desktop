@@ -20,6 +20,13 @@ The existing caption fade, Link graph sampler, prompt focus hand-back,
 NetworkManager completion/failure hooks, and password error timer remain in the
 controller. DNS picks settle in the open panel rather than closing it.
 
+NetworkManager's connectivity state adds a **Sign in to network** header action
+while a captive portal is active. It invokes `omarchy-network-captive-portal`
+with the fixed HTTP URL `http://ping.omacom.io/nm-check.txt` as one argument;
+response headers never become commands or navigation targets. Portal, limited,
+and offline links show `--` for Internet ping and loss while keeping probe
+history. Full and unknown links retain the usual sample-based presentation.
+
 Picking a DNS provider (DHCP, Cloudflare, Google) shows it chosen and
 pulsing busy at once (`pendingDnsProvider` / `selectedDnsProvider`, as the
 Power dropdown's profile pills do) instead of closing the dropdown the way

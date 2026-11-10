@@ -82,6 +82,20 @@ source = source.replace('WlrLayershell.', 'nativeLayer.')
 source = re.sub(r'(?m)^(  |        )anchors \{', r'\1nativeAnchors {', source)
 pathlib.Path(sys.argv[2]).write_text(source)
 PYBOUNDARY
+    elif [[ "$plugin" == */araneadev.network && "$name" == network-telemetry-panel ]]; then
+      # Replace NetworkManager I/O only; retain production actions and telemetry.
+      mkdir -p "$run_dir/cfg/plugins/araneadev.network"
+      for source in "$plugin"/*; do
+        [[ "${source##*/}" == Panel.qml ]] && continue
+        ln -s "$source" "$run_dir/cfg/plugins/araneadev.network/${source##*/}"
+      done
+      python - "$plugin/Panel.qml" "$run_dir/cfg/plugins/araneadev.network/Panel.qml" <<'PYNETWORK'
+import pathlib, re, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+source = source.replace('import Quickshell.Networking\n', 'import Quickshell.Networking\nimport "../../fixtures/network-host" as NetworkBoundary\n')
+source = re.sub(r'\bNetworking\.', 'NetworkBoundary.Networking.', source)
+pathlib.Path(sys.argv[2]).write_text(source)
+PYNETWORK
     elif [[ "$plugin" == */araneadev.notifications && ("$name" == notifications || "$name" == notification-inbox-focus) ]]; then
       # Only replace native Hyprland records/dispatch; service matching,
       # keyboard identity, activation and inbox lifecycle run unchanged.
@@ -252,7 +266,7 @@ CLOCKCOMMAND
   fi
   if [[ "$name" == network-telemetry-panel || "$name" == network-telemetry ]]; then
     # Fake only command I/O; production telemetry and host lifecycle remain real.
-    for display_command in network-fixture omarchy-network-status omarchy-network-band omarchy-dns nmcli ip busctl; do
+    for display_command in network-fixture omarchy-network-captive-portal omarchy-network-status omarchy-network-band omarchy-dns nmcli ip busctl; do
       ln -s "$repo_root/tests/qml/fixtures/network-command.py" "$run_dir/display-bin/$display_command"
     done
   fi
