@@ -127,7 +127,14 @@ ShellRoot {
     // A pending automatic lookup is superseded by an explicit user location.
     fixture.configure({
       geoBody: '{"name":"Wrong city","latitude":1,"longitude":2}',
-      geoDelay: 0.8
+      geoDelay: 0.8,
+      dailyDelay: 0.8,
+      airDelay: 0.8,
+      cancelDelays: {
+        geo: 0.05,
+        daily: 0.3,
+        air: 0.5
+      }
     }, function () {
       geoBefore = fixture.state.geoStarted
       host.opened = true
@@ -136,20 +143,28 @@ ShellRoot {
       t.waitFor(function () {
         return fixture.state.geoStarted === geoBefore + 1
       }, 1500, "new automatic lookup starts", function () {
-        fixture.configure({
-          locationFile: {
-            name: "London",
-            latitude: 51.5,
-            longitude: -0.12
-          }
-        }, function () {
-          weather.locationFile.reload()
+        var dailyBefore = fixture.state.dailyStarted || 0
+        var airBefore = fixture.state.airStarted || 0
+        weather.refreshDailyForecast(null)
+        t.waitFor(function () {
+          return fixture.state.dailyStarted > dailyBefore && fixture.state.airStarted > airBefore
+        }, 1500, "secondary requests are live before changing saved coordinates", function () {
+          fixture.configure({
+            locationFile: {
+              name: "London",
+              latitude: 51.5,
+              longitude: -0.12
+            }
+          }, function () {
+            weather.locationFile.reload()
+          })
         })
         t.waitFor(function () {
           return weather.locationQuery === "51.5,-0.12" && fixture.state.calls.some(function (call) {
             return call.kind === "daily" && call.argv[call.argv.length - 1].indexOf("latitude=51.5&longitude=-0.12") !== -1
           })
         }, 2000, "explicit coordinates start their own forecast", function () {
+          t.check(!weather.configuredRefreshPending, "saved-location refresh clears only after canceled requests settle and a new cycle claims it")
           t.step(900, function () {
             t.equal(weather.configuredLocationState, {
               name: "London",
@@ -172,7 +187,10 @@ ShellRoot {
       locationFile: null,
       geoBody: "{}",
       geoExit: 0,
-      geoDelay: 0.15
+      geoDelay: 0.15,
+      dailyDelay: 0,
+      airDelay: 0,
+      cancelDelays: {}
     }, function () {
       weather.detectedLocationState = {
         name: "",
@@ -207,62 +225,65 @@ ShellRoot {
       })
     })
   }
-  Component.onCompleted: fixture.configure({
-    geoBody: '{"name":"Amsterdam","latitude":52.37,"longitude":4.9}',
-    geoDelay: 0.3,
-    forecastBody: JSON.stringify(staleReport),
-    forecastDelay: 0.1,
-    dailyBody: JSON.stringify({
-      current: {
-        temperature_2m: 17,
-        weather_code: 2,
-        is_day: 1
-      },
-      daily: {
-        time: [],
-        weather_code: [],
-        temperature_2m_max: [],
-        temperature_2m_min: []
-      }
-    }),
-    airBody: '{"current":{"european_aqi":21,"uv_index":1}}'
-  }, function () {
-    host.opened = true
-    weather.report = staleReport
-    weather.activateEmbedded()
-    weather.refresh()
-    t.waitFor(function () {
-      return fixture.state.geoStarted === 1
-    }, 1500, "automatic lookup starts", function () {
+  Component.onCompleted: {
+    weather.locationFile.path = Quickshell.env("ARANEA_TEST_SANDBOX") + "/weather-fixture/weather.json"
+    fixture.configure({
+      geoBody: '{"name":"Amsterdam","latitude":52.37,"longitude":4.9}',
+      geoDelay: 0.3,
+      forecastBody: JSON.stringify(staleReport),
+      forecastDelay: 0.1,
+      dailyBody: JSON.stringify({
+        current: {
+          temperature_2m: 17,
+          weather_code: 2,
+          is_day: 1
+        },
+        daily: {
+          time: [],
+          weather_code: [],
+          temperature_2m_max: [],
+          temperature_2m_min: []
+        }
+      }),
+      airBody: '{"current":{"european_aqi":21,"uv_index":1}}'
+    }, function () {
+      host.opened = true
+      weather.report = staleReport
+      weather.activateEmbedded()
       weather.refresh()
-      t.equal(fixture.state.forecastStarted || 0, 0, "forecast waits for location discovery")
       t.waitFor(function () {
-        return weather.detectedLocationState.name === "Amsterdam" && fixture.state.forecastStarted === 1
-      }, 2000, "city and coordinates drive one forecast", function () {
-        t.equal(weather.locationQuery, "52.37,4.9", "detected coordinates drive the forecast query")
-        t.equal(weather.configuredLocationState, {
-          name: "",
-          latitude: null,
-          longitude: null
-        }, "detected place is ephemeral")
-        var geoCall = fixture.state.calls.filter(function (call) {
-          return call.kind === "geo"
-        })[0]
-        t.check(geoCall.argv.indexOf("--max-time") >= 0 && geoCall.argv[geoCall.argv.indexOf("--max-time") + 1] === "4", "location request has a bounded deadline")
-        t.check(geoCall.argv.indexOf("--max-filesize") >= 0, "location response size is bounded")
-        t.step(250, function () {
-          t.equal(fixture.state.dailyStarted, 1, "wttr completion cannot duplicate the daily request for detected coordinates")
-          t.equal(fixture.state.airStarted, 1, "one air request owns each coordinate refresh")
-          t.equal(weather.sharedWeather.locationQuery, "", "automatic peers share the configured query identity")
-          peer.offerShared(weather.sharedWeather)
-          t.equal(peer.detectedLocationState.name, "Amsterdam", "an unresolved automatic peer adopts detected location")
-          t.equal(peer.forecast, weather.forecast, "automatic peer adopts the owner's forecast")
-          staleForecast = weather.forecast
-          staleDaily = weather.dailyForecastReport
-          t.check(staleForecast !== null && staleDaily !== null, "successful requests establish last-good forecast data")
-          failDetection()
+        return fixture.state.geoStarted === 1
+      }, 1500, "automatic lookup starts", function () {
+        weather.refresh()
+        t.equal(fixture.state.forecastStarted || 0, 0, "forecast waits for location discovery")
+        t.waitFor(function () {
+          return weather.detectedLocationState.name === "Amsterdam" && fixture.state.forecastStarted === 1
+        }, 2000, "city and coordinates drive one forecast", function () {
+          t.equal(weather.locationQuery, "52.37,4.9", "detected coordinates drive the forecast query")
+          t.equal(weather.configuredLocationState, {
+            name: "",
+            latitude: null,
+            longitude: null
+          }, "detected place is ephemeral")
+          var geoCall = fixture.state.calls.filter(function (call) {
+            return call.kind === "geo"
+          })[0]
+          t.check(geoCall.argv.indexOf("--max-time") >= 0 && geoCall.argv[geoCall.argv.indexOf("--max-time") + 1] === "4", "location request has a bounded deadline")
+          t.check(geoCall.argv.indexOf("--max-filesize") >= 0, "location response size is bounded")
+          t.step(250, function () {
+            t.equal(fixture.state.dailyStarted, 1, "wttr completion cannot duplicate the daily request for detected coordinates")
+            t.equal(fixture.state.airStarted, 1, "one air request owns each coordinate refresh")
+            t.equal(weather.sharedWeather.locationQuery, "", "automatic peers share the configured query identity")
+            peer.offerShared(weather.sharedWeather)
+            t.equal(peer.detectedLocationState.name, "Amsterdam", "an unresolved automatic peer adopts detected location")
+            t.equal(peer.forecast, weather.forecast, "automatic peer adopts the owner's forecast")
+            staleForecast = weather.forecast
+            staleDaily = weather.dailyForecastReport
+            t.check(staleForecast !== null && staleDaily !== null, "successful requests establish last-good forecast data")
+            failDetection()
+          })
         })
       })
     })
-  })
+  }
 }

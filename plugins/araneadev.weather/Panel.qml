@@ -281,6 +281,8 @@ Panel {
   readonly property var locationState: Model.effectiveLocation(configuredLocationState, detectedLocationState)
   // The configured query owns cancellation even while detection changes place.
   readonly property string configuredLocationQuery: Model.wttrLocationQuery(configuredLocationState.name, configuredLocationState.latitude, configuredLocationState.longitude)
+  // A saved-location change waits until every canceled process has settled.
+  property bool configuredRefreshPending: false
   // Superseded discovery responses cannot alter the current location.
   property int locationGeneration: 0
   // Whether the bounded automatic lookup is still resolving.
@@ -294,6 +296,7 @@ Panel {
   // place label pulses while the new place saves, so stale data is never
   // presented under the newly configured location label for long.
   onConfiguredLocationQueryChanged: {
+    root.configuredRefreshPending = true
     root.refreshStarting = false
     root.locationGeneration++
     locationProc.running = false
@@ -315,7 +318,7 @@ Panel {
     autoCoords = null
     forecast = null
     air = null
-    Qt.callLater(root.autoRefresh)
+    Qt.callLater(root.resumeConfiguredRefresh)
   }
 
   // Watches weather.json so a hand edit (or omarchy-weather-location run
@@ -452,6 +455,8 @@ Panel {
   property string airKey: ""
   // True while any of this instance's weather requests is running.
   readonly property bool fetchInFlight: locationProc.running || forecastProc.running || dailyForecastProc.running || airProc.running
+  onFetchInFlightChanged: if (!root.fetchInFlight && root.configuredRefreshPending)
+    Qt.callLater(root.resumeConfiguredRefresh)
   // A clock for the location-time readings (rain soon, the trend, the
   // trace): set on open, on new data and each minute while open.
   property real nowMs: Date.now()
@@ -562,6 +567,7 @@ Panel {
     readyTimer.stop()
     forecastRetryTimer.stop()
     dailyForecastRetryTimer.stop()
+    root.configuredRefreshPending = false
     root.refreshStarting = true
     root.fetchClaimMs = Date.now()
     root.refreshCycle++
@@ -581,9 +587,17 @@ Panel {
       return
     if (!forecastProc.running) {
       root.refreshStarting = true
+      forecastProc.requestGeneration = root.locationGeneration
       forecastProc.running = true
     }
     refreshDailyForecast(null)
+  }
+
+  // Resume a saved-location refresh after the final canceled process exits.
+  function resumeConfiguredRefresh() {
+    if (!root.configuredRefreshPending || root.fetchInFlight || root.refreshStarting)
+      return
+    root.autoRefresh()
   }
 
   // An automatic refresh (the timer, an open, a location change): adopts a
@@ -695,6 +709,7 @@ Panel {
     peerWaitTimer.stop()
     if (!bundle || !(bundle.publishedAtMs > root.publishedAtMs))
       return
+    root.configuredRefreshPending = false
     root.report = bundle.report || root.report
     root.dailyForecastReport = bundle.daily || root.dailyForecastReport
     root.forecast = bundle.forecast || root.forecast
@@ -735,10 +750,12 @@ Panel {
     if (key === root.forecastDoneKey)
       return
     root.dailyForecastKey = key
+    dailyForecastProc.requestGeneration = root.locationGeneration
     dailyForecastProc.command = ["curl", "-fsS", "--max-time", "5", WeatherLogic.buildForecastUrl(lat, lon)]
     dailyForecastProc.running = true
     if (key !== root.airKey && !airProc.running) {
       root.airKey = key
+      airProc.requestGeneration = root.locationGeneration
       airProc.command = ["curl", "-fsS", "--max-time", "5", WeatherLogic.buildAirUrl(lat, lon)]
       airProc.running = true
     }
@@ -1054,6 +1071,8 @@ Panel {
 
   Process {
     id: forecastProc
+    // Ignore canceled responses belonging to a superseded saved location.
+    property int requestGeneration: -1
     onRunningChanged: if (running)
       root.refreshStarting = false
     command: ["curl", "-fsS", "--max-time", "10", "https://wttr.in/" + root.locationQuery + "?format=j1"]
@@ -1061,6 +1080,8 @@ Panel {
       id: forecastOut
       waitForEnd: true
       onStreamFinished: {
+        if (forecastProc.requestGeneration !== root.locationGeneration || (root.embedded && !root.sectionActive))
+          return
         var raw = String(forecastOut.text || "").trim()
         if (!raw) {
           root.scheduleForecastRetry()
@@ -1128,10 +1149,14 @@ Panel {
 
   Process {
     id: dailyForecastProc
+    // Ignore canceled responses belonging to a superseded saved location.
+    property int requestGeneration: -1
     stdout: StdioCollector {
       id: dailyForecastOut
       waitForEnd: true
       onStreamFinished: {
+        if (dailyForecastProc.requestGeneration !== root.locationGeneration || (root.embedded && !root.sectionActive))
+          return
         var raw = String(dailyForecastOut.text || "").trim()
         if (!raw) {
           root.scheduleDailyForecastRetry()
@@ -1160,10 +1185,14 @@ Panel {
   // failure hides the chips (no retry; the next refresh asks again).
   Process {
     id: airProc
+    // Ignore canceled responses belonging to a superseded saved location.
+    property int requestGeneration: -1
     stdout: StdioCollector {
       id: airOut
       waitForEnd: true
       onStreamFinished: {
+        if (airProc.requestGeneration !== root.locationGeneration || (root.embedded && !root.sectionActive))
+          return
         root.air = WeatherLogic.parseAir(String(airOut.text || ""))
         // Published either way, so the other instances drop a stale
         // reading when this request failed.
@@ -1213,7 +1242,7 @@ Panel {
     onExited: function (exitCode) {
       if (locationProc.requestGeneration !== root.locationGeneration || !root.autoLocation) {
         // Cancellation may still report running when the configuration changes.
-        Qt.callLater(root.autoRefresh)
+        Qt.callLater(root.resumeConfiguredRefresh)
         return
       }
       if (root.embedded && !root.sectionActive)

@@ -3,6 +3,7 @@
 import fcntl
 import json
 import os
+import signal
 from pathlib import Path
 import sys
 import tempfile
@@ -43,7 +44,7 @@ if name == "weather-fixture":
         options = json.loads(args[1])
         state.update(options)
         if "locationFile" in options:
-            path = Path(os.environ["HOME"]) / ".local/state/omarchy/settings/weather.json"
+            path = root / "weather.json"
             path.parent.mkdir(parents=True, exist_ok=True)
             if options["locationFile"] is None:
                 path.unlink(missing_ok=True)
@@ -60,8 +61,12 @@ elif name == "curl":
     def accept(state):
         state.setdefault("calls", []).append({"kind": kind, "argv": args})
         state[kind + "Started"] = state.get(kind + "Started", 0) + 1
-        return state.get(kind + "Delay", 0), state.get(kind + "Body", ""), state.get(kind + "Exit", 0)
-    delay, response, code = update(accept)
+        return state.get(kind + "Delay", 0), state.get(kind + "Body", ""), state.get(kind + "Exit", 0), state.get("cancelDelays", {}).get(kind, 0)
+    delay, response, code, cancel_delay = update(accept)
+    def canceled(_signal, _frame):
+        time.sleep(cancel_delay)
+        sys.exit(143)
+    signal.signal(signal.SIGTERM, canceled)
     time.sleep(delay)
     print(response, flush=True)
     update(lambda state: state.update({kind + "Finished": state.get(kind + "Finished", 0) + 1}))
