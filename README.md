@@ -10,13 +10,13 @@ workspaces, and application integrations share an obsidian, mint, and violet
 palette.
 
 [![Release](https://img.shields.io/github/v/release/AraneaDev/aranea-desktop?label=release)](https://github.com/AraneaDev/aranea-desktop/releases)
-[![Desktop page](https://img.shields.io/badge/desktop%20page-aranea--development.nl-0b7285)](https://aranea-development.nl/en/desktop)
+[![Desktop page](https://img.shields.io/badge/desktop%20page-aranea.dev-0b7285)](https://aranea.dev/en/desktop)
 [![CI](https://img.shields.io/github/actions/workflow/status/AraneaDev/aranea-desktop/ci.yml?label=CI)](https://github.com/AraneaDev/aranea-desktop/actions/workflows/ci.yml)
 [![Language](https://img.shields.io/github/languages/top/AraneaDev/aranea-desktop)](https://github.com/AraneaDev/aranea-desktop)
 [![Last commit](https://img.shields.io/github/last-commit/AraneaDev/aranea-desktop?label=last%20commit)](https://github.com/AraneaDev/aranea-desktop/commits/master)
 [![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org/)
 
-[Omarchy](https://omarchy.org) · [AraneaDev](https://aranea-development.nl)
+[Omarchy](https://omarchy.org) · [AraneaDev](https://aranea.dev)
 
 </div>
 
